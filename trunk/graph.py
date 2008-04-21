@@ -1,45 +1,65 @@
 #!/usr/bin/env python
 import sys, os.path, compiler
 from compiler.ast import *
+
 stdout = sys.stdout
 stderr = sys.stderr
+debug = 1
 
 PATHS = ['.']
 
 
-##  TypeGraph
+##  Report
 ##
-class TypeGraph:
+class Report:
 
-  nodes = []
+  msgs = {}
+  subspaces = {}
+
+  @classmethod
+  def put(klass, tree, s):
+    if tree not in klass.msgs:
+      klass.msgs[tree] = []
+    klass.msgs[tree].append(s)
+    return
+
+  warn = put
+  info = put
+
+  @classmethod
+  def register(klass, tree, node):
+    klass.subspaces[tree] = node
+    return
   
   @classmethod
-  def add(klass, node):
-    klass.nodes.append(node)
+  def show(klass, tree, fp=sys.stdout, level=0):
+    if tree in klass.subspaces:
+      klass.subspaces[tree].finish()
+      level += 1
+    if tree in klass.msgs:
+      lineno = tree.lineno
+      indent = ' '*level
+      for msg in klass.msgs[tree]:
+        fp.write(indent+'%s: %s\n' % (lineno, msg))
+    for node in tree.getChildNodes():
+      klass.show(node, fp, level)
     return
-
-  @classmethod
-  def finish(klass):
-    for node in klass.nodes:
-      node.finish()
-    return
-
+  
 
 ##  TypeNode
 ##
 class TypeNode:
-  
-  def __init__(self, space=None, *types):
-    self.space = space
+
+  def __init__(self, *types):
     self.types = set(types)
     self.sendto = set()
-    TypeGraph.add(self)
     return
 
   def connect(self, node):
     assert isinstance(node, CompoundTypeNode), node
     if node in self.sendto: return
-    #print 'connect: %r -> %r' % (self,node)
+    if debug:
+      print >>stderr, 'connect: %r -> %r' % (self,node)
     self.sendto.add(node)
     node.recv(self)
     return
@@ -56,18 +76,16 @@ class TypeNode:
   
   def describe(self):
     return self.desc1(set())
-
-  def finish(self):
-    return
+  def desc1(self, _):
+    raise NotImplementedError
 
 
 ##  SimpleTypeNode
 ##
 class SimpleTypeNode(TypeNode):
 
-  def __init__(self, space, typeobj):
-    self.typeobj = typeobj
-    TypeNode.__init__(self, space, self)
+  def __init__(self):
+    TypeNode.__init__(self, self)
     return
 
   def __repr__(self):
@@ -104,18 +122,19 @@ class CompoundTypeNode(TypeNode):
 ##
 class PrimitiveType(SimpleTypeNode):
   
-  def __init__(self, space, tree, typeobj):
-    SimpleTypeNode.__init__(self, space, typeobj.__name__)
+  def __init__(self, tree, typeobj):
+    self.typename = type(typeobj).__name__
+    SimpleTypeNode.__init__(self)
     self.tree = tree
     return
 
   def __repr__(self):
-    return '<%s>' % self.typeobj
+    return '<%s>' % self.typename
 
   def __eq__(self, obj):
-    return isinstance(obj, PrimitiveType) and self.typeobj == obj.typeobj
+    return isinstance(obj, PrimitiveType) and self.typename == obj.typename
   def __hash__(self):
-    return hash(self.typeobj)
+    return hash(self.typename)
 
 
 ##  Variable
@@ -123,8 +142,9 @@ class PrimitiveType(SimpleTypeNode):
 class Variable(CompoundTypeNode):
 
   def __init__(self, space, name):
-    CompoundTypeNode.__init__(self, space)
+    self.space = space
     self.name = name
+    CompoundTypeNode.__init__(self)
     return
   
   def __repr__(self):
@@ -170,9 +190,6 @@ class Namespace:
   def to_attrs(self):
     return self.vars.iteritems()
 
-  def get_var0(self, name):
-    return self.vars[name]
-
   def get_var(self, name):
     while self:
       if name in self.vars:
@@ -180,21 +197,17 @@ class Namespace:
       self = self.parent
     raise KeyError(name)
 
-  def get_subspace(self, name):
-    while self:
-      if name in self.subspaces:
-        return self.subspaces[name]
-      self = self.parent
-    raise KeyError(name)
+  def get_subspace(self, tree):
+    return self.subspaces[tree]
 
   def register_var(self, name):
     if name not in self.vars:
       self.vars[name] = Variable(self, name)
     return
   
-  def register_subspace(self, name, subspace):
-    if name not in self.subspaces:
-      self.subspaces[name] = subspace
+  def register_subspace(self, tree, subspace):
+    if tree not in self.subspaces:
+      self.subspaces[tree] = subspace
     return
   
   # register_names
@@ -205,13 +218,13 @@ class Namespace:
       for name in tree.argnames:
         space1.register_var(name)
       self.register_var(tree.name)
-      self.register_subspace(tree.name, space1)
+      self.register_subspace(tree, space1)
 
     # class
     elif isinstance(tree, Class):
       space1 = Namespace(self, tree.name, tree.code)
       self.register_var(tree.name)
-      self.register_subspace(tree.name, space1)
+      self.register_subspace(tree, space1)
 
     # assign
     elif isinstance(tree, Assign):
@@ -300,9 +313,10 @@ class Namespace:
     elif isinstance(tree, Continue):
       pass
     elif isinstance(tree, Raise):
-      pass
+      self.register_names(tree.expr1)
+      self.register_names(tree.expr2)
     elif isinstance(tree, Assert):
-      pass
+      self.register_names(tree.test)
     elif isinstance(tree, Printnl):
       for node in tree.nodes:
         self.register_names(node)
@@ -359,8 +373,7 @@ class Namespace:
       space1 = Namespace(self, tmpname, tree.code)
       for name in tree.argnames:
         space1.register_var(name)
-      self.register_var(tmpname)
-      self.register_subspace(tmpname, space1)
+      self.register_subspace(tree, space1)
 
     else:
       raise SyntaxError(tree)
@@ -373,29 +386,6 @@ class Namespace:
       self.subspaces[k] = v
     return
 
-  def flush(self, fp=sys.stdout, level=0):
-    indent = (' '*level)
-    level += 2
-    fp.write(indent+'[%s]\n' % self.name)
-    for (_,subspace) in sorted(self.subspaces.iteritems()):
-      if subspace:
-        subspace.flush(fp, level)
-    indent = (' '*level)
-    for (tree,msg) in self.msgs:
-      if tree:
-        lineno = 'L%s' % tree.lineno
-      else:
-        lineno = '???'
-      fp.write(indent+'%s: %s\n' % (lineno, msg))
-    for (name,var) in sorted(self.vars.iteritems()):
-      fp.write(indent+'%s = %s\n' % (name, var.describe()))
-    fp.write('\n')
-    return
-
-  def put(self, tree, s):
-    self.msgs.append((tree, s))
-    return
-  
 
 ##  GlobalNamespace
 ##
@@ -405,7 +395,7 @@ class GlobalNamespace(Namespace):
     self.register_var('True')
     self.register_var('False')
     self.register_var('None')
-    self['None'].bind(PrimitiveType(self, None, type(None)))
+    self['None'].bind(PrimitiveType(None, None))
     return
 
 GLOBAL_NAMESPACE = GlobalNamespace()
@@ -416,8 +406,9 @@ GLOBAL_NAMESPACE = GlobalNamespace()
 class ModuleType(SimpleTypeNode):
   
   def __init__(self, name, space, code):
-    SimpleTypeNode.__init__(self, space, self)
-    self.name = space.name
+    SimpleTypeNode.__init__(self)
+    self.space = space
+    self.name = name
     self.code = code
     return
   
@@ -473,7 +464,7 @@ def load_module(modname, asname=None):
 def build_expr(space, tree):
 
   if isinstance(tree, Const):
-    expr = PrimitiveType(space, tree, type(tree.value))
+    expr = PrimitiveType(tree, tree.value)
 
   elif isinstance(tree, Name):
     expr = space[tree.name]
@@ -481,24 +472,24 @@ def build_expr(space, tree):
   elif isinstance(tree, CallFunc):
     func = build_expr(space, tree.node)
     args = tuple( build_expr(space, arg1) for arg1 in tree.args )
-    expr = FunCall(space, tree, func, args)
+    expr = FunCall(tree, func, args)
 
   elif isinstance(tree, Getattr):
     obj = build_expr(space, tree.expr)
-    expr = AttrRef(space, tree, obj, tree.attrname)
+    expr = AttrRef(tree, obj, tree.attrname)
 
   elif isinstance(tree, Subscript):
     obj = build_expr(space, tree.expr)
     subs = [ build_expr(space, sub) for sub in tree.subs ]
-    expr = SubRef(space, tree, obj, subs)
+    expr = SubRef(tree, obj, subs)
 
   elif isinstance(tree, Tuple):
     elements = [ build_expr(space, node) for node in tree.nodes ]
-    expr = TupleType(space, tree, elements)
+    expr = TupleType(tree, elements)
 
   elif isinstance(tree, List):
     elements = [ build_expr(space, node) for node in tree.nodes ]
-    expr = ListType(space, tree, elements)
+    expr = ListType(tree, elements)
 
   # +, -, *, /, %, //, <<, >>, **, &, |, ^
   elif (isinstance(tree, Add) or isinstance(tree, Sub) or
@@ -510,13 +501,13 @@ def build_expr(space, tree):
     op = tree.__class__.__name__
     left = build_expr(space, tree.left)
     right = build_expr(space, tree.right)
-    expr = BinaryOp(space, tree, op, left, right)
+    expr = BinaryOp(tree, op, left, right)
 
   # ==, !=, <=, >=, <, >
   elif isinstance(tree, Compare):
     expr0 = build_expr(space, tree.expr)
     comps = [ (op, build_expr(space, node)) for (op,node) in tree.ops ]
-    expr = CompareOp(space, tree, expr0, comps)
+    expr = CompareOp(tree, expr0, comps)
 
   # +,-
   elif isinstance(tree, UnaryAdd) or isinstance(tree, UnarySub):
@@ -526,18 +517,18 @@ def build_expr(space, tree):
   # and, or
   elif (isinstance(tree, And) or isinstance(tree, Or)):
     nodes = [ build_expr(space, node) for node in tree.nodes ]
-    expr = BooleanOp(space, tree, tree.__class__.__name__, nodes)
+    expr = BooleanOp(tree, tree.__class__.__name__, nodes)
 
   # not
   elif isinstance(tree, Not):
     value = build_expr(space, tree.expr)
-    expr = NotOp(space, tree, value)
+    expr = NotOp(tree, value)
 
   # lambda
   elif isinstance(tree, Lambda):
     tmpname = '__lambda%x' % id(tree)
-    subspace = space.get_subspace(tmpname)
-    expr = FuncType(subspace, tree, tree.argnames, tree.code, lambdaexp=True)
+    subspace = space.get_subspace(tree)
+    expr = FuncType(tree, tmpname, subspace, tree.argnames, tree.code, lambdaexp=True)
 
   else:
     raise SyntaxError(tree)
@@ -553,19 +544,18 @@ def build_stmt(space, tree, evals, isfuncdef=False):
     if isinstance(n, AssName):
       space[n.name].bind(v)
     elif isinstance(n, AssTuple):
-      tup = TupleUnpack(v, len(n.nodes))
-      for (i,c) in enumerate(n.nodes):
-        space[n.name].bind(tup.get_ref(i))
+      vars = [ space[c.name] for c in n.nodes ]
+      TupleUnpack(n, v, vars)
     elif isinstance(n, AssAttr):
       obj = build_expr(space, n.expr)
-      evals.append((False, obj))
-      AttrAssign(space, n, obj, n.attrname, v)
+      evals.append((0, obj))
+      AttrAssign(n, obj, n.attrname, v)
     elif isinstance(n, Subscript):
       obj = build_expr(space, n.expr)
-      evals.append((False, obj))
+      evals.append((0, obj))
       subs = [ build_expr(space, expr) for expr in n.subs ]
       evals.extend( (False, sub) for sub in subs )
-      SubAssign(space, n, obj, subs, v)
+      SubAssign(n, obj, subs, v)
     else:
       raise TypeError(n)
     return
@@ -573,27 +563,27 @@ def build_stmt(space, tree, evals, isfuncdef=False):
   # def
   if isinstance(tree, Function):
     name = tree.name
-    subspace = space.get_subspace(name)
-    space[name].bind(FuncType(subspace, tree, tree.argnames, tree.code))
+    subspace = space.get_subspace(tree)
+    space[name].bind(FuncType(tree, name, subspace, tree.argnames, tree.code))
 
   # class
   elif isinstance(tree, Class):
     name = tree.name
-    subspace = space.get_subspace(name)
+    subspace = space.get_subspace(tree)
     bases = [ build_expr(space, base) for base in tree.bases ]
-    space[name].bind(ClassType(subspace, tree, bases, tree.code, evals))
+    space[name].bind(ClassType(tree, name, subspace, bases, tree.code, evals))
 
   # assign
   elif isinstance(tree, Assign):
     for n in tree.nodes:
       value = build_expr(space, tree.expr)
-      evals.append((False, value))
+      evals.append((0, value))
       assign(n, value)
 
   # return
   elif isinstance(tree, Return):
     value = build_expr(space, tree.value)
-    evals.append((True, value))
+    evals.append((1, value))
 
   # (mutliple statements)
   elif isinstance(tree, Stmt):
@@ -603,14 +593,14 @@ def build_stmt(space, tree, evals, isfuncdef=False):
     if isfuncdef:
       # if the last statement is not a Return
       if not isinstance(stmt, Return):
-        value = PrimitiveType(space, None, type(None))
-        evals.append((True, value))
+        value = PrimitiveType(None, None)
+        evals.append((1, value))
 
   # if, elif, else
   elif isinstance(tree, If):
     for (expr,stmt) in tree.tests:
       value = build_expr(space, expr)
-      evals.append((False, value))
+      evals.append((0, value))
       build_stmt(space, stmt, evals)
     if tree.else_:
       build_stmt(space, tree.else_, evals)
@@ -618,8 +608,8 @@ def build_stmt(space, tree, evals, isfuncdef=False):
   # for
   elif isinstance(tree, For):
     seq = build_expr(space, tree.list)
-    evals.append((False, seq))
-    assign(tree.assign, TypeSet([IterRef(seq)]))
+    evals.append((0, seq))
+    assign(tree.assign, IterRef(seq))
     build_stmt(space, tree.body, evals)
     if tree.else_:
       build_stmt(space, tree.else_, evals)
@@ -627,7 +617,7 @@ def build_stmt(space, tree, evals, isfuncdef=False):
   # while
   elif isinstance(tree, While):
     value = build_expr(space, tree.test)
-    evals.append((False, value))
+    evals.append((0, value))
     build_stmt(space, tree.body, evals)
     if tree.else_:
       build_stmt(space, tree.else_, evals)
@@ -637,8 +627,8 @@ def build_stmt(space, tree, evals, isfuncdef=False):
     build_stmt(space, tree.body, evals)
     #XXX exceptions.update(__)
     for (exc,e,stmt) in tree.handlers:
-      value = build_expr(space, exc, evals)
-      evals.append((False, value))
+      value = build_expr(space, exc)
+      evals.append((0, value))
       assign(e, value)
       build_stmt(space, stmt, evals)
     if tree.else_:
@@ -651,19 +641,19 @@ def build_stmt(space, tree, evals, isfuncdef=False):
 
   # yield
   elif isinstance(tree, Yield):
-    value = build_expr(space, tree.value, evals)
-    evals.append((False, value)) # XXX
+    value = build_expr(space, tree.value)
+    evals.append((2, value)) # XXX
 
   # printnl
   elif isinstance(tree, Printnl):
     for node in tree.nodes:
       value = build_expr(space, node)
-      evals.append((False, value))
+      evals.append((0, value))
 
   # discard
   elif isinstance(tree, Discard):
     value = build_expr(space, tree.expr)
-    evals.append((False, value))
+    evals.append((0, value))
 
   # pass
   elif isinstance(tree, Pass):
@@ -681,9 +671,9 @@ def build_stmt(space, tree, evals, isfuncdef=False):
   elif isinstance(tree, AssTuple):
     pass
   elif isinstance(tree, AssAttr):
-    evals.append((False, build_expr(space, tree.expr)))
+    evals.append((0, build_expr(space, tree.expr)))
   elif isinstance(tree, Subscript):
-    evals.append((False, build_expr(space, tree.expr)))
+    evals.append((0, build_expr(space, tree.expr)))
 
   else:
     raise SyntaxError(tree)
@@ -695,8 +685,8 @@ def build_stmt(space, tree, evals, isfuncdef=False):
 ##
 class FuncBodyType(CompoundTypeNode):
 
-  def __init__(self, space, name, evals):
-    CompoundTypeNode.__init__(self, space)
+  def __init__(self, name, evals):
+    CompoundTypeNode.__init__(self)
     self.name = name
     self.retvals = []
     for (is_retval,obj) in evals:
@@ -718,18 +708,20 @@ class FuncBodyType(CompoundTypeNode):
 ##
 class FuncType(SimpleTypeNode):
   
-  def __init__(self, space, tree, argnames, code, lambdaexp=False):
-    SimpleTypeNode.__init__(self, space, self)
-    self.name = space.name
+  def __init__(self, tree, name, space, argnames, code, lambdaexp=False):
+    SimpleTypeNode.__init__(self)
+    Report.register(tree, self)
     self.tree = tree
+    self.space = space
+    self.name = name
     self.argnames = argnames
     self.args = tuple( space[argname] for argname in argnames )
     evals = []
     if lambdaexp:
-      evals.append((True, build_expr(space, code)))
+      evals.append((1, build_expr(space, code)))
     else:
       build_stmt(space, code, evals, isfuncdef=True)
-    self.body = FuncBodyType(space, self.name, evals)
+    self.body = FuncBodyType(self.name, evals)
     return
 
   def __repr__(self):
@@ -744,8 +736,8 @@ class FuncType(SimpleTypeNode):
     return self.body
 
   def finish(self):
-    self.space.put(self.tree, 'def: args=[%s], body=%s' %
-                   (','.join(self.argnames), self.body))
+    Report.info(self.tree, 'def: args=[%s], body=%s' %
+                (','.join(self.argnames), self.body))
     return
 
 
@@ -754,6 +746,7 @@ class FuncType(SimpleTypeNode):
 class BoundFuncType(SimpleTypeNode):
   
   def __init__(self, arg0, func):
+    SimpleTypeNode.__init__(self)
     self.arg0 = arg0
     self.func = func
     if len(func.args) < 1:
@@ -775,8 +768,8 @@ class BoundFuncType(SimpleTypeNode):
 ##
 class FunCall(CompoundTypeNode):
   
-  def __init__(self, space, tree, func, args):
-    CompoundTypeNode.__init__(self, space)
+  def __init__(self, tree, func, args):
+    CompoundTypeNode.__init__(self)
     self.tree = tree
     self.func = func
     self.args = args
@@ -794,7 +787,7 @@ class FunCall(CompoundTypeNode):
         try:
           proc = func.get_proc()
         except TypeError:
-          self.space.put(self.tree, 'cannot call: %r might be %r' % (self.func, func))
+          Report.warn(self.tree, 'cannot call: %r might be %r' % (self.func, func))
           continue
         func.bind_args(self.args)
         proc.connect(self)
@@ -807,8 +800,8 @@ class FunCall(CompoundTypeNode):
 ##
 class BinaryOp(CompoundTypeNode):
   
-  def __init__(self, space, tree, op, left, right):
-    CompoundTypeNode.__init__(self, space)
+  def __init__(self, tree, op, left, right):
+    CompoundTypeNode.__init__(self)
     self.tree = tree
     self.op = op
     self.left = left
@@ -830,8 +823,8 @@ class BinaryOp(CompoundTypeNode):
 ##
 class CompareOp(CompoundTypeNode):
   
-  def __init__(self, space, tree, expr0, comps):
-    CompoundTypeNode.__init__(self, space, PrimitiveType(space, None, bool))
+  def __init__(self, tree, expr0, comps):
+    CompoundTypeNode.__init__(self, PrimitiveType(None, False))
     self.tree = tree
     self.expr0 = expr0
     self.comps = comps
@@ -851,8 +844,8 @@ class CompareOp(CompoundTypeNode):
 ##
 class BooleanOp(CompoundTypeNode):
   
-  def __init__(self, space, tree, op, nodes):
-    CompoundTypeNode.__init__(self, space, PrimitiveType(space, None, bool))
+  def __init__(self, tree, op, nodes):
+    CompoundTypeNode.__init__(self, PrimitiveType(None, False))
     self.tree = tree
     self.op = op
     self.nodes = nodes
@@ -872,8 +865,8 @@ class BooleanOp(CompoundTypeNode):
 ##
 class ListType(SimpleTypeNode):
   
-  def __init__(self, space, tree, elements):
-    SimpleTypeNode.__init__(self, space, self)
+  def __init__(self, tree, elements):
+    SimpleTypeNode.__init__(self)
     self.tree = tree
     self.elem = ListElement(self, elements)
     return
@@ -909,8 +902,8 @@ class ListElement(CompoundTypeNode):
 ##
 class TupleType(SimpleTypeNode):
   
-  def __init__(self, space, tree, elements):
-    SimpleTypeNode.__init__(self, space, self)
+  def __init__(self, tree, elements):
+    SimpleTypeNode.__init__(self)
     self.tree = tree
     self.elements = elements
     self.elemall = TupleElement(self, elements)
@@ -921,6 +914,9 @@ class TupleType(SimpleTypeNode):
 
   def desc1(self, done):
     return '(%s)' % ','.join( elem.desc1(done) for elem in self.elements )
+
+  def get_nth(self, i):
+    return self.elements[i]
 
   def get_element(self, write=False):
     if write:
@@ -944,13 +940,37 @@ class TupleElement(CompoundTypeNode):
     self.update(src.types)
     return
   
+class TupleUnpack(CompoundTypeNode):
+
+  def __init__(self, tree, refobj, vars):
+    CompoundTypeNode.__init__(self)
+    self.tree = tree
+    self.refobj = refobj
+    self.vars = vars
+    self.refobj.connect(self)
+    return
+
+  def recv(self, src):
+    assert src is self.refobj
+    for obj in src.types:
+      if isinstance(obj, TupleType):
+        if len(obj.elements) != len(self.vars):
+          Report.warn(self.tree, 'tuple elements mismatch: len(%r) != %r' %
+                      (obj, len(self.vars)))
+        else:
+          for (i,elem) in enumerate(obj.elements):
+            self.vars[i].bind(elem)
+      else:
+        pass
+    return
+
 
 ##  SubRef
 ##
 class SubRef(CompoundTypeNode):
   
-  def __init__(self, space, tree, refobj, subs):
-    CompoundTypeNode.__init__(self, space)
+  def __init__(self, tree, refobj, subs):
+    CompoundTypeNode.__init__(self)
     self.tree = tree
     self.refobj = refobj
     self.objs = set()
@@ -975,8 +995,8 @@ class SubRef(CompoundTypeNode):
 ##
 class SubAssign(CompoundTypeNode):
   
-  def __init__(self, space, tree, refobj, subs, value):
-    CompoundTypeNode.__init__(self, space)
+  def __init__(self, tree, refobj, subs, value):
+    CompoundTypeNode.__init__(self)
     self.tree = tree
     self.refobj = refobj
     self.objs = set()
@@ -1000,10 +1020,12 @@ class SubAssign(CompoundTypeNode):
 ##
 class ClassType(SimpleTypeNode):
   
-  def __init__(self, space, tree, bases, code, evals):
-    SimpleTypeNode.__init__(self, space, self)
-    self.name = space.name
+  def __init__(self, tree, name, space, bases, code, evals):
+    SimpleTypeNode.__init__(self)
+    Report.register(tree, self)
     self.tree = tree
+    self.name = name
+    self.space = space
     self.bases = bases
     self.attrs = {}
     for (name, value) in space.to_attrs():
@@ -1034,9 +1056,9 @@ class ClassType(SimpleTypeNode):
 
   def finish(self):
     for (_, attr) in sorted(self.attrs.iteritems()):
-      self.space.put(None, 'class.%s = %s' % (attr.name, attr.describe()))
+      Report.info(self.tree, 'class.%s = %s' % (attr.name, attr.describe()))
     for (_, attr) in sorted(self.instance.attrs.iteritems()):
-      self.space.put(None, 'instance.%s = %s' % (attr.name, attr.describe()))
+      Report.info(self.tree, 'instance.%s = %s' % (attr.name, attr.describe()))
     return
 
 
@@ -1063,11 +1085,10 @@ class ClassAttr(CompoundTypeNode):
 class InitMethodBody(CompoundTypeNode):
   
   def __init__(self, instance):
-    CompoundTypeNode.__init__(self, None, instance)
+    CompoundTypeNode.__init__(self, instance)
+    self.funcs = set()
     try:
       self.initfunc = instance.get_attr('__init__')
-      self.funcs = set()
-      self.args = ()
       self.initfunc.connect(self)
     except KeyError:
       self.initfunc = None
@@ -1088,7 +1109,7 @@ class InitMethodBody(CompoundTypeNode):
         try:
           proc = func.get_proc()
         except TypeError:
-          self.space.put(self.tree, 'cannot call: %r might be %r' % (self.func, func))
+          Report.warn(self.tree, 'cannot call: %r might be %r' % (self.func, func))
           continue
         proc.connect(self)
     else:
@@ -1102,7 +1123,7 @@ class InitMethodBody(CompoundTypeNode):
 class InstanceType(SimpleTypeNode):
   
   def __init__(self, klass, attrs):
-    SimpleTypeNode.__init__(self, None, self)
+    SimpleTypeNode.__init__(self)
     self.klass = klass
     self.attrs = {}
     for (name, value) in attrs:
@@ -1147,7 +1168,7 @@ class InstanceAttr(CompoundTypeNode):
           #elif isinstance(obj, ClassMethodType):
           #elif isinstance(obj, StaticMethodType):
         except TypeError:
-          self.space.put(obj.tree, 'cannot call: %r no arg0' % (obj))
+          Report.warn(obj.tree, 'cannot call: %r no arg0' % (obj))
           continue
       types.add(obj)
     self.update(types)
@@ -1158,8 +1179,8 @@ class InstanceAttr(CompoundTypeNode):
 ##
 class AttrRef(CompoundTypeNode):
   
-  def __init__(self, space, tree, refobj, attrname):
-    CompoundTypeNode.__init__(self, space)
+  def __init__(self, tree, refobj, attrname):
+    CompoundTypeNode.__init__(self)
     self.tree = tree
     self.refobj = refobj
     self.attrname = attrname
@@ -1177,7 +1198,7 @@ class AttrRef(CompoundTypeNode):
         try:
           obj.get_attr(self.attrname).connect(self)
         except KeyError:
-          self.space.put(self.tree, 'attribute not found: %r.%s' % (obj, self.attrname))
+          Report.warn(self.tree, 'attribute not found: %r.%s' % (obj, self.attrname))
     else:
       self.update(src.types)
     return
@@ -1187,8 +1208,8 @@ class AttrRef(CompoundTypeNode):
 ##
 class AttrAssign(CompoundTypeNode):
   
-  def __init__(self, space, tree, refobj, attrname, value):
-    CompoundTypeNode.__init__(self, space)
+  def __init__(self, tree, refobj, attrname, value):
+    CompoundTypeNode.__init__(self)
     self.tree = tree
     self.refobj = refobj
     self.objs = set()
@@ -1209,24 +1230,21 @@ class AttrAssign(CompoundTypeNode):
     return
 
 
-
+##  MainFuncType
+##
 class MainFuncType(FuncType):
   
   def __init__(self, space, code):
-    FuncType.__init__(self, space, None, (), code)
-    FunCall(space, None, self, ())
+    FuncType.__init__(self, None, None, space, (), code)
+    FunCall(None, self, ())
     return
   
-  def finish(self):
-    return
-
 
 def main(argv):
   name = argv[1]
   module = load_module(name, '__main__')
   MainFuncType(module.space, module.code)
-  TypeGraph.finish()
-  module.space.flush()
+  Report.show(module.code)
   return 0
 
 if __name__ == '__main__': sys.exit(main(sys.argv))
