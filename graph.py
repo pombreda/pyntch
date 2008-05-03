@@ -1,48 +1,70 @@
 #!/usr/bin/env python
 import sys, os.path, compiler
 from compiler.ast import *
-
 stdout = sys.stdout
 stderr = sys.stderr
-debug = 1
+debug = 0
 
-PATHS = ['.']
+# TODO:
+#  base classes
+#  keyword args
+#  +=
+#  sys, str method...
+#  generators, iterators
+#  list comprehension.
+#  @classmethod, @staticmethod
+#  __add__ etc.
 
 
-##  Report
+##  Reporter
 ##
-class Report:
+class Reporter:
 
-  msgs = {}
-  subspaces = {}
+  space = {}
+  indlevel = 2
 
   @classmethod
-  def put(klass, tree, s):
-    if tree not in klass.msgs:
-      klass.msgs[tree] = []
-    klass.msgs[tree].append(s)
+  def put(klass, tree, t, s):
+    while tree:
+      if tree in klass.space:
+        (_,msgs) = klass.space[tree]
+        msgs.append((t,s))
+        break
+      tree = tree.parent
     return
 
-  warn = put
-  info = put
-
   @classmethod
-  def register(klass, tree, node):
-    klass.subspaces[tree] = node
+  def error(klass, tree, s):
+    klass.put(tree, 'error', 'L%d: %s' % (tree.lineno, s))
+    return
+  @classmethod
+  def warn(klass, tree, s):
+    klass.put(tree, 'warn', 'L%d: %s' % (tree.lineno, s))
+    return
+  @classmethod
+  def info(klass, tree, s):
+    klass.put(tree, 'info', s)
+    return
+  
+  @classmethod
+  def register_space(klass, tree, node):
+    klass.put(tree, 'child', tree)
+    klass.space[tree] = (node, [])
     return
   
   @classmethod
   def show(klass, tree, fp=sys.stdout, level=0):
-    if tree in klass.subspaces:
-      klass.subspaces[tree].finish()
-      level += 1
-    if tree in klass.msgs:
-      lineno = tree.lineno
-      indent = ' '*level
-      for msg in klass.msgs[tree]:
-        fp.write(indent+'%s: %s\n' % (lineno, msg))
-    for node in tree.getChildNodes():
-      klass.show(node, fp, level)
+    def indent(n): return ' '*(n*klass.indlevel)
+    (node,msgs) = klass.space[tree]
+    s = node.finish()
+    fp.write('%s%s\n' % (indent(level), s))
+    level += 1
+    for (t,x) in msgs:
+      if t == 'child':
+        klass.show(x, fp=fp, level=level)
+      else:
+        fp.write('%s%s\n' % (indent(level), x))
+    fp.write('\n')
     return
   
 
@@ -117,6 +139,11 @@ class CompoundTypeNode(TypeNode):
         node.recv(self)
     return
 
+class UndefinedTypeNode(TypeNode):
+  def describe(self):
+    return 'undef'
+  def recv(self, src):
+    return
 
 ##  PrimitiveType
 ##
@@ -187,7 +214,7 @@ class Namespace:
   def __getitem__(self, name):
     return self.get_var(name)
 
-  def to_attrs(self):
+  def __iter__(self):
     return self.vars.iteritems()
 
   def get_var(self, name):
@@ -202,8 +229,11 @@ class Namespace:
 
   def register_var(self, name):
     if name not in self.vars:
-      self.vars[name] = Variable(self, name)
-    return
+      var = Variable(self, name)
+      self.vars[name] = var
+    else:
+      var = self.vars[name]
+    return var
   
   def register_subspace(self, tree, subspace):
     if tree not in self.subspaces:
@@ -314,7 +344,8 @@ class Namespace:
       pass
     elif isinstance(tree, Raise):
       self.register_names(tree.expr1)
-      self.register_names(tree.expr2)
+      if tree.expr2:
+        self.register_names(tree.expr2)
     elif isinstance(tree, Assert):
       self.register_names(tree.test)
     elif isinstance(tree, Printnl):
@@ -369,7 +400,7 @@ class Namespace:
       self.register_names(tree.expr)
     # lambda
     elif isinstance(tree, Lambda):
-      tmpname = '__lambda%x' % id(tree)
+      tmpname = '__lambda_%x' % id(tree)
       space1 = Namespace(self, tmpname, tree.code)
       for name in tree.argnames:
         space1.register_var(name)
@@ -401,21 +432,6 @@ class GlobalNamespace(Namespace):
 GLOBAL_NAMESPACE = GlobalNamespace()
 
 
-##  ModuleType
-##
-class ModuleType(SimpleTypeNode):
-  
-  def __init__(self, name, space, code):
-    SimpleTypeNode.__init__(self)
-    self.space = space
-    self.name = name
-    self.code = code
-    return
-  
-  def __repr__(self):
-    return '<Module %s>' % self.name
-
-
 ##  BuiltinNamespace
 ##
 class BuiltinNamespace(Namespace):
@@ -423,41 +439,6 @@ class BuiltinNamespace(Namespace):
   def __init__(self, name):
     Namespace.__init__(self, GLOBAL_NAMESPACE, name)
     return
-
-class BuiltinModuleType(ModuleType):
-  def __init__(self, name):
-    ModuleType.__init__(self, name, BuiltinNamespace(name), None)
-    return
-
-BUILTIN_MODULE = {
-  'sys': BuiltinModuleType('sys'),
-}
-
-# find_module
-def find_module(name):
-  fname = name+'.py'
-  for dirname in PATHS:
-    path = os.path.join(dirname, name)
-    if os.path.exists(path):
-      return path
-    path = os.path.join(dirname, fname)
-    if os.path.exists(path):
-      return path
-  raise ImportError(name)
-
-# load_module
-def load_module(modname, asname=None):
-  if modname in BUILTIN_MODULE:
-    return BUILTIN_MODULE[modname]
-  path = find_module(modname)
-  name = asname or modname
-  module = compiler.parseFile(path)
-  space1 = Namespace(GLOBAL_NAMESPACE, name, module.node)
-  space1.register_var('__name__')
-  module = ModuleType(name, space1, module.node)
-  return module
-
-
 
 
 # build_expr
@@ -467,7 +448,11 @@ def build_expr(space, tree):
     expr = PrimitiveType(tree, tree.value)
 
   elif isinstance(tree, Name):
-    expr = space[tree.name]
+    try:
+      expr = space[tree.name]
+    except KeyError:
+      Reporter.error(tree, 'undefined variable: %r' % tree.name)
+      expr = UndefinedTypeNode()
 
   elif isinstance(tree, CallFunc):
     func = build_expr(space, tree.node)
@@ -526,7 +511,7 @@ def build_expr(space, tree):
 
   # lambda
   elif isinstance(tree, Lambda):
-    tmpname = '__lambda%x' % id(tree)
+    tmpname = '__lambda_%x' % id(tree)
     subspace = space.get_subspace(tree)
     expr = FuncType(tree, tmpname, subspace, tree.argnames, tree.code, lambdaexp=True)
 
@@ -564,14 +549,16 @@ def build_stmt(space, tree, evals, isfuncdef=False):
   if isinstance(tree, Function):
     name = tree.name
     subspace = space.get_subspace(tree)
-    space[name].bind(FuncType(tree, name, subspace, tree.argnames, tree.code))
+    func = FuncType(tree, name, subspace, tree.argnames, tree.code)
+    space[name].bind(func)
 
   # class
   elif isinstance(tree, Class):
     name = tree.name
     subspace = space.get_subspace(tree)
     bases = [ build_expr(space, base) for base in tree.bases ]
-    space[name].bind(ClassType(tree, name, subspace, bases, tree.code, evals))
+    klass = ClassType(tree, name, subspace, bases, tree.code, evals)
+    space[name].bind(klass)
 
   # assign
   elif isinstance(tree, Assign):
@@ -710,20 +697,21 @@ class FuncType(SimpleTypeNode):
   
   def __init__(self, tree, name, space, argnames, code, lambdaexp=False):
     SimpleTypeNode.__init__(self)
-    Report.register(tree, self)
     self.tree = tree
     self.space = space
     self.name = name
     self.argnames = argnames
     self.args = tuple( space[argname] for argname in argnames )
+    self.code = code
+    Reporter.register_space(tree, self)
     evals = []
-    if lambdaexp:
-      evals.append((1, build_expr(space, code)))
-    else:
-      build_stmt(space, code, evals, isfuncdef=True)
+    if self.code:
+      if lambdaexp:
+        evals.append((1, build_expr(space, code)))
+      else:
+        build_stmt(space, code, evals, isfuncdef=True)
     self.body = FuncBodyType(self.name, evals)
     return
-
   def __repr__(self):
     return ('<Function %s>' % (self.name,))
 
@@ -736,14 +724,15 @@ class FuncType(SimpleTypeNode):
     return self.body
 
   def finish(self):
-    Report.info(self.tree, 'def: args=[%s], body=%s' %
-                (','.join(self.argnames), self.body))
-    return
+    for (k,v) in sorted(self.space):
+      Reporter.info(self.tree, '%s = %s' % (k, v.describe()))
+    Reporter.info(self.tree, 'return: %s' % self.body.describe())
+    return 'def %s(%s):' % (self.name, ', '.join(self.argnames))
 
 
-##  BoundFuncType
+##  BoundMethodType
 ##
-class BoundFuncType(SimpleTypeNode):
+class BoundMethodType(SimpleTypeNode):
   
   def __init__(self, arg0, func):
     SimpleTypeNode.__init__(self)
@@ -754,7 +743,7 @@ class BoundFuncType(SimpleTypeNode):
     return
   
   def __repr__(self):
-    return '<BoundFuncType %r(%s=%r)>' % (self.func, self.func.argnames[0], self.arg0)
+    return '<Bound %r(%s=%r)>' % (self.func, self.func.argnames[0], self.arg0)
   
   def bind_args(self, args):
     self.func.bind_args((self.arg0,)+args)
@@ -787,7 +776,7 @@ class FunCall(CompoundTypeNode):
         try:
           proc = func.get_proc()
         except TypeError:
-          Report.warn(self.tree, 'cannot call: %r might be %r' % (self.func, func))
+          Reporter.warn(self.tree, 'cannot call: %r might be %r' % (self.func, func))
           continue
         func.bind_args(self.args)
         proc.connect(self)
@@ -834,7 +823,8 @@ class CompareOp(CompoundTypeNode):
     return
   
   def __repr__(self):
-    return 'cmp(%r %s)' % (self.expr0, ','.join( '%s %r' % (op,expr) for (op,expr) in self.comps ))
+    return 'cmp(%r %s)' % (self.expr0,
+                           ','.join( '%s %r' % (op,expr) for (op,expr) in self.comps ))
   
   def recv(self, _):
     return
@@ -877,7 +867,7 @@ class ListType(SimpleTypeNode):
   def desc1(self, done):
     return '[%s]' % self.elem.desc1(done)
 
-  def get_element(self, _=False):
+  def get_element(self, write=False):
     return self.elem
 
 class ListElement(CompoundTypeNode):
@@ -955,7 +945,7 @@ class TupleUnpack(CompoundTypeNode):
     for obj in src.types:
       if isinstance(obj, TupleType):
         if len(obj.elements) != len(self.vars):
-          Report.warn(self.tree, 'tuple elements mismatch: len(%r) != %r' %
+          Reporter.warn(self.tree, 'tuple elements mismatch: len(%r) != %r' %
                       (obj, len(self.vars)))
         else:
           for (i,elem) in enumerate(obj.elements):
@@ -1022,13 +1012,13 @@ class ClassType(SimpleTypeNode):
   
   def __init__(self, tree, name, space, bases, code, evals):
     SimpleTypeNode.__init__(self)
-    Report.register(tree, self)
     self.tree = tree
     self.name = name
     self.space = space
     self.bases = bases
     self.attrs = {}
-    for (name, value) in space.to_attrs():
+    Reporter.register_space(tree, self)
+    for (name, value) in space:
       value.connect(self.add_attr(name))
     self.instance = InstanceType(self, self.attrs.iteritems())
     self.initbody = InitMethodBody(self.instance)
@@ -1056,10 +1046,10 @@ class ClassType(SimpleTypeNode):
 
   def finish(self):
     for (_, attr) in sorted(self.attrs.iteritems()):
-      Report.info(self.tree, 'class.%s = %s' % (attr.name, attr.describe()))
+      Reporter.info(self.tree, 'class.%s = %s' % (attr.name, attr.describe()))
     for (_, attr) in sorted(self.instance.attrs.iteritems()):
-      Report.info(self.tree, 'instance.%s = %s' % (attr.name, attr.describe()))
-    return
+      Reporter.info(self.tree, 'instance.%s = %s' % (attr.name, attr.describe()))
+    return 'class %s:' % self.name
 
 
 ##  ClassAttr
@@ -1095,7 +1085,7 @@ class InitMethodBody(CompoundTypeNode):
     return
 
   def __repr__(self):
-    return '<InitMethodBody %r>' % self.initfunc
+    return '<InitMethod %r>' % self.initfunc
 
   def bind_args(self, args):
     for func in self.funcs:
@@ -1109,7 +1099,7 @@ class InitMethodBody(CompoundTypeNode):
         try:
           proc = func.get_proc()
         except TypeError:
-          Report.warn(self.tree, 'cannot call: %r might be %r' % (self.func, func))
+          Reporter.warn(self.tree, 'cannot call: %r might be %r' % (self.func, func))
           continue
         proc.connect(self)
     else:
@@ -1163,12 +1153,12 @@ class InstanceAttr(CompoundTypeNode):
     for obj in src.types:
       if isinstance(obj, FuncType):
         try:
-          obj = BoundFuncType(self.instance, obj)
+          obj = BoundMethodType(self.instance, obj)
           # XXX
           #elif isinstance(obj, ClassMethodType):
           #elif isinstance(obj, StaticMethodType):
         except TypeError:
-          Report.warn(obj.tree, 'cannot call: %r no arg0' % (obj))
+          Reporter.warn(obj.tree, 'cannot call: %r no arg0' % (obj))
           continue
       types.add(obj)
     self.update(types)
@@ -1198,7 +1188,7 @@ class AttrRef(CompoundTypeNode):
         try:
           obj.get_attr(self.attrname).connect(self)
         except KeyError:
-          Report.warn(self.tree, 'attribute not found: %r.%s' % (obj, self.attrname))
+          Reporter.warn(self.tree, 'attribute not found: %r.%s' % (obj, self.attrname))
     else:
       self.update(src.types)
     return
@@ -1230,21 +1220,80 @@ class AttrAssign(CompoundTypeNode):
     return
 
 
-##  MainFuncType
+##  ModuleType
 ##
-class MainFuncType(FuncType):
+class ModuleType(FuncType):
   
-  def __init__(self, space, code):
-    FuncType.__init__(self, None, None, space, (), code)
+  def __init__(self, name, space, code):
+    FuncType.__init__(self, code, name, space, (), code)
     FunCall(None, self, ())
     return
   
+  def __repr__(self):
+    return '<Module %s>' % self.name
 
+  def finish(self):
+    for (k,v) in sorted(self.space):
+      Reporter.info(self.tree, '%s = %s' % (k, v.describe()))
+    return '[%s]' % self.name
+
+
+class BuiltinModuleType(ModuleType):
+  def __init__(self, name):
+    ModuleType.__init__(self, name, BuiltinNamespace(name), None)
+    return
+
+BUILTIN_MODULE = {
+  'sys': BuiltinModuleType('sys'),
+}
+
+# find_module
+def find_module(name, paths):
+  fname = name+'.py'
+  for dirname in paths:
+    path = os.path.join(dirname, name)
+    if os.path.exists(path):
+      return path
+    path = os.path.join(dirname, fname)
+    if os.path.exists(path):
+      return path
+  raise ImportError(name)
+
+# load_module
+def load_module(modname, asname=None, paths=['.']):
+  if modname in BUILTIN_MODULE:
+    return BUILTIN_MODULE[modname]
+  def rec(n, parent):
+    n.parent = parent
+    for c in n.getChildNodes():
+      rec(c, n)
+    return
+  path = find_module(modname, paths)
+  name = asname or modname
+  tree = compiler.parseFile(path)
+  rec(tree, None)
+  space1 = Namespace(GLOBAL_NAMESPACE, name, tree.node)
+  space1.register_var('__name__').bind(PrimitiveType(None, ''))
+  module = ModuleType(name, space1, tree.node)
+  return module
+
+
+# main
 def main(argv):
-  name = argv[1]
-  module = load_module(name, '__main__')
-  MainFuncType(module.space, module.code)
-  Report.show(module.code)
+  global debug
+  import getopt
+  def usage():
+    print 'usage: %s [-d] [file ...]' % argv[0]
+    return 100
+  try:
+    (opts, args) = getopt.getopt(argv[1:], 'd')
+  except getopt.GetoptError:
+    return usage()
+  for (k, v) in opts:
+    if k == '-d': debug += 1
+  for name in args:
+    module = load_module(name, '__main__')
+    Reporter.show(module.code)
   return 0
 
 if __name__ == '__main__': sys.exit(main(sys.argv))
