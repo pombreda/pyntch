@@ -1,11 +1,18 @@
 #!/usr/bin/env python
+
+# pros:
+# evals.append...
+# 
+
 import sys, compiler
 from compiler.ast import *
 stdout = sys.stdout
 stderr = sys.stderr
 debug = 0
 
+
 # TODO:
+#  exceptions
 #  builtin functions
 #  sys, str method...
 #  +=
@@ -20,10 +27,10 @@ def maprec(func, x):
   else:
     return func(x)
 
-def recjoin(k, seq):
+def recjoin(sep, seq):
   for x in seq:
     if isinstance(x, tuple):
-      yield '(%s)' % k.join(recjoin(k, x))
+      yield '(%s)' % sep.join(recjoin(sep, x))
     else:
       yield str(x)
   return
@@ -87,21 +94,19 @@ class NodeError(Exception): pass
 class NodeTypeError(NodeError): pass
 class InvalidMethodError(NodeError): pass
 
-class TypeNode:
+class TypeNode(object):
 
-  def __init__(self, *types):
+  def __init__(self, types):
     self.types = set(types)
-    self.sendto = set()
+    self.sendto = []
     return
 
-  def connect(self, node):
-    assert isinstance(node, CompoundTypeNode), node
-    if node in self.sendto: return
+  def connect(self, node, receiver=None):
+    #assert isinstance(node, CompoundTypeNode), node
     if debug:
-      print >>stderr, 'connect: %r :- %r' % (node,self)
-    assert node not in self.sendto
-    self.sendto.add(node)
-    node.recv(self)
+      print >>stderr, 'connect: %r :- %r' % (node, self)
+    self.sendto.append((node, receiver))
+    (receiver or node.recv)(self)
     return
 
   def recv(self, src):
@@ -121,13 +126,12 @@ class TypeNode:
   def desc1(self, _):
     raise NotImplementedError
 
-
 ##  SimpleTypeNode
 ##
 class SimpleTypeNode(TypeNode):
 
   def __init__(self):
-    TypeNode.__init__(self, self)
+    TypeNode.__init__(self, [self])
     return
 
   def __repr__(self):
@@ -136,42 +140,82 @@ class SimpleTypeNode(TypeNode):
   def desc1(self, _):
     return repr(self)
 
+
+class UndefinedTypeNode(TypeNode):
   
+  def __init__(self):
+    TypeNode.__init__(self, [])
+    return
+  
+  def __repr__(self):
+    return '(undef)'
+  
+  def desc1(self, _):
+    return '(undef)'
+
+
 ##  CompoundTypeNode
 ##
 class CompoundTypeNode(TypeNode):
+
+  def __init__(self, *types):
+    TypeNode.__init__(self, types)
+    return
 
   def desc1(self, done):
     if self in done:
       return '...'
     else:
       done.add(self)
-      return '{%s}' % '|'.join( obj.desc1(done) for obj in self.types )
-
+      return ('{%s}' % '|'.join( obj.desc1(done) for obj in self.types ))
+                                  
   def recv(self, src):
-    self.update(src.types)
+    self.update_types(src.types)
     return
 
-  def update(self, types):
-    diff = types.difference(self.types)
-    if diff:
-      self.types.update(diff)
-      for node in list(self.sendto):
-        node.recv(self)
+  def update_types(self, types):
+    types = types.difference(self.types)
+    self.types.update(types)
+    if types:
+      for (node,receiver) in self.sendto:
+        (receiver or node.recv)(self)
     return
 
 
-##  UndefinedType
+##  ExecutionNode
 ##
-class UndefinedType(TypeNode):
+##  An execution node is a place where an exception belongs.
+##
+class ExecutionNode(object):
 
-  def __repr__(self):
-    return '<undef>'
+  def __init__(self):
+    self.expts = set()
+    self.callers = []
+    return
+  
+  def propagate(self, node):
+    assert isinstance(node, ExecutionNode), node
+    if debug:
+      print >>stderr, 'propagate: %r raises %s' % (node, ', '.join( obj.describe() for obj in self.expts ))
+    self.callers.append(node)
+    (node.recv_expt)(self)
+    return
 
-  def describe(self):
-    return 'undef'
+  def recv_expt(self, src):
+    assert isinstance(src, ExecutionNode), src
+    self.update_expts(src.expts)
+    return
 
-  def recv(self, src):
+  def add_expt(self, exc):
+    self.update_expts(set([exc]))
+    return
+
+  def update_expts(self, expts):
+    expts = expts.difference(self.expts)
+    self.expts.update(expts)
+    if expts:
+      for (node,receiver) in self.callers:
+        (receiver or node.recv)(self)
     return
 
 
@@ -179,28 +223,33 @@ class UndefinedType(TypeNode):
 ##
 class PrimitiveType(SimpleTypeNode):
   
-  def __init__(self, tree, typeobj):
-    self.typename = type(typeobj).__name__
+  def __init__(self, tree, realtype, rank=0):
     self.tree = tree
+    self.realtype = realtype
+    self.rank = rank
+    self.typename = realtype.__name__
     SimpleTypeNode.__init__(self)
     return
 
   def __repr__(self):
-    return '<%s>' % self.typename
+    return '<PrimitiveType %s>' % self.typename
 
   def __eq__(self, obj):
     return isinstance(obj, PrimitiveType) and self.typename == obj.typename
   def __hash__(self):
     return hash(self.typename)
 
-# None
-NONE_TYPE = PrimitiveType(None, None)
-BOOL_TYPE = PrimitiveType(None, True)
-INT_TYPE = PrimitiveType(None, 1)
-LONG_TYPE = PrimitiveType(None, 1L)
-FLOAT_TYPE = PrimitiveType(None, 1.0)
-STR_TYPE = PrimitiveType(None, '')
-UNICODE_TYPE = PrimitiveType(None, u'')
+# built-in types
+NONE_TYPE = PrimitiveType(None, type(None))
+TYPE_TYPE = PrimitiveType(None, type)
+BOOL_TYPE = PrimitiveType(None, bool)
+INT_TYPE = PrimitiveType(None, int, 0)
+LONG_TYPE = PrimitiveType(None, long, 1)
+FLOAT_TYPE = PrimitiveType(None, float, 2)
+STR_TYPE = PrimitiveType(None, str, 0)
+UNICODE_TYPE = PrimitiveType(None, unicode, 1)
+NUMBER_TYPE = ( INT_TYPE, LONG_TYPE, FLOAT_TYPE )
+BASESTRING_TYPE = ( STR_TYPE, UNICODE_TYPE )
 
 ##  KeywordArg
 ##
@@ -221,32 +270,57 @@ class KeywordArg(SimpleTypeNode):
 ##
 class TypeFilter(CompoundTypeNode):
   
-  def __init__(self, tree, *objs):
+  def __init__(self, tree, *typeobjs):
     self.tree = tree
-    self.objs = objs
+    self.typeobjs = typeobjs
     self.validtypes = set()
     CompoundTypeNode.__init__(self)
-    for obj in objs:
-      obj.connect(self)
+    for obj in typeobjs:
+      obj.connect(self, self.recv_typeobj)
     return
 
   def __repr__(self):
     return ('<TypeFilter: %s: %s>' % 
-            (','.join(map(repr, self.objs)),
+            (','.join(map(repr, self.typeobjs)),
              '|'.join(map(repr, self.validtypes))))
+
+  def recv_typeobj(self, src):
+    self.validtypes.update(src.types)
+    return
   
   def recv(self, src):
-    if src in self.objs:
-      self.validtypes.update(src.types)
-    else:
-      types = set()
-      for obj in src.types:
-        if obj in self.validtypes:
-          types.add(obj)
-        else:
-          Reporter.warn(self.tree, '%r not type in %r' % (obj, self.validtypes))
-      self.update(types)
+    types = set()
+    validtypes = set( obj.typeobj for obj in self.validtypes )
+    for obj in src.types:
+      if obj in validtypes:
+        types.add(obj)
+      else:
+        Reporter.warn(self.tree, '%r not type in %r' % (obj, validtypes))
+    self.update_types(types)
     return
+
+
+##  ExceptionType
+##
+class ExceptionType(SimpleTypeNode):
+
+  def __init__(self, tree, name, msg):
+    SimpleTypeNode.__init__(self)
+    self.tree = tree
+    self.name = name
+    self.msg = msg
+    return
+
+  def __repr__(self):
+    return '<%s: %s at %s:%d>' % (self.name, self.msg, self.tree.modname, self.tree.lineno)
+
+  def connect(self, node, receiver=None):
+    if debug:
+      print >>stderr, 'raise: %r :- %r' % (node, self)
+    return
+
+  def desc1(self, _):
+    return repr(self)
 
 
 ##  Variable
@@ -274,13 +348,13 @@ class Variable(CompoundTypeNode):
 ##
 class Namespace:
 
-  def __init__(self, parent, name):
-    self.parent = parent
+  def __init__(self, parent_space, name):
+    self.parent_space = parent_space
     self.name = name
     self.vars = {}
     self.msgs = []
-    if parent:
-      self.name = parent.name+'.'+name
+    if parent_space:
+      self.name = parent_space.name+'.'+name
     return
   
   def __repr__(self):
@@ -299,7 +373,7 @@ class Namespace:
     while self:
       if name in self.vars:
         return self.vars[name]
-      self = self.parent
+      self = self.parent_space
     raise KeyError(name)
 
   def register_var(self, name):
@@ -430,321 +504,17 @@ class Namespace:
     return
 
 
-##  GlobalNamespace
-##
-class GlobalNamespace(Namespace):
-  def __init__(self):
-    Namespace.__init__(self, None, '')
-    self.register_var('True').bind(BOOL_TYPE)
-    self.register_var('False').bind(BOOL_TYPE)
-    self.register_var('None').bind(NONE_TYPE)
-    self.register_var('int').bind(INT_TYPE)
-    self.register_var('long').bind(LONG_TYPE)
-    self.register_var('float').bind(FLOAT_TYPE)
-    self.register_var('str').bind(STR_TYPE)
-    self.register_var('unicode').bind(UNICODE_TYPE)
-    return
-
-GLOBAL_NAMESPACE = GlobalNamespace()
-
-
-##  BuiltinNamespace
-##
-class BuiltinNamespace(Namespace):
-  
-  def __init__(self, name):
-    Namespace.__init__(self, GLOBAL_NAMESPACE, name)
-    return
-
-
-# build_expr
-def build_expr(space, tree, evals):
-
-  if isinstance(tree, Const):
-    expr = PrimitiveType(tree, tree.value)
-
-  elif isinstance(tree, Name):
-    try:
-      expr = space[tree.name]
-    except KeyError:
-      Reporter.error(tree, 'undefined variable: %r' % tree.name)
-      expr = UndefinedType()
-
-  elif isinstance(tree, CallFunc):
-    func = build_expr(space, tree.node, evals)
-    args = tuple( build_expr(space, arg1, evals) for arg1 in tree.args )
-    expr = FunCall(tree, func, args)
-
-  elif isinstance(tree, Keyword):
-    expr = KeywordArg(tree, tree.name, build_expr(space, tree.expr, evals))
-    
-  elif isinstance(tree, Getattr):
-    obj = build_expr(space, tree.expr, evals)
-    expr = AttrRef(tree, obj, tree.attrname)
-
-  elif isinstance(tree, Subscript):
-    obj = build_expr(space, tree.expr, evals)
-    subs = [ build_expr(space, sub, evals) for sub in tree.subs ]
-    expr = SubRef(tree, obj, subs)
-
-  elif isinstance(tree, Slice):
-    obj = build_expr(space, tree.expr, evals)
-    lower = upper = None
-    if tree.lower:
-      lower = build_expr(space, tree.lower, evals)
-    if tree.upper:
-      upper = build_expr(space, tree.upper, evals)
-    expr = SliceRef(tree, obj, lower, upper)
-
-  elif isinstance(tree, Tuple):
-    elements = [ build_expr(space, node, evals) for node in tree.nodes ]
-    expr = TupleType(tree, elements)
-
-  elif isinstance(tree, List):
-    elements = [ build_expr(space, node, evals) for node in tree.nodes ]
-    expr = ListType(tree, elements)
-
-  elif isinstance(tree, Dict):
-    items = [ (build_expr(space, k, evals), build_expr(space, v, evals))
-              for (k,v) in tree.items ]
-    expr = DictType(tree, items)
-
-  # +, -, *, /, %, //, <<, >>, **, &, |, ^
-  elif (isinstance(tree, Add) or isinstance(tree, Sub) or
-        isinstance(tree, Mul) or isinstance(tree, Div) or
-        isinstance(tree, Mod) or isinstance(tree, FloorDiv) or
-        isinstance(tree, LeftShift) or isinstance(tree, RightShift) or
-        isinstance(tree, Power) or isinstance(tree, Bitand) or
-        isinstance(tree, Bitor) or isinstance(tree, Bitxor)):
-    op = tree.__class__.__name__
-    left = build_expr(space, tree.left, evals)
-    right = build_expr(space, tree.right, evals)
-    expr = BinaryOp(tree, op, left, right)
-
-  # ==, !=, <=, >=, <, >
-  elif isinstance(tree, Compare):
-    expr0 = build_expr(space, tree.expr, evals)
-    comps = [ (op, build_expr(space, node, evals)) for (op,node) in tree.ops ]
-    expr = CompareOp(tree, expr0, comps)
-
-  # +,-
-  elif isinstance(tree, UnaryAdd) or isinstance(tree, UnarySub):
-    value = build_expr(space, tree.expr, evals)
-    expr = UnaryOp(tree.__class__, value)
-
-  # and, or
-  elif (isinstance(tree, And) or isinstance(tree, Or)):
-    nodes = [ build_expr(space, node, evals) for node in tree.nodes ]
-    expr = BooleanOp(tree, tree.__class__.__name__, nodes)
-
-  # not
-  elif isinstance(tree, Not):
-    value = build_expr(space, tree.expr, evals)
-    expr = NotOp(tree, value)
-
-  # lambda
-  elif isinstance(tree, Lambda):
-    defaults = [ build_expr(space, value, evals) for value in tree.defaults ]
-    expr = LambdaFuncType(tree, space, tree.argnames,
-                          defaults, tree.varargs, tree.kwargs)
-    expr.set_code(tree.code)
-
-  # yield (for python 2.5)
-  elif isinstance(tree, Yield):
-    value = build_expr(space, tree.value, evals)
-    expr = GeneratorSlot(tree, value)
-    evals.append((2, expr)) # XXX
-
-  else:
-    raise SyntaxError(tree)
-
-  assert isinstance(expr, TypeNode) or isinstance(expr, tuple)
-  return expr
-
-
-# build_stmt
-def build_stmt(space, tree, evals, isfuncdef=False):
-
-  if 2 <= debug:
-    print >>stderr, 'build: %r' % tree
-
-  def assign(n, v):
-    if isinstance(n, AssName):
-      space[n.name].bind(v)
-    elif isinstance(n, AssTuple):
-      tup = TupleUnpack(n, v, len(n.nodes))
-      for (i,c) in enumerate(n.nodes):
-        assign(c, tup.get_element(i))
-    elif isinstance(n, AssAttr):
-      obj = build_expr(space, n.expr, evals)
-      evals.append((0, obj))
-      AttrAssign(n, obj, n.attrname, v)
-    elif isinstance(n, Subscript):
-      obj = build_expr(space, n.expr, evals)
-      evals.append((0, obj))
-      subs = [ build_expr(space, expr, evals) for expr in n.subs ]
-      evals.extend( (False, sub) for sub in subs )
-      SubAssign(n, obj, subs, v)
-    else:
-      raise TypeError(n)
-    return
-
-  # def
-  if isinstance(tree, Function):
-    name = tree.name
-    defaults = [ build_expr(space, value, evals) for value in tree.defaults ]
-    func = FuncType(tree, space, name, tree.argnames,
-                    defaults, tree.varargs, tree.kwargs)
-    func.set_code(tree.code)
-    space[name].bind(func)
-
-  # class
-  elif isinstance(tree, Class):
-    name = tree.name
-    bases = [ build_expr(space, base, evals) for base in tree.bases ]
-    klass = ClassType(tree, space, name, bases, tree.code, evals)
-    space[name].bind(klass)
-
-  # assign
-  elif isinstance(tree, Assign):
-    for n in tree.nodes:
-      value = build_expr(space, tree.expr, evals)
-      evals.append((0, value))
-      assign(n, value)
-
-  # return
-  elif isinstance(tree, Return):
-    value = build_expr(space, tree.value, evals)
-    evals.append((1, value))
-
-  # yield (for python 2.4)
-  elif isinstance(tree, Yield):
-    value = build_expr(space, tree.value, evals)
-    evals.append((2, value)) # XXX
-
-  # (mutliple statements)
-  elif isinstance(tree, Stmt):
-    stmt = None
-    for stmt in tree.nodes:
-      build_stmt(space, stmt, evals)
-    if isfuncdef:
-      # if the last statement is not a Return
-      if not isinstance(stmt, Return):
-        value = PrimitiveType(None, None)
-        evals.append((1, value))
-
-  # if, elif, else
-  elif isinstance(tree, If):
-    for (expr,stmt) in tree.tests:
-      value = build_expr(space, expr, evals)
-      evals.append((0, value))
-      build_stmt(space, stmt, evals)
-    if tree.else_:
-      build_stmt(space, tree.else_, evals)
-
-  # for
-  elif isinstance(tree, For):
-    seq = build_expr(space, tree.list, evals)
-    evals.append((0, seq))
-    assign(tree.assign, IterRef(tree.list, seq))
-    build_stmt(space, tree.body, evals)
-    if tree.else_:
-      build_stmt(space, tree.else_, evals)
-
-  # while
-  elif isinstance(tree, While):
-    value = build_expr(space, tree.test, evals)
-    evals.append((0, value))
-    build_stmt(space, tree.body, evals)
-    if tree.else_:
-      build_stmt(space, tree.else_, evals)
-
-  # try ... except
-  elif isinstance(tree, TryExcept):
-    build_stmt(space, tree.body, evals)
-    #XXX exceptions.update(__)
-    for (exc,e,stmt) in tree.handlers:
-      value = build_expr(space, exc, evals)
-      evals.append((0, value))
-      assign(e, value)
-      build_stmt(space, stmt, evals)
-    if tree.else_:
-      build_stmt(space, tree.else_, evals)
-
-  # try ... finally
-  elif isinstance(tree, TryFinally):
-    build_stmt(space, tree.body, evals)
-    build_stmt(space, tree.final, evals)
-
-  # printnl
-  elif isinstance(tree, Printnl):
-    for node in tree.nodes:
-      value = build_expr(space, node, evals)
-      evals.append((0, value))
-
-  # discard
-  elif isinstance(tree, Discard):
-    value = build_expr(space, tree.expr, evals)
-    evals.append((0, value))
-
-  # pass
-  elif isinstance(tree, Pass):
-    pass
-
-  # import
-  elif isinstance(tree, Import):
-    pass
-  elif isinstance(tree, From):
-    pass
-
-  # del
-  elif isinstance(tree, AssName):
-    pass
-  elif isinstance(tree, AssTuple):
-    pass
-  elif isinstance(tree, AssAttr):
-    evals.append((0, build_expr(space, tree.expr, evals)))
-  elif isinstance(tree, Subscript):
-    evals.append((0, build_expr(space, tree.expr, evals)))
-
-  elif isinstance(tree, Assert):
-    if (isinstance(tree.test, CallFunc) and
-        isinstance(tree.test.node, Name) and
-        tree.test.node.name == 'isinstance'):
-      (a,b) = tree.test.args
-      build_expr(space, a, evals).connect(TypeFilter(a, build_expr(space, b, evals)))
-
-  else:
-    raise SyntaxError(tree)
-
-  return
-
-
 ##  FuncType
 ##
-class BuiltinFuncType(SimpleTypeNode):
-
-  def __init__(self, name, retval):
-    self.name = name
-    self.retval = retval
-    return
-
-  def __repr__(self):
-    return ('<BuiltInFunction %s>' % (self.name))
-
-  def get_body(self, caller, args):
-    return self.retval
-
-
 class FuncType(SimpleTypeNode):
   
-  def __init__(self, tree, parent, name, argnames, defaults, varargs, kwargs):
+  def __init__(self, tree, parent_space, name, argnames, defaults, varargs, kwargs, code):
     SimpleTypeNode.__init__(self)
+    Reporter.register_tree(tree, self)
     self.tree = tree
-    self.parent = parent
     self.name = name
     self.kwarg = self.vararg = None
-    self.space = Namespace(parent, name)
+    self.space = Namespace(parent_space, name)
     if kwargs:
       self.kwarg = argnames[-1]
       del argnames[-1]
@@ -769,19 +539,20 @@ class FuncType(SimpleTypeNode):
       return
     for (var1,arg1) in zip(self.argvars[-len(defaults):], self.defaults):
       assign(var1, arg1)
-    self.evals = []
     self.callers = set()
-    Reporter.register_tree(tree, self)
+    self.body = FuncBody(name)
+    self.build_body(code)
+    return
+
+  def build_body(self, tree):
+    evals = []
+    self.space.register_names(tree)
+    build_stmt(self.body, self.space, tree, evals, isfuncdef=True)
+    self.body.set_retval(evals)
     return
 
   def __repr__(self):
     return ('<Function %s>' % (self.name))
-
-  def set_code(self, code):
-    self.space.register_names(code)
-    build_stmt(self.space, code, self.evals, isfuncdef=True)
-    self.body = FuncBody(self)
-    return
 
   def get_body(self, caller, args):
     self.callers.add(caller)
@@ -834,7 +605,7 @@ class FuncType(SimpleTypeNode):
       Reporter.info(self.tree, '%s = %s' % (k, v.describe()))
     Reporter.info(self.tree, 'return %s' % self.body.describe())
     for caller in self.callers:
-      Reporter.info(self.tree, '%r' % caller)
+      Reporter.info(self.tree, '# caller: %s(%s)' % (caller.tree.modname, caller.tree.lineno))
     r = list(recjoin(', ', self.argnames))
     if self.vararg:
       r.append('*'+self.vararg)
@@ -847,74 +618,72 @@ class FuncType(SimpleTypeNode):
 ##
 class LambdaFuncType(FuncType):
   
-  def __init__(self, tree, parent, argnames, defaults, varargs, kwargs):
+  def __init__(self, tree, parent_space, argnames, defaults, varargs, kwargs, code):
     name = '__lambda_%x' % id(tree)
-    FuncType.__init__(self, tree, parent, name, argnames, defaults, varargs, kwargs)
+    FuncType.__init__(self, tree, parent_space, name, argnames, defaults, varargs, kwargs, code)
+    return
+
+  def build_body(self, tree):
+    evals = []
+    evals.append(('r', build_expr(self.body, self.space, tree, evals)))
+    self.body.set_retval(evals)
     return
   
   def __repr__(self):
     return ('<LambdaFunc %s>' % (self.name))
 
-  def set_code(self, code):
-    self.evals.append((1, build_expr(self.space, code)))
-    self.body = FuncBody(self)
-    return
-
 
 ##  FuncBody
 ##
-class FuncBody(CompoundTypeNode):
+class FuncBody(CompoundTypeNode, ExecutionNode):
 
-  def __init__(self, func):
+  def __init__(self, name):
     CompoundTypeNode.__init__(self)
-    self.func = func
-    evals = [ obj for (t,obj) in func.evals if t == 0 ]
-    returns = [ obj for (t,obj) in func.evals if t == 1 ]
-    yields = [ obj for (t,obj) in func.evals if t == 2 ]
+    ExecutionNode.__init__(self)
+    self.name = name
+    return
+
+  def set_retval(self, evals):
+    returns = [ obj for (t,obj) in evals if t == 'r' ]
+    yields = [ obj for (t,obj) in evals if t == 'y' ]
     assert returns
     if yields:
-      self.retvals = [ Generator(func.tree, yields) ]
+      retvals = [ Generator(tree, yields) ]
     else:
-      self.retvals = returns
-    for obj in (evals+self.retvals):
+      retvals = returns
+    for obj in retvals:
       obj.connect(self)
     return
 
   def __repr__(self):
-    return '<FuncBody %r>' % self.func
-  
-  def recv(self, src):
-    if src in self.retvals:
-      self.update(src.types)
-    return
+    return '<FuncBody %s>' % self.name
 
 
 ##  FunCall
 ##
 class FunCall(CompoundTypeNode):
   
-  def __init__(self, tree, func, args):
+  def __init__(self, execpath, tree, func, args):
     CompoundTypeNode.__init__(self)
+    self.execpath = execpath
     self.tree = tree
     self.func = func
     self.args = args
-    func.connect(self)
+    func.connect(self, self.recv_func)
     return
 
   def __repr__(self):
     return '<%r(%s)>' % (self.func, ','.join(map(repr, self.args)))
 
-  def recv(self, src):
-    if src is self.func:
-      for func in src.types:
-        try:
-          body = func.get_body(self, self.args)
-        except NodeTypeError:
-          Reporter.warn(self.tree, 'cannot call: %r might be %r' % (self.func, func))
-          continue
-        body.connect(self)
-    else:
-      self.update(src.types)
+  def recv_func(self, src):
+    for func in src.types:
+      try:
+        body = func.get_body(self, self.args)
+      except NodeTypeError:
+        Reporter.warn(self.tree, 'cannot call: %r might be %r' % (self.func, func))
+        continue
+      body.propagate(self.execpath)
+      body.connect(self)
     return
 
 
@@ -922,20 +691,19 @@ class FunCall(CompoundTypeNode):
 ##
 class ClassType(SimpleTypeNode):
   
-  def __init__(self, tree, parent, name, bases, code=None, evals=None):
+  def __init__(self, tree, execpath, parent_space, name, bases, code, evals):
     SimpleTypeNode.__init__(self)
+    Reporter.register_tree(tree, self)
     self.tree = tree
-    self.parent = parent
     self.name = name
     self.bases = bases
-    self.space = Namespace(parent, name)
+    self.space = Namespace(parent_space, name)
     self.attrs = {}
     if code:
       self.space.register_names(code)
-      build_stmt(self.space, code, evals)
+      build_stmt(execpath, self.space, code, evals)
     self.instance = InstanceType(self)
     self.initbody = InitMethodBody(self.instance)
-    Reporter.register_tree(tree, self)
     return
 
   def __repr__(self):
@@ -975,18 +743,15 @@ class ClassAttr(CompoundTypeNode):
     self.klass = klass
     self.bases = bases
     for base in bases:
-      base.connect(self)
+      base.connect(self, self.recv_base)
     return
 
   def __repr__(self):
     return '%r.@%s' % (self.klass, self.name)
   
-  def recv(self, src):
-    if src in self.bases:
-      for obj in src.types:
-        obj.get_attr(self.name).connect(self)
-    else:
-      self.update(src.types)
+  def recv_base(self, src):
+    for klass in src.types:
+      klass.get_attr(self.name).connect(self)
     return
   
   # XXX check if defined at last.
@@ -1001,7 +766,7 @@ class InitMethodBody(CompoundTypeNode):
     self.binds = []
     self.instance = instance
     self.initmethod = instance.get_attr('__init__')
-    self.initmethod.connect(self)
+    self.initmethod.connect(self, self.recv_initmethod)
     return
 
   def __repr__(self):
@@ -1012,19 +777,19 @@ class InitMethodBody(CompoundTypeNode):
     self.recv(self.initmethod)
     return
 
-  def recv(self, src):
-    if src is self.initmethod:
-      for func in src.types:
-        for (caller,args) in self.binds:
-          try:
-            body = func.get_body(caller, args)
-          except NodeTypeError:
-            Reporter.warn(None, 'cannot call: %r might be %r' % (self.initmethod, func))
-            continue
-          body.connect(self)
-    else:
-      # ignore return value
-      pass
+  def recv_initmethod(self, src):
+    for func in src.types:
+      for (caller,args) in self.binds:
+        try:
+          body = func.get_body(caller, args)
+        except NodeTypeError:
+          Reporter.warn(None, 'cannot call: %r might be %r' % (self.initmethod, func))
+          continue
+        body.connect(self)
+    return
+
+  def recv(self, _):
+    # ignore return value
     return
 
 
@@ -1073,32 +838,33 @@ class InstanceAttr(CompoundTypeNode):
     self.klass = klass
     self.instance = instance
     self.processed = set()
-    klass.connect(self)
+    self.klass.connect(self, self.recv_klass)
     return
 
   def __repr__(self):
     return '%r.@%s' % (self.instance, self.name)
+
+  def recv_klass(self, src):
+    for obj in src.types:
+      obj.get_attr(self.name).connect(self)
+    return
   
   def recv(self, src):
-    if src == self.klass:
-      for obj in src.types:
-        obj.get_attr(self.name).connect(self)
-    else:
-      types = set()
-      for obj in src.types:
-        if obj in self.processed: continue
-        self.processed.add(obj)
-        if isinstance(obj, FuncType):
-          try:
-            obj = self.instance.bind_func(obj)
-            # XXX
-            #elif isinstance(obj, ClassMethodType):
-            #elif isinstance(obj, StaticMethodType):
-          except InvalidMethodError:
-            Reporter.warn(obj.tree, 'cannot call: %r no arg0' % (obj))
-            continue
-        types.add(obj)
-      self.update(types)
+    types = set()
+    for obj in src.types:
+      if obj in self.processed: continue
+      self.processed.add(obj)
+      if isinstance(obj, FuncType):
+        try:
+          obj = self.instance.bind_func(obj)
+          # XXX
+          #elif isinstance(obj, ClassMethodType):
+          #elif isinstance(obj, StaticMethodType):
+        except InvalidMethodError:
+          Reporter.warn(obj.tree, 'cannot call: %r no arg0' % (obj))
+          continue
+      types.add(obj)
+    self.update(types)
     return
 
 
@@ -1131,29 +897,26 @@ class BoundMethodType(SimpleTypeNode):
 ##
 class AttrRef(CompoundTypeNode):
   
-  def __init__(self, tree, refobj, attrname):
+  def __init__(self, tree, target, attrname):
     CompoundTypeNode.__init__(self)
     self.tree = tree
-    self.refobj = refobj
+    self.target = target
     self.attrname = attrname
     self.objs = set()
-    self.refobj.connect(self)
+    self.target.connect(self, self.recv_target)
     return
 
   def __repr__(self):
-    return '%r.%s' % (self.refobj, self.attrname)
+    return '%r.%s' % (self.target, self.attrname)
 
-  def recv(self, src):
-    if src == self.refobj:
-      self.objs.update(src.types)
-      for obj in self.objs:
-        try:
-          obj.get_attr(self.attrname).connect(self)
-        except NodeTypeError:
-          Reporter.warn(self.tree, 'cannot get attribute: %r might be %r, no attr %s' % (self.refobj, obj, self.attrname))
-          continue
-    else:
-      self.update(src.types)
+  def recv_target(self, src):
+    self.objs.update(src.types)
+    for obj in self.objs:
+      try:
+        obj.get_attr(self.attrname).connect(self)
+      except NodeTypeError:
+        Reporter.warn(self.tree, 'cannot get attribute: %r might be %r, no attr %s' % (self.target, obj, self.attrname))
+        continue
     return
 
 
@@ -1161,21 +924,20 @@ class AttrRef(CompoundTypeNode):
 ##
 class AttrAssign(CompoundTypeNode):
   
-  def __init__(self, tree, refobj, attrname, value):
+  def __init__(self, tree, target, attrname, value):
     CompoundTypeNode.__init__(self)
     self.tree = tree
-    self.refobj = refobj
+    self.target = target
     self.objs = set()
     self.attrname = attrname
     self.value = value
-    self.refobj.connect(self)
+    self.target.connect(self, self.recv_target)
     return
 
   def __repr__(self):
-    return 'assign(%r.%s, %r)' % (self.refobj, self.attrname, self.value)
+    return 'assign(%r.%s, %r)' % (self.target, self.attrname, self.value)
 
-  def recv(self, src):
-    assert src is self.refobj
+  def recv_target(self, src):
     self.objs.update(src.types)
     for obj in self.objs:
       attr = obj.get_attr(self.attrname)
@@ -1191,14 +953,49 @@ class BinaryOp(CompoundTypeNode):
     CompoundTypeNode.__init__(self)
     self.tree = tree
     self.op = op
-    self.left = left
-    self.right = right
-    self.left.connect(self)
-    self.right.connect(self)
+    self.lefttypes = set()
+    self.righttypes = set()
+    left.connect(self, self.recv_left)
+    right.connect(self, self.recv_right)
     return
   
   def __repr__(self):
-    return '%s(%r,%r)' % (self.op, self.left, self.right)
+    return '%s(%r,%r)' % (self.op, self.lefttypes, self.righttypes)
+
+  def recv_left(self, src):
+    self.lefttypes.update(src.types)
+    self.update()
+    return
+  def recv_right(self, src):
+    self.righttypes.update(src.types)
+    self.update()
+    return
+
+  VALID_TYPES = {
+    (STR_TYPE, 'Mul', INT_TYPE): STR_TYPE,
+    (UNICODE_TYPE, 'Mul', INT_TYPE): UNICODE_TYPE,
+    }
+  def update(self):
+    for lobj in self.lefttypes:
+      for robj in self.righttypes:
+        if (lobj in NUMBER_TYPE) and (robj in NUMBER_TYPE):
+          if self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv'):
+            if lobj.rank < robj.rank:
+              self.update_types(set([robj]))
+            else:
+              self.update_types(set([lobj]))
+            continue
+        if lobj in BASESTRING_TYPE and robj in BASESTRING_TYPE and self.op == 'Add':
+          if lobj.rank < robj.rank:
+            self.update_types(set([robj]))
+          else:
+            self.update_types(set([lobj]))
+          continue
+        k = (lobj, self.op, robj)
+        if k in self.VALID_TYPES:
+          self.update_types(set([self.VALID_TYPES[k]]))
+          continue
+    return
 
 
 ##  CompareOp
@@ -1206,7 +1003,7 @@ class BinaryOp(CompoundTypeNode):
 class CompareOp(CompoundTypeNode):
   
   def __init__(self, tree, expr0, comps):
-    CompoundTypeNode.__init__(self, PrimitiveType(None, False))
+    CompoundTypeNode.__init__(self, BOOL_TYPE)
     self.tree = tree
     self.expr0 = expr0
     self.comps = comps
@@ -1229,7 +1026,7 @@ class CompareOp(CompoundTypeNode):
 class BooleanOp(CompoundTypeNode):
   
   def __init__(self, tree, op, nodes):
-    CompoundTypeNode.__init__(self, PrimitiveType(None, False))
+    CompoundTypeNode.__init__(self, BOOL_TYPE)
     self.tree = tree
     self.op = op
     self.nodes = nodes
@@ -1282,7 +1079,7 @@ class ListType(SimpleTypeNode):
       return ListAppend(self)
     elif name == 'remove':
       return ListAppend(self)
-    elif name == 'remove':
+    elif name == 'reverse':
       return NopFuncType()
     elif name == 'sort':
       return NopFuncType()
@@ -1293,17 +1090,17 @@ class NopFuncType(SimpleTypeNode):
     return NONE_TYPE
 
 class ListAppend(SimpleTypeNode):
-  def __init__(self, refobj):
+  def __init__(self, target):
     SimpleTypeNode.__init__(self)
-    self.refobj = refobj
+    self.target = target
     return
 
   def __repr__(self):
-    return '%r.append' % self.refobj
+    return '%r.append' % self.target
 
   def get_body(self, caller, args):
-    args[0].connect(self.refobj.elem)
-    return self.refobj.elem
+    args[0].connect(self.target.elem)
+    return NopFuncType()
 
 class ListElement(CompoundTypeNode):
   
@@ -1369,22 +1166,22 @@ class TupleElement(CompoundTypeNode):
 
 class TupleUnpack(CompoundTypeNode):
 
-  def __init__(self, tree, refobj, nelems):
+  def __init__(self, tree, tupobj, nelems):
     CompoundTypeNode.__init__(self)
     self.tree = tree
-    self.refobj = refobj
+    self.tupobj = tupobj
     self.elems = [ TupleElement(self, i) for i in xrange(nelems) ]
-    self.refobj.connect(self)
+    self.tupobj.connect(self, self.recv_tupobj)
     return
 
   def __repr__(self):
-    return '<TupleUnpack: %r>' % (self.refobj,)
+    return '<TupleUnpack: %r>' % (self.tupobj,)
 
   def get_element(self, i):
     return self.elems[i]
 
-  def recv(self, src):
-    assert src is self.refobj
+  def recv_tupobj(self, src):
+    assert src is self.tupobj
     for obj in src.types:
       if isinstance(obj, TupleType):
         if len(obj.elements) != len(self.elems):
@@ -1438,46 +1235,31 @@ class DictItem(CompoundTypeNode):
   
   def __init__(self, objs):
     CompoundTypeNode.__init__(self)
-    self.objs = set()
     for obj in objs:
-      self.bind(obj)
+      obj.connect(self)
     return
-
-  def bind(self, obj):
-    self.objs.add(obj)
-    obj.connect(self)
-    return
-
-  def __eq__(self, obj):
-    return (isinstance(obj, DictItem) and
-            self.objs == obj.objs)
-  def __hash__(self):
-    return hash(tuple(sorted(self.objs)))
 
 
 ##  SubRef
 ##
 class SubRef(CompoundTypeNode):
   
-  def __init__(self, tree, refobj, subs):
+  def __init__(self, tree, target, subs):
     CompoundTypeNode.__init__(self)
     self.tree = tree
-    self.refobj = refobj
+    self.target = target
     self.objs = set()
     self.subs = subs
-    self.refobj.connect(self)
+    self.target.connect(self, self.recv_target)
     return
 
   def __repr__(self):
-    return '%r[%s]' % (self.refobj, ':'.join(map(repr, self.subs)))
+    return '%r[%s]' % (self.target, ':'.join(map(repr, self.subs)))
 
-  def recv(self, src):
-    if src == self.refobj:
-      self.objs.update(src.types)
-      for obj in self.objs:
-        obj.get_element(self.subs).connect(self)
-    else:
-      self.update(src.types)
+  def recv_target(self, src):
+    self.objs.update(src.types)
+    for obj in self.objs:
+      obj.get_element(self.subs).connect(self)
     return
 
 
@@ -1485,21 +1267,20 @@ class SubRef(CompoundTypeNode):
 ##
 class SubAssign(CompoundTypeNode):
   
-  def __init__(self, tree, refobj, subs, value):
+  def __init__(self, tree, target, subs, value):
     CompoundTypeNode.__init__(self)
     self.tree = tree
+    self.target = target
     self.objs = set()
     self.subs = subs
     self.value = value
-    self.refobj = refobj
-    self.refobj.connect(self)
+    self.target.connect(self, self.recv_target)
     return
 
   def __repr__(self):
-    return 'assign(%r%r, %r)' % (self.refobj, self.subs, self.value)
+    return 'assign(%r%r, %r)' % (self.target, self.subs, self.value)
 
-  def recv(self, src):
-    assert src is self.refobj
+  def recv_target(self, src):
     self.objs.update(src.types)
     for obj in self.objs:
       self.value.connect(obj.get_element(self.subs, write=True))
@@ -1538,26 +1319,23 @@ class Generator(SimpleTypeNode):
 ##
 class IterRef(CompoundTypeNode):
   
-  def __init__(self, tree, refobj):
+  def __init__(self, tree, target):
     CompoundTypeNode.__init__(self)
     self.tree = tree
-    self.refobj = refobj
-    self.refobj.connect(self)
+    self.target = target
+    self.target.connect(self, self.recv_target)
     return
 
   def __repr__(self):
-    return 'iter(%r)' % (self.refobj,)
+    return 'iter(%r)' % (self.target,)
 
-  def recv(self, src):
-    if src is self.refobj:
-      for obj in src.types:
-        try:
-          obj.get_iter().connect(self)
-        except NodeTypeError:
-          Reporter.warn(self.tree, '%r might not be an iterator' % (obj))
-          continue
-    else:
-      self.update(src.types)
+  def recv_target(self, src):
+    for obj in src.types:
+      try:
+        obj.get_iter().connect(self)
+      except NodeTypeError:
+        Reporter.warn(self.tree, '%r might not be an iterator: %r' % (self.target, obj))
+        continue
     return
 
     
@@ -1565,12 +1343,11 @@ class IterRef(CompoundTypeNode):
 ##
 class ModuleType(FuncType):
   
-  def __init__(self, tree, parent, name):
-    FuncType.__init__(self, tree, parent, name, (), (), False, False)
-    self.space.register_var('__name__').bind(PrimitiveType(None, ''))
-    self.set_code(tree.node)
+  def __init__(self, tree, parent_space, name):
+    FuncType.__init__(self, tree, parent_space, name, (), (), False, False, tree.node)
+    self.space.register_var('__name__').bind(STR_TYPE)
     self.attrs = {}
-    FunCall(tree, self, ())
+    #FunCall(tree, self, ())
     return
   
   def __repr__(self):
@@ -1609,6 +1386,62 @@ class ModuleAttr(CompoundTypeNode):
   
   # XXX check if defined at last.
 
+
+##  Built-in Stuff
+##
+
+##  BuiltinFuncType
+##
+class BuiltinFuncType(SimpleTypeNode):
+  pass
+
+class BuiltinTypeType(SimpleTypeNode):
+
+  def __init__(self, typeobj):
+    SimpleTypeNode.__init__(self)
+    self.typeobj = typeobj
+    return
+
+  def __repr__(self):
+    return '<BuiltinType: %r>' % self.typeobj
+
+class BuiltinTypeCheck(CompoundTypeNode):
+
+  def __init__(self, *validtypes):
+    self.validtypes = set(validtypes)
+    CompoundTypeNode.__init__(self)
+    return
+
+  def recv(self, src):
+    for obj in src.types:
+      if obj not in self.validtypes:
+        Reporter.warn(obj.tree, '%r not type in %r' % (obj, self.validtypes))
+      else:
+        self.update_types(src.types)
+    return
+
+  def check(self, obj):
+    obj.connect(self)
+    return self
+
+
+
+##  BuiltinNamespace
+##
+class BuiltinNamespace(Namespace):
+
+  def __init__(self):
+    Namespace.__init__(self, None, '')
+    self.register_var('True').bind(BOOL_TYPE)
+    self.register_var('False').bind(BOOL_TYPE)
+    self.register_var('None').bind(NONE_TYPE)
+    self.register_var('int').bind(BuiltinTypeType(INT_TYPE))
+    #self.register_var('Exception').bind(BuiltinTypeType(EXC_TYPE))
+
+    #self.register_var('abs').bind(BuiltinFuncType(BuiltinABSBody()))
+    return
+
+BUILTIN_NAMESPACE = BuiltinNamespace()
 
 ##  BuiltInModuleType
 ##
@@ -1662,7 +1495,273 @@ def load_module(modname, asname=None, paths=['.']):
   name = asname or modname
   tree = compiler.parseFile(path)
   rec(tree, None)
-  return ModuleType(tree, GLOBAL_NAMESPACE, name)
+  return ModuleType(tree, BUILTIN_NAMESPACE, name)
+
+
+# build_expr(execpath, namespace, tree, evals)
+# Constructs a TypeNode from a given syntax tree.
+def build_expr(execpath, space, tree, evals):
+
+  if isinstance(tree, Const):
+    expr = PrimitiveType(tree, type(tree.value))
+
+  elif isinstance(tree, Name):
+    try:
+      expr = space[tree.name]
+    except KeyError:
+      expr = UndefinedTypeNode()
+      execpath.add_expt(ExceptionType(tree, 'NameError', 'name %r is not defined' % tree.name))
+
+  elif isinstance(tree, CallFunc):
+    func = build_expr(execpath, space, tree.node, evals)
+    args = tuple( build_expr(execpath, space, arg1, evals) for arg1 in tree.args )
+    expr = FunCall(execpath, tree, func, args)
+
+  elif isinstance(tree, Keyword):
+    expr = KeywordArg(tree, tree.name, build_expr(execpath, space, tree.expr, evals))
+    
+  elif isinstance(tree, Getattr):
+    obj = build_expr(execpath, space, tree.expr, evals)
+    expr = AttrRef(tree, obj, tree.attrname)
+
+  elif isinstance(tree, Subscript):
+    obj = build_expr(execpath, space, tree.expr, evals)
+    subs = [ build_expr(execpath, space, sub, evals) for sub in tree.subs ]
+    expr = SubRef(tree, obj, subs)
+
+  elif isinstance(tree, Slice):
+    obj = build_expr(execpath, space, tree.expr, evals)
+    lower = upper = None
+    if tree.lower:
+      lower = build_expr(execpath, space, tree.lower, evals)
+    if tree.upper:
+      upper = build_expr(execpath, space, tree.upper, evals)
+    expr = SliceRef(tree, obj, lower, upper)
+
+  elif isinstance(tree, Tuple):
+    elements = [ build_expr(execpath, space, node, evals) for node in tree.nodes ]
+    expr = TupleType(tree, elements)
+
+  elif isinstance(tree, List):
+    elements = [ build_expr(execpath, space, node, evals) for node in tree.nodes ]
+    expr = ListType(tree, elements)
+
+  elif isinstance(tree, Dict):
+    items = [ (build_expr(execpath, space, k, evals), build_expr(execpath, space, v, evals))
+              for (k,v) in tree.items ]
+    expr = DictType(tree, items)
+
+  # +, -, *, /, %, //, <<, >>, **, &, |, ^
+  elif (isinstance(tree, Add) or isinstance(tree, Sub) or
+        isinstance(tree, Mul) or isinstance(tree, Div) or
+        isinstance(tree, Mod) or isinstance(tree, FloorDiv) or
+        isinstance(tree, LeftShift) or isinstance(tree, RightShift) or
+        isinstance(tree, Power) or isinstance(tree, Bitand) or
+        isinstance(tree, Bitor) or isinstance(tree, Bitxor)):
+    op = tree.__class__.__name__
+    left = build_expr(execpath, space, tree.left, evals)
+    right = build_expr(execpath, space, tree.right, evals)
+    expr = BinaryOp(tree, op, left, right)
+
+  # ==, !=, <=, >=, <, >
+  elif isinstance(tree, Compare):
+    expr0 = build_expr(execpath, space, tree.expr, evals)
+    comps = [ (op, build_expr(execpath, space, node, evals)) for (op,node) in tree.ops ]
+    expr = CompareOp(tree, expr0, comps)
+
+  # +,-
+  elif isinstance(tree, UnaryAdd) or isinstance(tree, UnarySub):
+    value = build_expr(execpath, space, tree.expr, evals)
+    expr = UnaryOp(tree.__class__, value)
+
+  # and, or
+  elif (isinstance(tree, And) or isinstance(tree, Or)):
+    nodes = [ build_expr(execpath, space, node, evals) for node in tree.nodes ]
+    expr = BooleanOp(tree, tree.__class__.__name__, nodes)
+
+  # not
+  elif isinstance(tree, Not):
+    value = build_expr(execpath, space, tree.expr, evals)
+    expr = NotOp(tree, value)
+
+  # lambda
+  elif isinstance(tree, Lambda):
+    defaults = [ build_expr(execpath, space, value, evals) for value in tree.defaults ]
+    expr = LambdaFuncType(tree, space, tree.argnames,
+                          defaults, tree.varargs, tree.kwargs, tree.code)
+
+  # yield (for python 2.5)
+  elif isinstance(tree, Yield):
+    value = build_expr(execpath, space, tree.value, evals)
+    expr = GeneratorSlot(tree, value)
+    evals.append(('y', expr)) # XXX
+
+  else:
+    raise SyntaxError(tree)
+
+  assert isinstance(expr, TypeNode) or isinstance(expr, tuple), expr
+  evals.append((None, expr))
+  return expr
+
+
+# build_stmt
+def build_stmt(execpath, space, tree, evals, isfuncdef=False):
+  assert isinstance(execpath, ExecutionNode)
+  if 2 <= debug:
+    print >>stderr, 'build: %r' % tree
+
+  def assign(n, v):
+    if isinstance(n, AssName):
+      space[n.name].bind(v)
+    elif isinstance(n, AssTuple):
+      tup = TupleUnpack(n, v, len(n.nodes))
+      for (i,c) in enumerate(n.nodes):
+        assign(c, tup.get_element(i))
+    elif isinstance(n, AssAttr):
+      obj = build_expr(execpath, space, n.expr, evals)
+      AttrAssign(n, obj, n.attrname, v)
+    elif isinstance(n, Subscript):
+      obj = build_expr(execpath, space, n.expr, evals)
+      subs = [ build_expr(execpath, space, expr, evals) for expr in n.subs ]
+      evals.extend( (False, sub) for sub in subs )
+      SubAssign(n, obj, subs, v)
+    else:
+      raise TypeError(n)
+    return
+
+  # def
+  if isinstance(tree, Function):
+    name = tree.name
+    defaults = [ build_expr(execpath, space, value, evals) for value in tree.defaults ]
+    func = FuncType(tree, space, name, tree.argnames,
+                    defaults, tree.varargs, tree.kwargs, tree.code)
+    space[name].bind(func)
+
+  # class
+  elif isinstance(tree, Class):
+    name = tree.name
+    bases = [ build_expr(execpath, space, base, evals) for base in tree.bases ]
+    klass = ClassType(tree, execpath, space, name, bases, tree.code, evals)
+    space[name].bind(klass)
+
+  # assign
+  elif isinstance(tree, Assign):
+    for n in tree.nodes:
+      value = build_expr(execpath, space, tree.expr, evals)
+      assign(n, value)
+
+  # return
+  elif isinstance(tree, Return):
+    value = build_expr(execpath, space, tree.value, evals)
+    evals.append(('r', value))
+
+  # yield (for python 2.4)
+  elif isinstance(tree, Yield):
+    value = build_expr(execpath, space, tree.value, evals)
+    evals.append(('y', value)) # XXX
+
+  # (mutliple statements)
+  elif isinstance(tree, Stmt):
+    stmt = None
+    for stmt in tree.nodes:
+      build_stmt(execpath, space, stmt, evals)
+    if isfuncdef:
+      # if the last statement is not a Return
+      if not isinstance(stmt, Return):
+        value = NONE_TYPE
+        evals.append(('r', value))
+
+  # if, elif, else
+  elif isinstance(tree, If):
+    for (expr,stmt) in tree.tests:
+      value = build_expr(execpath, space, expr, evals)
+      build_stmt(execpath, space, stmt, evals)
+    if tree.else_:
+      build_stmt(execpath, space, tree.else_, evals)
+
+  # for
+  elif isinstance(tree, For):
+    seq = build_expr(execpath, space, tree.list, evals)
+    assign(tree.assign, IterRef(tree.list, seq))
+    build_stmt(execpath, space, tree.body, evals)
+    if tree.else_:
+      build_stmt(execpath, space, tree.else_, evals)
+
+  # while
+  elif isinstance(tree, While):
+    value = build_expr(execpath, space, tree.test, evals)
+    build_stmt(execpath, space, tree.body, evals)
+    if tree.else_:
+      build_stmt(execpath, space, tree.else_, evals)
+
+  # try ... except
+  elif isinstance(tree, TryExcept):
+    build_stmt(execpath, space, tree.body, evals)
+    #XXX exceptions.update(__)
+    for (exc,e,stmt) in tree.handlers:
+      value = build_expr(execpath, space, exc, evals)
+      assign(e, value)
+      build_stmt(execpath, space, stmt, evals)
+    if tree.else_:
+      build_stmt(execpath, space, tree.else_, evals)
+
+  # try ... finally
+  elif isinstance(tree, TryFinally):
+    build_stmt(execpath, space, tree.body, evals)
+    build_stmt(execpath, space, tree.final, evals)
+
+  # raise
+  elif isinstance(tree, Raise):
+    if tree.expr2:
+      exctype = build_expr(execpath, space, tree.expr1, evals)
+      excarg = build_expr(execpath, space, tree.expr2, evals)
+      exc = exctype # XXX
+    else:
+      value = build_expr(execpath, space, tree.expr1, evals)
+      exc = value # XXX
+    execpath.add_expt(exc)
+
+  # printnl
+  elif isinstance(tree, Printnl):
+    for node in tree.nodes:
+      value = build_expr(execpath, space, node, evals)
+
+  # discard
+  elif isinstance(tree, Discard):
+    value = build_expr(execpath, space, tree.expr, evals)
+
+  # pass
+  elif isinstance(tree, Pass):
+    pass
+
+  # import
+  elif isinstance(tree, Import):
+    pass
+  elif isinstance(tree, From):
+    pass
+
+  # del
+  elif isinstance(tree, AssName):
+    pass
+  elif isinstance(tree, AssTuple):
+    pass
+  elif isinstance(tree, AssAttr):
+    build_expr(execpath, space, tree.expr, evals)
+  elif isinstance(tree, Subscript):
+    build_expr(execpath, space, tree.expr, evals)
+
+  elif isinstance(tree, Assert):
+    if (isinstance(tree.test, CallFunc) and
+        isinstance(tree.test.node, Name) and
+        tree.test.node.name == 'isinstance'):
+      (a,b) = tree.test.args
+      build_expr(execpath, space, a, evals).connect(TypeFilter(a, build_expr(execpath, space, b, evals)))
+
+  else:
+    raise SyntaxError(tree)
+
+  return
+
 
 
 # main
