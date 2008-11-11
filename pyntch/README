@@ -1,0 +1,36 @@
+Pyntch
+README
+
+Pyntch is a PYthoN Type CHecker.  It examines a Python source code
+and infers possible types of the variables, class attributes, and
+return values of functions therein. Then it detects possible
+errors caused by type mismatch. Optionally, Pyntch can infer
+possible exceptions that arise from functions and methods. Unlike
+Pychecker or Pyflakes, it does not check the style issue.
+
+Pyntch can detect the following kinds of errors:
+
+ * type mismatch (e.g. 1+'a')
+ * call of something uncallable (e.g. f(1) where f is a number)
+ * subscript access to unsubscriptable objects (e.g. a[1] where a is a number)
+ * access to undefined attributes (e.g. obj.attr when "obj" does not have "attr")
+
+Pyntch supports most of the features in Python language.
+Therefore it can correctly analyze most programs that are written
+purely in Python. However, due to the nature of source level
+analysis, Pyntch cannot analyze a program that uses extension
+modules, in which the code behavior are embedded in opaque
+binaries.  In that case, a user can instruct Pyntch to use an
+alternative "stub" module which is written in Python and defines
+only the return type of each function, just like C headers.
+
+Pyntch assumes the scope of each namespace is statically defined,
+i.e. all the names (variables, functions, classes and attributes)
+are written down in the source code. Therefore a program that
+Pyntch can analyze correctly has to meet the following conditions:
+
+ * not altering __dict__, globals(), locals()
+ * not using getattr, setattr
+ * not using eval, compile or exec
+
+cannot catch UnboundLocalError
