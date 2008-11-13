@@ -97,6 +97,8 @@ class TypeNode(object):
 ##
 class SimpleTypeNode(TypeNode):
 
+  NAME = None
+
   def __init__(self):
     TypeNode.__init__(self, [self])
     return
@@ -144,11 +146,19 @@ class CompoundTypeNode(TypeNode):
 ##
 class ExceptionFrame(object):
 
-  def __init__(self, parent):
-    self.parent = parent
+  def __init__(self):
     self.expts = set()
+    self.callers = []
     return
 
+  def connect_expt(self, frame):
+    assert isinstance(frame, ExceptionFrame)
+    self.callers.append(frame)
+    if debug:
+      print >>stderr, 'connect_expt: %r :- %r' % (frame, self)
+    self.propagate_expts(self.expts)
+    return
+  
   def add_expt(self, loc, expt):
     expt.loc = loc
     if debug:
@@ -163,36 +173,14 @@ class ExceptionFrame(object):
     return
   
   def propagate_expts(self, expts):
-    self.parent.update_expts(expts)
+    for frame in self.callers:
+      frame.update_expts(expts)
     return
 
   def update_expts(self, expts):
     if expts.difference(self.expts):
       self.expts.update(expts)
       self.propagate_expts(self.expts)
-    return
-
-
-##  ExceptionBroadcaster
-##
-class ExceptionBroadcaster(ExceptionFrame):
-  
-  def __init__(self):
-    ExceptionFrame.__init__(self, self)
-    self.callers = []
-    return
-  
-  def connect_expt(self, frame):
-    assert isinstance(frame, ExceptionFrame)
-    self.callers.append(frame)
-    if debug:
-      print >>stderr, 'connect_expt: %r :- %r' % (frame, self)
-    return
-  
-  def propagate_expts(self, expts):
-    ExceptionFrame.propagate_expts(self, expts)
-    for frame in self.callers:
-      frame.update_expts(expts)
     return
 
   def show(self, p):
@@ -206,9 +194,10 @@ class ExceptionBroadcaster(ExceptionFrame):
 class ExceptionCatcher(ExceptionFrame):
   
   def __init__(self, parent):
-    ExceptionFrame.__init__(self, parent)
+    ExceptionFrame.__init__(self)
     self.handlers = {}
     self.catchall = False
+    ExceptionFrame.connect_expt(self, parent)
     return
   
   def __repr__(self):
@@ -258,10 +247,11 @@ class ExceptionRaiser(ExceptionFrame):
   nodes = []
 
   def __init__(self, parent, loc=None):
-    ExceptionFrame.__init__(self, parent)
-    ExceptionRaiser.nodes.append(self)
+    ExceptionFrame.__init__(self)
     assert not loc or isinstance(loc, Node)
     self.loc = loc
+    ExceptionFrame.connect_expt(self, parent)
+    ExceptionRaiser.nodes.append(self)
     return
   
   def raise_expt(self, expt):
@@ -293,38 +283,6 @@ class UndefinedTypeNode(TypeNode):
   def desc1(self, _):
     return '(undef)'
 
-
-##  PrimitiveType
-##
-class PrimitiveType(SimpleTypeNode):
-  
-  def __init__(self, expr, realtype, rank=0):
-    self.expr = expr
-    self.realtype = realtype
-    self.rank = rank
-    self.typename = realtype.__name__
-    SimpleTypeNode.__init__(self)
-    return
-
-  def __repr__(self):
-    return '<PrimitiveType %s>' % self.typename
-
-  def __eq__(self, obj):
-    return isinstance(obj, PrimitiveType) and self.typename == obj.typename
-  def __hash__(self):
-    return hash(self.typename)
-
-# built-in types
-NONE_TYPE = PrimitiveType(None, type(None))
-TYPE_TYPE = PrimitiveType(None, type)
-BOOL_TYPE = PrimitiveType(None, bool)
-INT_TYPE = PrimitiveType(None, int, 0)
-LONG_TYPE = PrimitiveType(None, long, 1)
-FLOAT_TYPE = PrimitiveType(None, float, 2)
-STR_TYPE = PrimitiveType(None, str, 0)
-UNICODE_TYPE = PrimitiveType(None, unicode, 1)
-NUMBER_TYPE = ( INT_TYPE, LONG_TYPE, FLOAT_TYPE )
-BASESTRING_TYPE = ( STR_TYPE, UNICODE_TYPE )
 
 ##  KeywordArg
 ##
@@ -390,7 +348,7 @@ class ExceptionType(SimpleTypeNode):
 
   def __repr__(self):
     if self.loc:
-      return '<%s: %s> at %s(%d)' % (self.name, self.msg, self.loc.modname, self.loc.lineno)
+      return '<%s: %s> at %s(%d)' % (self.name, self.msg, self.loc._modname, self.loc.lineno)
     else:
       return '<%s: %s>' % (self.name, self.msg)
 
@@ -414,7 +372,6 @@ class ExptMaker(CompoundTypeNode, ExceptionRaiser):
     for obj in src.types:
       # Instantiate an object only if it is a class object.
       # Otherwise, just return the object given.
-      XXX
       if isinstance(obj, ClassType):
         try:
           result = obj.call(self, self.excargs)
@@ -709,11 +666,11 @@ class FuncType(SimpleTypeNode, TreeReporter):
   
   ##  FuncBody
   ##
-  class FuncBody(CompoundTypeNode, ExceptionBroadcaster):
+  class FuncBody(CompoundTypeNode, ExceptionFrame):
 
     def __init__(self, name):
       CompoundTypeNode.__init__(self)
-      ExceptionBroadcaster.__init__(self)
+      ExceptionFrame.__init__(self)
       self.name = name
       return
 
@@ -830,7 +787,7 @@ class FuncType(SimpleTypeNode, TreeReporter):
           'TypeError',
           'too many argument: more than %r' % len(self.argvars)))
     if kwargs:
-      self.space[self.kwarg].bind(DictType([ (STR_TYPE,obj) for obj in kwargs ]))
+      self.space[self.kwarg].bind(DictType([ (BuiltinStrType.get(), obj) for obj in kwargs ]))
     if varargs:
       self.space[self.vararg].bind(TupleType(tuple(varargs)))
     if argvars:
@@ -882,6 +839,9 @@ class ConstFuncType(SimpleTypeNode):
   def __init__(self, obj):
     SimpleTypeNode.__init__(self)
     self.obj = obj
+    return
+
+  def connect_expt(self, frame):
     return
   
   def call(self, caller, args):
@@ -980,11 +940,11 @@ class ClassType(SimpleTypeNode, TreeReporter):
 
   ##  InitMethodBody
   ##
-  class InitMethodBody(OptionalAttr, ExceptionBroadcaster):
+  class InitMethodBody(OptionalAttr, ExceptionFrame):
 
     def __init__(self, instance):
       ClassType.OptionalAttr.__init__(self, instance, '__init__')
-      ExceptionBroadcaster.__init__(self)
+      ExceptionFrame.__init__(self)
       self.types.add(instance)
       return
 
@@ -1229,30 +1189,31 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
     return
 
   VALID_TYPES = {
-    (STR_TYPE, 'Mul', INT_TYPE): STR_TYPE,
-    (UNICODE_TYPE, 'Mul', INT_TYPE): UNICODE_TYPE,
+    ('str', 'Mul', 'int'): 'str',
+    ('unicode', 'Mul', 'int'): 'unicode',
     }
   def update(self):
     for lobj in self.left_types:
       for robj in self.right_types:
         if (lobj,robj) in self.combinations: continue
         self.combinations.add((lobj,robj))
-        if (lobj in NUMBER_TYPE) and (robj in NUMBER_TYPE):
+        if (isinstance(lobj, BuiltinNumberType) and
+            isinstance(robj, BuiltinNumberType)):
           if self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv'):
             if lobj.rank < robj.rank:
               self.update_types(set([robj]))
             else:
               self.update_types(set([lobj]))
             continue
-        if lobj in BASESTRING_TYPE and robj in BASESTRING_TYPE and self.op == 'Add':
-          if lobj.rank < robj.rank:
-            self.update_types(set([robj]))
-          else:
-            self.update_types(set([lobj]))
+        if (isinstance(lobj, BuiltinBaseStringType) and
+            isinstance(robj, BuiltinBaseStringType) and
+            self.op == 'Add'):
+          self.update_types(set([robj]))
           continue
-        k = (lobj, self.op, robj)
+        k = (lobj.NAME, self.op, robj.NAME)
         if k in self.VALID_TYPES:
-          self.update_types(set([self.VALID_TYPES[k]]))
+          v = BUILTIN_TYPE[self.VALID_TYPES[k]]
+          self.update_types(set([v]))
           continue
         self.raise_expt(ExceptionType(
           'TypeError',
@@ -1269,7 +1230,7 @@ class CompareOp(CompoundTypeNode, ExceptionRaiser):
   def __init__(self, parent_frame, loc, expr0, comps):
     CompoundTypeNode.__init__(self)
     ExceptionRaiser.__init__(self, parent_frame, loc)
-    self.types.add(BOOL_TYPE)
+    self.types.add(BuiltinBoolType.get())
     self.expr0 = expr0
     self.comps = comps
     self.expr0.connect(self)
@@ -1292,7 +1253,7 @@ class BooleanOp(CompoundTypeNode):
   
   def __init__(self, op, nodes):
     CompoundTypeNode.__init__(self)
-    self.types.add(BOOL_TYPE)
+    self.types.add(BuiltinBoolType.get())
     self.op = op
     self.nodes = nodes
     for node in self.nodes:
@@ -1333,7 +1294,7 @@ class ListType(SimpleTypeNode):
 
     def call(self, caller, args):
       args[0].connect(self.target.elem)
-      return ConstFuncType(NONE_TYPE)
+      return ConstFuncType(BuiltinNoneType.get())
 
   #
   def __init__(self, elems):
@@ -1373,9 +1334,9 @@ class ListType(SimpleTypeNode):
     elif name == 'remove':
       return self.AppendMethod(self)
     elif name == 'reverse':
-      return ConstFuncType(NONE_TYPE)
+      return ConstFuncType(BuiltinNoneType.get())
     elif name == 'sort':
-      return ConstFuncType(NONE_TYPE)
+      return ConstFuncType(BuiltinNoneType.get())
     raise NodeTypeError
 
 
@@ -1650,9 +1611,9 @@ class ModuleType(FuncType, ExceptionFrame):
 
   def __init__(self, reporter, tree, parent_space, name):
     FuncType.__init__(self, reporter, self, parent_space, name, (), (), False, False, tree.node)
-    self.space.register_var('__name__').bind(STR_TYPE)
+    ExceptionFrame.__init__(self)
     self.attrs = {}
-    #FunCall(self, tree, self, ())
+    FunCall(self, tree, self, ())
     return
   
   def __repr__(self):
@@ -1681,7 +1642,44 @@ class ModuleType(FuncType, ExceptionFrame):
 ##  Built-in Stuff
 ##
 
-##  BuiltInModuleType
+##  BuiltinType
+##
+class BuiltinType(SimpleTypeNode):
+
+  NAME = None
+  SINGLETON = None
+
+  def __repr__(self):
+    return '<%s>' % self.NAME
+
+  @classmethod
+  def get(klass):
+    if not klass.SINGLETON:
+      klass.SINGLETON = klass()
+    return klass.SINGLETON
+
+class BuiltinNoneType(BuiltinType): NAME = 'NoneType'
+class BuiltinBoolType(BuiltinType): NAME = 'bool'
+class BuiltinNumberType(BuiltinType):
+  NAME = 'number'
+  rank = 0
+class BuiltinIntType(BuiltinNumberType):
+  NAME = 'int'
+  rank = 1
+class BuiltinLongType(BuiltinIntType):
+  NAME = 'long'
+  rank = 2
+class BuiltinFloatType(BuiltinNumberType):
+  NAME = 'float'
+  rank = 3
+class BuiltinComplexType(BuiltinNumberType):
+  NAME = 'complex'
+  rank = 4
+class BuiltinBaseStringType(BuiltinType): NAME = 'basestring'
+class BuiltinStrType(BuiltinBaseStringType): NAME = 'str'
+class BuiltinUnicodeType(BuiltinBaseStringType): NAME = 'unicode'
+
+##  BuiltinModuleType
 ##
 class BuiltinModuleType(ModuleType):
 
@@ -1715,13 +1713,9 @@ class BuiltinFuncType(SimpleTypeNode):
       ExceptionRaiser.__init__(self, parent_frame)
       return
     
-    def connect_expt(self, frame):
-      assert isinstance(frame, ExceptionFrame)
-      return
-    
     def recv_basetype(self, types, src):
       for obj in src.types:
-        if isinstance(obj, PrimitiveType) and obj.typename in types:
+        if isinstance(obj, BuiltinType) and obj.typename in types:
           pass
         else:
           self.raise_expt(ExceptionType(
@@ -1759,7 +1753,7 @@ class BuiltinIntFunc(BuiltinFuncType):
   
     def recv(self, src):
       for obj in src.types:
-        if not isinstance(obj, PrimitiveType):
+        if not isinstance(obj, BuiltinType):
           self.raise_expt(ExceptionType(
             'TypeError',
             'unsupported conversion: %s' % obj.typename))
@@ -1780,7 +1774,7 @@ class BuiltinIntFunc(BuiltinFuncType):
 
   def call(self, caller, args):
     if not args:
-      return INT_TYPE
+      return BuiltinIntType.get()
     if 2 < len(args):
       caller.raise_expt(ExceptionType(
         'TypeError',
@@ -1800,7 +1794,7 @@ class BuiltinStrFunc(BuiltinFuncType):
     
     def __init__(self, parent_frame, obj):
       BuiltinFuncType.Body.__init__(self, parent_frame)
-      self.types.add(STR_TYPE)
+      self.types.add(BuiltinStrType.get())
       self.obj = obj
       self.obj.connect(self)
       return
@@ -1813,7 +1807,7 @@ class BuiltinStrFunc(BuiltinFuncType):
 
   def call(self, caller, args):
     if not args:
-      return STR_TYPE
+      return BuiltinStrType.get()
     if 1 < len(args):
       caller.raise_expt(ExceptionType(
         'TypeError',
@@ -1836,7 +1830,7 @@ class BuiltinRangeFunc(BuiltinFuncType):
       for arg in args:
         arg.connect(self, self.recv_int)
       XXX
-      self.ListType([INT_TYPE])
+      self.ListType([BuiltinIntType.get()])
       return
   
   def call(self, caller, args):
@@ -1853,9 +1847,10 @@ class BuiltinNamespace(Namespace):
 
   def __init__(self):
     Namespace.__init__(self, None, '')
-    self.register_var('True').bind(BOOL_TYPE)
-    self.register_var('False').bind(BOOL_TYPE)
-    self.register_var('None').bind(NONE_TYPE)
+    self.register_var('True').bind(BuiltinBoolType.get())
+    self.register_var('False').bind(BuiltinBoolType.get())
+    self.register_var('None').bind(BuiltinNoneType.get())
+    self.register_var('__name__').bind(BuiltinStrType.get())
 
     # int,float,bool,buffer,chr,dict,file,open,list,set,frozenset,
     # object,xrange,slice,type,unicode,tuple,super,str,staticmethod,classmethod,reversed
@@ -1876,14 +1871,20 @@ class BuiltinNamespace(Namespace):
 
 ##  Global stuff
 ##
+BUILTIN_TYPE = dict(
+  (cls.NAME, cls.get()) for cls in
+  ( BuiltinNoneType, BuiltinBoolType, BuiltinIntType,
+    BuiltinLongType, BuiltinFloatType, BuiltinStrType,
+    BuiltinUnicodeType
+    ))
 BUILTIN_NAMESPACE = BuiltinNamespace()
-BUILTIN_MODULE = {
-  'sys': BuiltinModuleType('sys'),
-}
 
 # find_module
+class ModuleNotFound(Exception): pass
 def find_module(name, paths):
   import os.path
+  if debug:
+    print >>stderr, 'find_module: name=%r' % name
   fname = name+'.py'
   for dirname in paths:
     path = os.path.join(dirname, name)
@@ -1892,25 +1893,23 @@ def find_module(name, paths):
     path = os.path.join(dirname, fname)
     if os.path.exists(path):
       return path
-  raise ImportError(name)
+  raise ModuleNotFound(name)
 
 # load_module
 def load_module(modname, asname=None, paths=['.']):
-  if modname in BUILTIN_MODULE:
-    return BUILTIN_MODULE[modname]
   def rec(n, parent):
-    n.parent = parent
-    n.modname = modname
+    n._modname = modname
     for c in n.getChildNodes():
       rec(c, n)
     return
   path = find_module(modname, paths)
   name = asname or modname
+  if debug:
+    print >>stderr, 'load_module: %r' % path
   tree = compiler.parseFile(path)
   rec(tree, None)
   reporter = TreeReporter()
   return ModuleType(reporter, tree, BUILTIN_NAMESPACE, name)
-  
 
 
 ##  build_assign(frame, namespace, node1, node2, evals)
@@ -1941,7 +1940,8 @@ def build_assign(frame, space, n, v, evals):
 def build_expr(frame, space, tree, evals):
 
   if isinstance(tree, Const):
-    expr = PrimitiveType(tree, type(tree.value))
+    typename = type(tree.value).__name__
+    expr = BUILTIN_TYPE[typename]
 
   elif isinstance(tree, Name):
     try:
@@ -2043,7 +2043,7 @@ def build_expr(frame, space, tree, evals):
   elif isinstance(tree, Yield):
     value = build_expr(frame, space, tree.value, evals)
     expr = GeneratorSlot(value)
-    evals.append(('y', expr)) # XXX
+    evals.append(('y', expr)) # XXX ???
 
   else:
     raise SyntaxError(tree)
@@ -2110,7 +2110,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     if isfuncdef:
       # if the last statement is not a Return
       if not isinstance(stmt, Return):
-        value = NONE_TYPE
+        value = BuiltinNoneType.get()
         evals.append(('r', value))
 
   # if, elif, else
