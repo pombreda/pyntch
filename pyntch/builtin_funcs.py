@@ -1,42 +1,12 @@
 #!/usr/bin/env python
 
+##  This module should not be imported as toplevel,
+##  as it causes circular imports!
+
 from typenode import SimpleTypeNode, CompoundTypeNode
 from frame import ExceptionType, ExceptionRaiser
-from builtin_types import IntType, StrType
-
-
-##  BuiltinFuncType
-##
-class BuiltinFuncType(SimpleTypeNode):
-
-  NAME = None
-
-  class Body(CompoundTypeNode, ExceptionRaiser):
-    
-    def __init__(self, parent_frame):
-      CompoundTypeNode.__init__(self)
-      ExceptionRaiser.__init__(self, parent_frame)
-      return
-    
-    def recv_basetype(self, types, src):
-      for obj in src.types:
-        if isinstance(obj, BuiltinType) and obj.typename in types:
-          pass
-        else:
-          self.raise_expt(ExceptionType(
-            'TypeError',
-            'invalid type: %r (not %s)' % (obj, ','.join(types))))
-      return
-
-    def recv_int(self, src):
-      return self.recv_basetype(('int','long'), src)
-    def recv_str(self, src):
-      return self.recv_basetype(('str','unicode'), src)
-    def recv_xint(self, src):
-      return self.recv_basetype(('int','long','float','bool'), src)
-
-  def __repr__(self):
-    return '<builtin %s>' % self.NAME
+from construct import ClassType, InstanceType
+from builtin_types import IntType, StrType, BuiltinFuncType
 
 
 ##  IntFunc

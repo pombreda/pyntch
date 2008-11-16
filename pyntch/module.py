@@ -51,7 +51,7 @@ class ModuleType(FuncType, ExceptionFrame):
   def show(self, p):
     p('[%s]' % self.name)
     for (k,v) in sorted(self.space):
-      p(' %s = %s' % (k, v.describe()))
+      p('  %s = %s' % (k, v.describe()))
     self.body.show(p)
     return
   
@@ -117,17 +117,15 @@ BUILTIN_NAMESPACE = BuiltinNamespace()
 class ModuleNotFound(Exception): pass
 
 def find_module(name, paths, debug=0):
+  # XXX support hierarchical packages
   import os.path
   if debug:
     print >>stderr, 'find_module: name=%r' % name
-  fname = name+'.py'
-  for dirname in paths:
-    path = os.path.join(dirname, name)
-    if os.path.exists(path):
-      return path
-    path = os.path.join(dirname, fname)
-    if os.path.exists(path):
-      return path
+  for dirname in paths+['stub']:
+    for fname in (name, name+'.py', name+'.pyi'):
+      path = os.path.join(dirname, fname)
+      if os.path.exists(path):
+        return path
   raise ModuleNotFound(name)
 
 # load_module

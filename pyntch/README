@@ -1,6 +1,15 @@
 Pyntch
 README
 
+
+# TODO:
+#  builtin functions
+#  builtin methods
+#  +=
+#  __add__ etc.
+#  automatic coercion
+#  hierarchical types (to handle exception catching)
+
 Pyntch is a PYthoN Type CHecker.  It examines a Python source code
 and infers possible types of the variables, class attributes, and
 return values of functions therein. Then it detects possible

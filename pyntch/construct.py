@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from typenode import SimpleTypeNode, CompoundTypeNode
+from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError
 from namespace import Namespace, Variable
 from frame import ExceptionType, ExceptionFrame
 
@@ -64,7 +64,7 @@ class FuncType(SimpleTypeNode, TreeReporter):
       yields = [ obj for (t,obj) in evals if t == 'y' ]
       assert returns
       if yields:
-        retvals = [ GeneratorType(yields) ]
+        retvals = [ GeneratorType([ slot.value for slot in yields ]) ]
       else:
         retvals = returns
       for obj in retvals:
@@ -201,9 +201,9 @@ class FuncType(SimpleTypeNode, TreeReporter):
       r.append('**'+self.kwarg)
     p('def %s(%s):' % (self.name, ', '.join(r)) )
     for (k,v) in sorted(self.space):
-      p(' %s = %s' % (k, v.describe()))
+      p('  %s = %s' % (k, v.describe()))
     self.body.show(p)
-    p(' return %s' % self.body.describe())
+    p('  return %s' % self.body.describe())
     return
 
 
@@ -345,9 +345,9 @@ class ClassType(SimpleTypeNode, TreeReporter):
   def show(self, p):
     p('class %s:' % self.name)
     for (_, attr) in sorted(self.attrs.iteritems()):
-      p(' class.%s = %s' % (attr.name, attr.describe()))
+      p('  class.%s = %s' % (attr.name, attr.describe()))
     for (_, attr) in sorted(self.instance.attrs.iteritems()):
-      p(' instance.%s = %s' % (attr.name, attr.describe()))
+      p('  instance.%s = %s' % (attr.name, attr.describe()))
     return
 
 

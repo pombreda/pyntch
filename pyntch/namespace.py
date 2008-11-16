@@ -269,8 +269,18 @@ class Namespace:
         for qif in qual.ifs:
           self.register_names(qif.test)
     
+  # generator expression
+    elif isinstance(tree, ast.GenExpr):
+      gen = tree.code
+      self.register_names(gen.expr)
+      for qual in gen.quals:
+        self.register_names(qual.iter)
+        self.register_names(qual.assign)
+        for qif in qual.ifs:
+          self.register_names(qif.test)
+    
     else:
-      raise SyntaxError('unsupported syntax: %r' % tree)
+      raise SyntaxError('unsupported syntax: %r (%s:%d)' % (tree, tree._modname, tree.lineno))
     return
 
   def import_all(self, space):
