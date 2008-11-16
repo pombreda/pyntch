@@ -5,7 +5,7 @@ from typenode import TypeNode, UndefinedTypeNode
 from frame import ExceptionType, ExceptionFrame, ExceptionCatcher, ExceptionMaker, TypeChecker
 from construct import KeywordArg, FuncType, LambdaFuncType, ClassType
 from expression import AttrAssign, SubAssign, AttrRef, SubRef, IterRef, \
-     FunCall, BinaryOp, CompareOp, BooleanOp, AssignOp, GeneratorSlot
+     FunCall, BinaryOp, CompareOp, BooleanOp, AssignOp
 #from expression import SliceRef, UnaryOp, NotOp
 
 
@@ -37,7 +37,7 @@ def build_assign(reporter, frame, space, n, v, evals):
 ##  Constructs a TypeNode from a given syntax tree.
 ##
 def build_expr(reporter, frame, space, tree, evals):
-  from builtin_types import BUILTIN_TYPE, ListType, DictType, TupleType
+  from builtin_types import BUILTIN_TYPE, ListType, DictType, TupleType, GeneratorSlot
 
   if isinstance(tree, ast.Const):
     typename = type(tree.value).__name__
@@ -137,6 +137,17 @@ def build_expr(reporter, frame, space, tree, evals):
     for qual in tree.quals:
       seq = build_expr(reporter, frame, space, qual.list, evals)
       build_assign(reporter, frame, space, qual.assign, IterRef(frame, qual.list, seq), evals)
+      for qif in qual.ifs:
+        build_expr(reporter, frame, space, qif.test, evals)
+
+  # generator expression
+  elif isinstance(tree, ast.GenExpr):
+    gen = tree.code
+    elems = [ build_expr(reporter, frame, space, gen.expr, evals) ]
+    expr = ListType(elems)
+    for qual in gen.quals:
+      seq = build_expr(reporter, frame, space, qual.iter, evals)
+      build_assign(reporter, frame, space, qual.assign, IterRef(frame, qual.iter, seq), evals)
       for qif in qual.ifs:
         build_expr(reporter, frame, space, qif.test, evals)
 

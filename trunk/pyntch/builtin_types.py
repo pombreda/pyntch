@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+##  This module should not be imported as toplevel,
+##  as it causes circular imports!
+
 from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError
 from frame import ExceptionType, ExceptionRaiser
 
@@ -25,9 +28,43 @@ class BuiltinAggregateType(BuiltinType):
   pass
 
 
+##  BuiltinFuncType
+##
+class BuiltinFuncType(SimpleTypeNode):
+
+  NAME = None
+
+  class Body(CompoundTypeNode, ExceptionRaiser):
+    
+    def __init__(self, parent_frame):
+      CompoundTypeNode.__init__(self)
+      ExceptionRaiser.__init__(self, parent_frame)
+      return
+    
+    def recv_basetype(self, types, src):
+      for obj in src.types:
+        if isinstance(obj, BuiltinType) and obj.typename in types:
+          pass
+        else:
+          self.raise_expt(ExceptionType(
+            'TypeError',
+            'invalid type: %r (not %s)' % (obj, ','.join(types))))
+      return
+
+    def recv_int(self, src):
+      return self.recv_basetype(('int','long'), src)
+    def recv_str(self, src):
+      return self.recv_basetype(('str','unicode'), src)
+    def recv_xint(self, src):
+      return self.recv_basetype(('int','long','float','bool'), src)
+
+  def __repr__(self):
+    return '<builtin %s>' % self.NAME
+
+
 ##  ConstFuncType
 ##
-class ConstFuncType(SimpleTypeNode):
+class ConstFuncType(BuiltinFuncType):
 
   def __init__(self, obj):
     SimpleTypeNode.__init__(self)
@@ -194,7 +231,7 @@ class ListType(BuiltinAggregateType):
 
   #
   def __init__(self, elems):
-    SimpleTypeNode.__init__(self)
+    BuiltinAggregateType.__init__(self)
     self.elem = self.Element(elems)
     return
   
@@ -254,7 +291,7 @@ class DictType(BuiltinAggregateType):
   def __init__(self, items):
     self.key = self.Item( k for (k,v) in items )
     self.value = self.Item( v for (k,v) in items )
-    SimpleTypeNode.__init__(self)
+    BuiltinAggregateType.__init__(self)
     return
   
   def __repr__(self):
@@ -381,9 +418,9 @@ class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
     loc = None
     if isinstance(tupobj, TupleType):
       loc = tupobj.loc
-    ExceptionRaiser.__init__(self, parent_frame, loc)
     self.tupobj = tupobj
     self.elems = [ self.Element(self, i) for i in xrange(nelems) ]
+    ExceptionRaiser.__init__(self, parent_frame, loc)
     self.tupobj.connect(self, self.recv_tupobj)
     return
 
@@ -419,8 +456,8 @@ class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
 class GeneratorType(BuiltinAggregateType):
 
   def __init__(self, yields):
-    SimpleTypeNode.__init__(self)
-    self.elem = ListType.Element([ slot.value for slot in yields ])
+    BuiltinAggregateType.__init__(self)
+    self.elem = ListType.Element(yields)
     return
 
   def __repr__(self):
@@ -431,6 +468,26 @@ class GeneratorType(BuiltinAggregateType):
 
   def get_iter(self):
     return self.elem
+
+
+##  GeneratorSlot
+##
+class GeneratorSlot(CompoundTypeNode):
+
+  def __init__(self, value):
+    CompoundTypeNode.__init__(self)
+    self.types.add(self)
+    self.value = value
+    return
+
+
+##  FileType
+##
+class FileType(BuiltinType):
+
+  def __init__(self, args):
+    BuiltinType.__init__(self)
+    return
 
 
 #

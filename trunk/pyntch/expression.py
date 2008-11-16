@@ -2,7 +2,6 @@
 
 from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError
 from frame import ExceptionType, ExceptionRaiser
-#from builtin_types import NumberType, BoolType, ListType, BaseStringType, BUILTIN_TYPE
 
 
 ##  FunCall
@@ -11,9 +10,9 @@ class FunCall(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, func, args):
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
     self.func = func
     self.args = args
+    ExceptionRaiser.__init__(self, parent_frame, loc)
     func.connect(self, self.recv_func)
     return
 
@@ -254,17 +253,6 @@ class SubAssign(CompoundTypeNode, ExceptionRaiser):
         self.raise_expt(ExceptionType(
           'TypeError',
           'unsubscriptable object: %r' % obj))
-    return
-
-
-##  GeneratorSlot
-##
-class GeneratorSlot(CompoundTypeNode):
-
-  def __init__(self, value):
-    CompoundTypeNode.__init__(self)
-    self.types.add(self)
-    self.value = value
     return
 
 

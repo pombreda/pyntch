@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import sys
 stderr = sys.stderr
+
 from compiler import ast
 from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError
 
@@ -182,7 +183,7 @@ class ExceptionMaker(CompoundTypeNode, ExceptionRaiser):
     return '<exception %r(%s)>' % (self.exctype, ','.join(map(repr, self.excargs)))
 
   def recv_type(self, src):
-    from builtin_types import ClassType
+    from construct import ClassType
     for obj in src.types:
       # Instantiate an object only if it is a class object.
       # Otherwise, just return the object given.

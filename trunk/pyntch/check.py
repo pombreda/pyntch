@@ -1,18 +1,9 @@
 #!/usr/bin/env python
 
 import sys
-from frame import ExceptionRaiser
+from typenode import TypeNode
+from frame import ExceptionFrame, ExceptionRaiser
 from module import load_module
-
-
-# TODO:
-#  hierarchical types (to handle exception catching)
-#  hierarchical packages
-#  builtin functions
-#  builtin type methods
-#  +=
-#  __add__ etc.
-#  automatic coercion
 
 # main
 def main(argv):
@@ -27,6 +18,8 @@ def main(argv):
   debug = 0
   for (k, v) in opts:
     if k == '-d': debug += 1
+  TypeNode.debug = debug
+  ExceptionFrame.debug = debug
   for name in args:
     ExceptionRaiser.reset()
     module = load_module(name, '__main__', debug=debug)
