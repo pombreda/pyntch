@@ -101,3 +101,14 @@ class UndefinedTypeNode(TypeNode):
   
   def desc1(self, _):
     return '(undef)'
+
+  def call(self, caller, args):
+    return self
+  def get_attr(self, name):
+    return self
+  def get_element(self, subs, write=False):
+    return self
+  def get_iter(self):
+    return self
+  
+  

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError
-from frame import ExceptionType, ExceptionRaiser
+from exception import ExceptionType, ExceptionFrame, ExceptionRaiser
 
 
 ##  FunCall
@@ -23,8 +23,9 @@ class FunCall(CompoundTypeNode, ExceptionRaiser):
     for func in src.types:
       try:
         result = func.call(self, self.args)
-        result.connect_expt(self)
         result.connect(self)
+        if isinstance(result, ExceptionFrame):
+          result.connect_expt(self)
       except NodeTypeError:
         self.raise_expt(ExceptionType(
           'TypeError',
@@ -38,10 +39,10 @@ class AttrRef(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, target, attrname):
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
     self.target = target
     self.attrname = attrname
     self.objs = set()
+    ExceptionRaiser.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
     return
 
@@ -99,11 +100,11 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, op, left, right):
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
     self.op = op
     self.left_types = set()
     self.right_types = set()
     self.combinations = set()
+    ExceptionRaiser.__init__(self, parent_frame, loc)
     left.connect(self, self.recv_left)
     right.connect(self, self.recv_right)
     return
@@ -163,10 +164,10 @@ class CompareOp(CompoundTypeNode, ExceptionRaiser):
   def __init__(self, parent_frame, loc, expr0, comps):
     from builtin_types import BoolType
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
     self.types.add(BoolType.get())
     self.expr0 = expr0
     self.comps = comps
+    ExceptionRaiser.__init__(self, parent_frame, loc)
     self.expr0.connect(self)
     for (_,expr) in self.comps:
       expr.connect(self)
@@ -280,5 +281,3 @@ class IterRef(CompoundTypeNode, ExceptionRaiser):
           '%r might not be an iterator: %r' % (self.target, obj)))
         continue
     return
-
-    

@@ -173,9 +173,9 @@ class ExceptionMaker(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, exctype, excargs):
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
     self.exctype = exctype
     self.excargs = excargs
+    ExceptionRaiser.__init__(self, parent_frame, loc)
     exctype.connect(self, self.recv_type)
     return
   
@@ -183,7 +183,7 @@ class ExceptionMaker(CompoundTypeNode, ExceptionRaiser):
     return '<exception %r(%s)>' % (self.exctype, ','.join(map(repr, self.excargs)))
 
   def recv_type(self, src):
-    from construct import ClassType
+    from function import ClassType
     for obj in src.types:
       # Instantiate an object only if it is a class object.
       # Otherwise, just return the object given.
@@ -205,35 +205,63 @@ class ExceptionMaker(CompoundTypeNode, ExceptionRaiser):
 
 ##  TypeChecker
 ##
-class TypeChecker(CompoundTypeNode, ExceptionRaiser):
+class TypeChecker(CompoundTypeNode):
   
-  def __init__(self, parent, *typeobjs):
+  def __init__(self, parent_frame, types, blame=None):
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent)
-    self.typeobjs = typeobjs
+    self.parent_frame = parent_frame
+    self.types = types
     self.validtypes = set()
-    for obj in typeobjs:
-      obj.connect(self, self.recv_typeobj)
+    self.blame = blame
+    for obj in types:
+      obj.connect(self, self.recv_type)
     return
 
   def __repr__(self):
-    return ('<TypeChecker: %s: %s>' % 
-            (','.join(map(repr, self.typeobjs)),
+    return ('<TypeChecker: %s: {%s}>' % 
+            (','.join(map(repr, self.types)),
              '|'.join(map(repr, self.validtypes))))
 
-  def recv_typeobj(self, src):
+  def recv_type(self, src):
     self.validtypes.update(src.types)
     return
   
   def recv(self, src):
     types = set()
-    validtypes = set( obj.typeobj for obj in self.validtypes )
     for obj in src.types:
-      if obj in validtypes:
+      if obj in self.validtypes:
         types.add(obj)
-      else:
-        self.raise_expt(ExceptionType(
+      elif self.blame:
+        self.parent_frame.raise_expt(ExceptionType(
           'TypeError',
-          '%r not type in %r' % (obj, validtypes)))
+          '%s (%s) must be {%s}' % (self.blame, obj, '|'.join(map(repr, self.validtypes)))))
+    self.update_types(types)
+    return
+
+
+##  ElementTypeChecker
+##
+class ElementTypeChecker(TypeChecker):
+  
+  def recv(self, src):
+    for obj in src.types:
+      try:
+        obj.get_iter().connect(self, self.recv_elemobj)
+      except NodeTypeError:
+        if self.blame:
+          self.parent_frame.raise_expt(ExceptionType(
+            'TypeError',
+            '%s (%s) must be iterable' % (self.blame, obj)))
+    return
+  
+  def recv_elemobj(self, src):
+    types = set()
+    for obj in src.types:
+      if obj in self.validtypes:
+        types.add(obj)
+      elif self.blame:
+        self.parent_frame.raise_expt(ExceptionType(
+          'TypeError',
+          '%s (%s) must be [{%s}]' % (self.blame, obj, '|'.join(map(repr, self.validtypes)))))
     self.update_types(types)
     return

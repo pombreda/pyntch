@@ -4,74 +4,59 @@
 ##  as it causes circular imports!
 
 from typenode import SimpleTypeNode, CompoundTypeNode
-from frame import ExceptionType, ExceptionRaiser
-from construct import ClassType, InstanceType
-from builtin_types import IntType, StrType, BuiltinFuncType
+from exception import ExceptionType, ExceptionRaiser
+from function import ClassType, InstanceType
+from builtin_types import NumberType, BoolType, IntType, LongType, StrType, ListType, BuiltinFunc, INT_ARG, STR_ARG, ANY_ARG
 
 
 ##  IntFunc
 ##
-class IntFunc(BuiltinFuncType):
+class IntFunc(BuiltinFunc):
 
-  NAME = 'int'
-
-  ##  Body
-  ##
-  class Body(BuiltinFuncType.Body):
+  class IntConversion(CompoundTypeNode):
     
-    def __init__(self, parent_frame, obj, base=None):
-      BuiltinFuncType.Body.__init__(self, parent_frame)
+    def __init__(self, parent_frame, obj):
+      CompoundTypeNode.__init__(self)
+      self.parent_frame = parent_frame
       obj.connect(self)
-      if base:
-        base.connect(self, self.recv_xint)
       return
-  
+    
     def recv(self, src):
       for obj in src.types:
-        if not isinstance(obj, BuiltinType):
-          self.raise_expt(ExceptionType(
-            'TypeError',
-            'unsupported conversion: %s' % obj.typename))
-          continue
-        if obj.typename in ('int','long','float','bool'):
-          continue
-        if obj.typename in ('str','unicode','basestring'):
-          self.raise_expt(ExceptionType(
+        if isinstance(obj, BaseStringType):
+          self.parent_frame.raise_expt(ExceptionType(
             'ValueError',
             'might be conversion error'))
-          continue
-        if obj.typename in ('complex',):
-          self.raise_expt(ExceptionType(
+        elif isinstance(obj, (NumberType, BoolType)):
+          pass
+        else:
+          self.parent_frame.raise_expt(ExceptionType(
             'TypeError',
-            'cannot convert complex'))
-          continue
+            'cannot convert: %s' % obj))
       return
 
-  def call(self, caller, args):
-    if not args:
-      return IntType.get()
-    if 2 < len(args):
-      caller.raise_expt(ExceptionType(
-        'TypeError',
-        'too many argument: more than 2'))
-    return self.Body(caller, *args)
+  def check_arg(self, caller, i):
+    if i == 0:
+      return self.IntConversion(caller, self.args[i])
+    else:
+      return BuiltinFunc.check_arg(self, caller, i)
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'int', IntType.get(),
+                         [],
+                         [ANY_ARG, INT_ARG])
+    return
 
 
 ##  StrFunc
 ##
-class StrFunc(BuiltinFuncType):
+class StrFunc(BuiltinFunc):
 
-  NAME = 'str'
-
-  ##  Body
-  ##
-  class Body(BuiltinFuncType.Body):
+  class StrConversion(CompoundTypeNode):
     
-    def __init__(self, parent_frame, obj):
-      BuiltinFuncType.Body.__init__(self, parent_frame)
-      self.types.add(StrType.get())
-      self.obj = obj
-      self.obj.connect(self)
+    def __init__(self, parent_frame):
+      CompoundTypeNode.__init__(self)
+      self.parent_frame = parent_frame
       return
     
     def recv(self, src):
@@ -80,39 +65,22 @@ class StrFunc(BuiltinFuncType):
           ClassType.OptionalAttr(obj, '__str__').call(self, ())
       return
 
-  def call(self, caller, args):
-    if not args:
-      return StrType.get()
-    if 1 < len(args):
-      caller.raise_expt(ExceptionType(
-        'TypeError',
-        'too many argument: more than 1'))
-    return self.Body(caller, *args)
+  def check_arg(self, caller, _):
+    return self.StrConversion(caller)
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'str', StrType.get(),
+                         [],
+                         [ANY_ARG])
+    return
 
 
 ##  RangeFunc
 ##
-class RangeFunc(BuiltinFuncType):
+class RangeFunc(BuiltinFunc):
 
-  NAME = 'range'
-  
-  ##  Body
-  ##
-  class Body(BuiltinFuncType.Body):
-    
-    def __init__(self, parent_frame, loc, args):
-      BuiltinFuncType.Body.__init__(self, parent_frame, loc)
-      for arg in args:
-        arg.connect(self, self.recv_int)
-      XXX
-      self.ListType([IntType.get()])
-      return
-  
-  def call(self, caller, args):
-    if not args or 3 < len(args):
-      caller.raise_expt(ExceptionType(
-        'TypeError',
-        'invalid number of args: %d' % len(args)))
-    return self.Body(caller, args)
-
-  
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'range', ListType([IntType.get()]), 
+                         [INT_ARG],
+                         [INT_ARG, INT_ARG])
+    return

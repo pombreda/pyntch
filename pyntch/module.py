@@ -3,8 +3,8 @@ import sys
 stderr = sys.stderr
 from namespace import Namespace
 from typenode import SimpleTypeNode, CompoundTypeNode
-from construct import FuncType
-from frame import ExceptionFrame
+from function import FuncType
+from exception import ExceptionFrame
 
 
 ##  ModuleType
