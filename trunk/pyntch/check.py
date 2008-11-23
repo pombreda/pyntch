@@ -2,7 +2,7 @@
 
 import sys
 from typenode import TypeNode
-from frame import ExceptionFrame, ExceptionRaiser
+from exception import ExceptionFrame, ExceptionRaiser
 from module import load_module
 
 # main

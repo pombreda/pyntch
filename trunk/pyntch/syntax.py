@@ -2,8 +2,8 @@
 
 from compiler import ast
 from typenode import TypeNode, UndefinedTypeNode
-from frame import ExceptionType, ExceptionFrame, ExceptionCatcher, ExceptionMaker, TypeChecker
-from construct import KeywordArg, FuncType, LambdaFuncType, ClassType
+from exception import ExceptionType, ExceptionFrame, ExceptionCatcher, ExceptionMaker, TypeChecker
+from function import KeywordArg, FuncType, LambdaFuncType, ClassType
 from expression import AttrAssign, SubAssign, AttrRef, SubRef, IterRef, \
      FunCall, BinaryOp, CompareOp, BooleanOp, AssignOp
 #from expression import SliceRef, UnaryOp, NotOp

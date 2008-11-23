@@ -36,6 +36,9 @@ class Namespace:
     self.msgs = []
     if parent_space:
       self.name = parent_space.name+'.'+name
+      self.global_space = parent_space.global_space
+    else:
+      self.global_space = self
     return
   
   def __repr__(self):
@@ -72,7 +75,7 @@ class Namespace:
     # global
     if isinstance(tree, ast.Global):
       for name in tree.names:
-        pass # XXX
+        self.vars[name] = self.global_place.register_var(name)
 
     # def
     elif isinstance(tree, ast.Function):

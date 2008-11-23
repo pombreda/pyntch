@@ -2,7 +2,7 @@
 
 from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError
 from namespace import Namespace, Variable
-from frame import ExceptionType, ExceptionFrame
+from exception import ExceptionType, ExceptionFrame
 
 
 ##  TreeReporter
@@ -183,7 +183,7 @@ class FuncType(SimpleTypeNode, TreeReporter):
     if argvars:
       caller.raise_expt(ExceptionType(
         'TypeError',
-        'not enough argument: %r more' % (len(argvars))))
+        'too few argument: %r more' % (len(argvars))))
     return self.body
 
   def show(self, p):
@@ -207,6 +207,10 @@ class FuncType(SimpleTypeNode, TreeReporter):
     return
 
 
+class StaticMethodType(FuncType): pass
+class ClassMethodType(FuncType): pass
+
+
 ##  LambdaFuncType
 ##
 class LambdaFuncType(FuncType):
@@ -228,6 +232,23 @@ class LambdaFuncType(FuncType):
   
   def __repr__(self):
     return ('<LambdaFunc %s>' % (self.name))
+
+
+##  BoundMethod
+##
+class BoundMethod(SimpleTypeNode):
+
+  def __init__(self, arg0, func):
+    self.arg0 = arg0
+    self.func = func
+    SimpleTypeNode.__init__(self)
+    return
+
+  def __repr__(self):
+    return '<Bound %r(%s=%r)>' % (self.func, self.func.argnames[0], self.arg0)
+
+  def call(self, caller, args):
+    return self.func.call(caller, (self.arg0,)+tuple(args))
 
 
 ##  ClassType
@@ -272,6 +293,9 @@ class ClassType(SimpleTypeNode, TreeReporter):
       self.body = ClassType.OptionalMethod()
       return
 
+    def __repr__(self):
+      return repr(self.method)
+
     def call(self, caller, args):
       self.binds.append((caller, args))
       self.recv_method(self.method)
@@ -300,9 +324,6 @@ class ClassType(SimpleTypeNode, TreeReporter):
       self.types.add(instance)
       return
 
-    def __repr__(self):
-      return '<__init__ %r>' % self.instance
-
     def call(self, caller, args):
       ClassType.OptionalAttr.call(self, caller, args)
       return self
@@ -318,6 +339,7 @@ class ClassType(SimpleTypeNode, TreeReporter):
     self.bases = bases
     self.space = Namespace(parent_space, name)
     self.attrs = {}
+    self.boundmethods = {}
     if code:
       self.space.register_names(code)
       build_stmt(self, parent_frame, self.space, code, evals)
@@ -338,6 +360,14 @@ class ClassType(SimpleTypeNode, TreeReporter):
     else:
       attr = self.attrs[name]
     return attr
+
+  def bind_func(self, func):
+    if func not in self.boundmethods:
+      method = BoundMethod(self, func)
+      self.boundmethods[func] = method
+    else:
+      method = self.boundmethods[func]
+    return method
 
   def call(self, caller, args):
     return self.InitMethodBody(self.instance).call(caller, args)
@@ -381,11 +411,12 @@ class InstanceType(SimpleTypeNode):
       for obj in src.types:
         if obj in self.processed: continue
         self.processed.add(obj)
-        if isinstance(obj, FuncType):
+        if isinstance(obj, StaticMethodType):
+          pass
+        elif isinstance(obj, ClassMethodType):
+          obj = self.klass.bind_func(obj)
+        elif isinstance(obj, FuncType):
           obj = self.instance.bind_func(obj)
-        # XXX
-        #elif isinstance(obj, ClassMethodType):
-        #elif isinstance(obj, StaticMethodType):
         types.add(obj)
       self.update_types(types)
       return
@@ -393,34 +424,11 @@ class InstanceType(SimpleTypeNode):
   class InstanceOptAttr(InstanceAttr):
     pass
     
-  ##  BoundMethodType
-  ##
-  class BoundMethodType(SimpleTypeNode):
-
-    def __init__(self, arg0, func):
-      self.arg0 = arg0
-      self.func = func
-      SimpleTypeNode.__init__(self)
-      return
-
-    def __repr__(self):
-      return '<Bound %r(%s=%r)>' % (self.func, self.func.argnames[0], self.arg0)
-
-    def __eq__(self, obj):
-      return (isinstance(obj, self.__class__) and
-              self.arg0 == obj.arg0 and
-              self.func == obj.func)
-    def __hash__(self):
-      return hash((self.arg0, self.func))
-
-    def call(self, caller, args):
-      return self.func.call(caller, (self.arg0,)+tuple(args))
-
   def __init__(self, klass):
     SimpleTypeNode.__init__(self)
     self.klass = klass
-    self.boundfuncs = {}
     self.attrs = {}
+    self.boundmethods = {}
     for (name, value) in klass.space:
       value.connect(self.get_attr(name))
     return
@@ -445,11 +453,9 @@ class InstanceType(SimpleTypeNode):
     return attr
 
   def bind_func(self, func):
-    if func not in self.boundfuncs:
-      method = self.BoundMethodType(self, func)
-      self.boundfuncs[func] = method
+    if func not in self.boundmethods:
+      method = BoundMethod(self, func)
+      self.boundmethods[func] = method
     else:
-      method = self.boundfuncs[func]
+      method = self.boundmethods[func]
     return method
-      
-

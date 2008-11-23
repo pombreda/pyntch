@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 class A:
-  def __str__(self): return 'foo'
+  def __str__(self): return 123
+  pass
 
 a=A()
-str(a)
+b=str(a)
