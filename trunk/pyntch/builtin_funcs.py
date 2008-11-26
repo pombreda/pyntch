@@ -35,11 +35,11 @@ class IntFunc(BuiltinFunc):
             'cannot convert: %s' % obj))
       return
 
-  def check_arg(self, caller, i):
+  def accept_arg(self, caller, i):
     if i == 0:
       return self.IntConversion(caller, self.args[i])
     else:
-      return BuiltinFunc.check_arg(self, caller, i)
+      return BuiltinFunc.accept_arg(self, caller, i)
 
   def __init__(self):
     BuiltinFunc.__init__(self, 'int', IntType.get(),
@@ -65,7 +65,7 @@ class StrFunc(BuiltinFunc):
           ClassType.OptionalAttr(obj, '__str__').call(self, ())
       return
 
-  def check_arg(self, caller, _):
+  def accept_arg(self, caller, _):
     return self.StrConversion(caller)
 
   def __init__(self):

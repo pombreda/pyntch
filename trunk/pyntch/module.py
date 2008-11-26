@@ -91,8 +91,8 @@ class BuiltinNamespace(Namespace):
     self.register_var('None').bind(builtin_types.NoneType.get())
     self.register_var('__name__').bind(builtin_types.StrType.get())
 
-    # int,float,bool,buffer,chr,dict,file,open,list,set,frozenset,
-    # object,xrange,slice,type,unicode,tuple,super,str,staticmethod,classmethod,reversed
+    # int,long,float,bool,chr,dict,file,open,list,set,frozenset,
+    # object,xrange,type,unicode,tuple,str,staticmethod,classmethod,reversed
     self.register_var('int').bind(builtin_funcs.IntFunc())
     self.register_var('str').bind(builtin_funcs.StrFunc())
 
