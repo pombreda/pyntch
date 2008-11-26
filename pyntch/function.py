@@ -59,12 +59,12 @@ class FuncType(SimpleTypeNode, TreeReporter):
       return '<FuncBody %s>' % self.name
 
     def set_retval(self, evals):
-      from builtin_types import GeneratorType
+      from builtin_types import IterType
       returns = [ obj for (t,obj) in evals if t == 'r' ]
       yields = [ obj for (t,obj) in evals if t == 'y' ]
       assert returns
       if yields:
-        retvals = [ GeneratorType([ slot.value for slot in yields ]) ]
+        retvals = [ IterType([ slot.value for slot in yields ]) ]
       else:
         retvals = returns
       for obj in retvals:

@@ -50,7 +50,7 @@ class BuiltinFunc(SimpleTypeNode):
   def connect_expt(self, frame):
     return
 
-  def check_arg(self, caller, i):
+  def accept_arg(self, caller, i):
     return TypeChecker(caller, self.args[i], 'arg%d' % i)
 
   def call(self, caller, args):
@@ -70,7 +70,7 @@ class BuiltinFunc(SimpleTypeNode):
             'cannot take keyword argument: %r' % arg1.name))
         elif self.args[i]:
           assert isinstance(arg1, TypeNode)
-          arg1.connect(self.check_arg(caller, i))
+          arg1.connect(self.accept_arg(caller, i))
     for expt in self.expts:
       caller.raise_expt(expt)
     return self.retval
@@ -104,7 +104,7 @@ class BaseStringType(BuiltinType):
   NAME = 'basestring'
 
   class JoinFunc(BuiltinFunc):
-    def check_arg(self, caller, i):
+    def accept_arg(self, caller, i):
       return ElementTypeChecker(caller, self.args[i], 'arg%d' % i)
 
   def get_attr(self, name):
@@ -272,22 +272,43 @@ class ListType(BuiltinAggregateType):
     def __repr__(self):
       return '|'.join(map(str, self.elements))
 
-  ##  Method
+  ##  Methods
   ##
-  class AppendMethod(SimpleTypeNode):
-
-    def __init__(self, target):
-      SimpleTypeNode.__init__(self)
-      self.target = target
+  class AppendMethod(BuiltinFunc):
+    def __init__(self, listobj):
+      BuiltinFunc.__init__(self, 'list.append', NoneType.get(), [ANY_ARG])
+      self.listobj = listobj
       return
-
     def __repr__(self):
-      return '%r.append' % self.target
+      return '%r.append' % self.listobj
+    def accept_arg(self, caller, _):
+      return self.listobj.elem
 
-    def call(self, caller, args):
-      args[0].connect(self.target.elem)
-      return BuiltinFunc(NoneType.get(), [])
-
+  class ExtendMethod(BuiltinFunc):
+    def __init__(self, listobj):
+      BuiltinFunc.__init__(self, 'list.extend', NoneType.get(), [ANY_ARG])
+      self.listobj = listobj
+      return
+    def __repr__(self):
+      return '%r.extend' % self.listobj
+    def accept_arg(self, caller, i):
+      XXX
+      return ElementExtender(caller, self.listobj.elem)
+    
+  class InsertMethod(BuiltinFunc):
+    def __init__(self, listobj):
+      BuiltinFunc.__init__(self, 'list.insert', NoneType.get(), [INT_ARG, ANY_ARG], [],
+                           [ExceptionType('IndexError', 'might be out of range')])
+      self.listobj = listobj
+      return
+    def __repr__(self):
+      return '%r.extend' % self.listobj
+    def accept_arg(self, caller, i):
+      if i == 0:
+        return self.listobj.elem
+      else:
+        return BuiltinFunc.accept_arg(self, caller, i)
+      
   #
   def __init__(self, elems):
     BuiltinAggregateType.__init__(self)
@@ -332,7 +353,8 @@ class ListType(BuiltinAggregateType):
                          [ExceptionType('IndexError', 'might be out of range')])
     elif name == 'remove':
       return BuiltinFunc('list.remove', NoneType.get(),
-                         [ANY_ARG])
+                         [ANY_ARG],
+                         [ExceptionType('ValueError', 'might not able to remove the element')])
     elif name == 'reverse':
       return BuiltinFunc('list.remove', NoneType.get())
     elif name == 'sort':
@@ -346,7 +368,6 @@ class DictType(BuiltinAggregateType):
 
   ##  Item
   class Item(CompoundTypeNode):
-
     def __init__(self, objs):
       CompoundTypeNode.__init__(self)
       for obj in objs:
@@ -354,27 +375,26 @@ class DictType(BuiltinAggregateType):
       return
 
   def __init__(self, items):
+    self.items = items
+    self.default = CompoundTypeNode()
     self.key = self.Item( k for (k,v) in items )
     self.value = self.Item( v for (k,v) in items )
+    NoneType.get().connect(self.default)
     BuiltinAggregateType.__init__(self)
     return
   
   def __repr__(self):
     return '{%s: %s}' % (self.key, self.value)
 
-  def __eq__(self, obj):
-    return (isinstance(obj, DictType) and
-            self.key == obj.key and
-            self.value == obj.value)
-  def __hash__(self):
-    return hash((self.key, self.value))
+  def copy(self):
+    return DictType(self.items)
 
   def desc1(self, done):
     return '{%s: %s}' % (self.key.desc1(done), self.value.desc1(done))
 
   def bind(self, key, value):
-    self.key.bind(key)
-    self.value.bind(value)
+    key.connect(self.key)
+    value.connect(self.value)
     return
 
   def get_element(self, subs, write=False):
@@ -386,35 +406,35 @@ class DictType(BuiltinAggregateType):
 
   def get_attr(self, name):
     if name == 'clear':
-      return XXX
+      return BuiltinFunc('dict.claer', NoneType.get())
     elif name == 'copy':
-      return XXX
+      return BuiltinFunc('dict.copy', self.copy())
     elif name == 'fromkeys':
       return XXX
     elif name == 'get':
       return XXX
     elif name == 'has_key':
-      return XXX
+      return BuiltinFunc('dict.has_key', BoolType.get(), [ANY_ARG])
     elif name == 'items':
-      return XXX
+      return BuiltinFunc('dict.items', ListType([ TupleType([self.key, self.value]) ]))
     elif name == 'iteritems':
-      return XXX
+      return BuiltinFunc('dict.iteritems', IterType([ TupleType([self.key, self.value]) ]))
     elif name == 'iterkeys':
-      return XXX
+      return BuiltinFunc('dict.iterkeys', IterType([ TupleType([self.key]) ]))
     elif name == 'itervalues':
-      return XXX
+      return BuiltinFunc('dict.itervalues', IterType([ TupleType([self.value]) ]))
     elif name == 'keys':
-      return XXX
+      return BuiltinFunc('dict.keys', ListType([ TupleType([self.key]) ]))
     elif name == 'pop':
       return XXX
     elif name == 'popitem':
-      return XXX
+      return BuiltinFunc('dict.popitem', TupleType([self.key, self.value]))
     elif name == 'setdefault':
       return XXX
     elif name == 'update':
       return XXX
     elif name == 'values':
-      return XXX
+      return BuiltinFunc('dict.keys', ListType([ TupleType([self.key]) ]))
     raise NodeTypeError
 
 
@@ -516,9 +536,9 @@ class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
     return
 
 
-##  GeneratorType
+##  IterType
 ##
-class GeneratorType(BuiltinAggregateType):
+class IterType(BuiltinAggregateType):
 
   def __init__(self, yields):
     BuiltinAggregateType.__init__(self)
