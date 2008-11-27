@@ -8,6 +8,4 @@ def gcd(x,y):
     (y,x) = mod(x,y)
   return 
 
-gcd(10,22)
-x = abs(10)
-x = abs('a')
+gcd(13,17)

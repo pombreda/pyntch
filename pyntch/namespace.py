@@ -15,7 +15,7 @@ class Variable(CompoundTypeNode):
     return
   
   def __repr__(self):
-    return '@'+self.name
+    return '@'+self.fullname()
 
   def fullname(self):
     return '%s.%s' % (self.space.name, self.name)

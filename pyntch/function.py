@@ -108,7 +108,7 @@ class FuncType(SimpleTypeNode, TreeReporter):
       if isinstance(var1, tuple):
         tup = TupleUnpack(parent_frame, arg1, len(var1))
         for (i,v) in enumerate(var1):
-          assign(v, tup.get_element(i))
+          assign(v, tup.get_nth(i))
       else:
         arg1.connect(var1)
       return
@@ -147,7 +147,7 @@ class FuncType(SimpleTypeNode, TreeReporter):
       elif isinstance(var1, tuple):
         tup = TupleUnpack(caller, arg1, len(var1))
         for (i,v) in enumerate(var1):
-          assign(v, tup.get_element(i))
+          assign(v, tup.get_nth(i))
       else:
         arg1.connect(var1)
       return
@@ -187,12 +187,14 @@ class FuncType(SimpleTypeNode, TreeReporter):
     return self.body
 
   def show(self, p):
+    names = set()
     def recjoin(sep, seq):
       for x in seq:
         if isinstance(x, tuple):
           yield '(%s)' % sep.join(recjoin(sep, x))
         else:
-          yield str(x)
+          names.add(x)
+          yield '%s=%s' % (x, self.space[x].describe())
       return
     r = list(recjoin(', ', self.argnames))
     if self.vararg:
@@ -201,9 +203,10 @@ class FuncType(SimpleTypeNode, TreeReporter):
       r.append('**'+self.kwarg)
     p('def %s(%s):' % (self.name, ', '.join(r)) )
     for (k,v) in sorted(self.space):
-      p('  %s = %s' % (k, v.describe()))
-    self.body.show(p)
+      if k not in names:
+        p('  %s = %s' % (k, v.describe()))
     p('  return %s' % self.body.describe())
+    self.body.show(p)
     return
 
 
@@ -337,12 +340,16 @@ class ClassType(SimpleTypeNode, TreeReporter):
     TreeReporter.__init__(self, parent_reporter)
     self.name = name
     self.bases = bases
-    self.space = Namespace(parent_space, name)
-    self.attrs = {}
     self.boundmethods = {}
+    space = Namespace(parent_space, name)
     if code:
-      self.space.register_names(code)
-      build_stmt(self, parent_frame, self.space, code, evals)
+      space.register_names(code)
+      build_stmt(self, parent_frame, space, code, evals)
+    self.attrs = {}
+    for (name,var) in space:
+      attr = self.ClassAttr(name, self, self.bases)
+      var.connect(attr)
+      self.attrs[name] = attr
     self.instance = InstanceType(self)
     return
 
@@ -353,10 +360,6 @@ class ClassType(SimpleTypeNode, TreeReporter):
     if name not in self.attrs:
       attr = self.ClassAttr(name, self, self.bases)
       self.attrs[name] = attr
-      try:
-        self.space[name].connect(attr)
-      except KeyError:
-        pass
     else:
       attr = self.attrs[name]
     return attr
@@ -429,7 +432,7 @@ class InstanceType(SimpleTypeNode):
     self.klass = klass
     self.attrs = {}
     self.boundmethods = {}
-    for (name, value) in klass.space:
+    for (name, value) in klass.attrs.iteritems():
       value.connect(self.get_attr(name))
     return
   

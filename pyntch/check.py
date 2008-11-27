@@ -21,6 +21,7 @@ def main(argv):
   TypeNode.debug = debug
   ExceptionFrame.debug = debug
   for name in args:
+    print '===', name, '==='
     ExceptionRaiser.reset()
     module = load_module(name, '__main__', debug=debug)
     ExceptionRaiser.runall()

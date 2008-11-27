@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# exception handling
 
 class E():
   def __init__(self, *args):

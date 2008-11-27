@@ -19,7 +19,7 @@ def build_assign(reporter, frame, space, n, v, evals):
   elif isinstance(n, ast.AssTuple):
     tup = TupleUnpack(frame, v, len(n.nodes))
     for (i,c) in enumerate(n.nodes):
-      build_assign(reporter, frame, space, c, tup.get_element(i), evals)
+      build_assign(reporter, frame, space, c, tup.get_nth(i), evals)
   elif isinstance(n, ast.AssAttr):
     obj = build_expr(reporter, frame, space, n.expr, evals)
     AttrAssign(n, obj, n.attrname, v)
