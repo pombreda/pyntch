@@ -56,7 +56,7 @@ class ExceptionFrame(object):
 
   def show(self, p):
     for expt in self.expts:
-      p(' raises %r' % expt)
+      p('  raises %r' % expt)
     return
 
 
@@ -93,6 +93,7 @@ class ExceptionCatcher(ExceptionFrame):
     (t,_) = self.handlers[src]
     for expt in src.types:
       if isinstance(expt, TupleType):
+        XXX
         expt.get_element(None).connect(t)
       else:
         expt.connect(t)
@@ -246,7 +247,7 @@ class ElementTypeChecker(TypeChecker):
   def recv(self, src):
     for obj in src.types:
       try:
-        obj.get_iter().connect(self, self.recv_elemobj)
+        obj.get_iter(self.parent_frame).connect(self, self.recv_elemobj)
       except NodeTypeError:
         if self.blame:
           self.parent_frame.raise_expt(ExceptionType(

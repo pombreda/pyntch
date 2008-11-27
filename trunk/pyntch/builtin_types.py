@@ -80,6 +80,8 @@ class BuiltinFunc(SimpleTypeNode):
 ##
 class NoneType(BuiltinType):
   NAME = 'NoneType'
+  def __repr__(self):
+    return '<None>'
 
 class BoolType(BuiltinType):
   NAME = 'bool'
@@ -226,7 +228,7 @@ class BaseStringType(BuiltinType):
                          [INT_ARG])
     raise NodeTypeError
 
-  def get_iter(self):
+  def get_iter(self, caller):
     return self.get()
 
 
@@ -325,12 +327,6 @@ class ListType(BuiltinAggregateType):
     obj.connect(self.elem)
     return
 
-  def get_element(self, subs, write=False):
-    return self.elem
-
-  def get_iter(self):
-    return self.elem
-
   def get_attr(self, name):
     if name == 'append':
       return self.AppendMethod(self)
@@ -360,6 +356,15 @@ class ListType(BuiltinAggregateType):
     elif name == 'sort':
       return self.SortMethod(NoneType.get())
     raise NodeTypeError
+
+  def get_element(self, caller, subs, write=False):
+    caller.raise_expt(ExceptionType(
+      'IndexError',
+      '%r index might be out of range.' % self))
+    return self.elem
+
+  def get_iter(self, caller):
+    return self.elem
 
 
 ##  DictType
@@ -397,13 +402,6 @@ class DictType(BuiltinAggregateType):
     value.connect(self.value)
     return
 
-  def get_element(self, subs, write=False):
-    assert len(subs) == 1
-    if write:
-      for k in subs:
-        k.connect(self.key)
-    return self.value
-
   def get_attr(self, name):
     if name == 'clear':
       return BuiltinFunc('dict.claer', NoneType.get())
@@ -437,6 +435,20 @@ class DictType(BuiltinAggregateType):
       return BuiltinFunc('dict.keys', ListType([ TupleType([self.key]) ]))
     raise NodeTypeError
 
+  def get_element(self, caller, subs, write=False):
+    assert len(subs) == 1
+    key = subs[0]
+    if write:
+      key.connect(self.key)
+    else:
+      caller.raise_expt(ExceptionType(
+        'KeyError',
+        'might not have the key: %r' % key))
+    return self.value
+
+  def get_iter(self, caller):
+    return self.key
+
 
 ##  TupleType
 ##
@@ -469,15 +481,18 @@ class TupleType(BuiltinAggregateType):
   def desc1(self, done):
     return '(%s)' % ','.join( elem.desc1(done) for elem in self.elements )
 
-  def get_nth(self, i):
-    return self.elements[i]
-
-  def get_element(self, subs, write=False):
+  def get_element(self, caller, subs, write=False):
     if write:
-      raise NodeTypeError('cannot change tuple')
+      caller.raise_expt(ExceptionType(
+        'TypeError',
+        'tuple does not support assignment.'))
+    else:
+      caller.raise_expt(ExceptionType(
+        'IndexError',
+        '%r index might be out of range.' % self))
     return self.elemall
 
-  def get_iter(self):
+  def get_iter(self, caller):
     return self.elemall
 
 
@@ -512,7 +527,7 @@ class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
   def __repr__(self):
     return '<TupleUnpack: %r>' % (self.tupobj,)
 
-  def get_element(self, i, write=False):
+  def get_nth(self, i):
     return self.elems[i]
 
   def recv_tupobj(self, src):
@@ -526,13 +541,15 @@ class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
         else:
           for (i,elem) in enumerate(obj.elements):
             elem.connect(self.elems[i])
-      if isinstance(obj, ListType):
-        for elem in self.elems:
-          obj.elem.connect(elem)
       else:
-        self.raise_expt(ExceptionType(
-          'TypeError',
-          'not unpackable: %r' % src))
+        try:
+          src = obj.get_iter(self)
+          for elem in self.elems:
+            src.connect(elem)
+        except NodeTypeError:
+          self.raise_expt(ExceptionType(
+            'TypeError',
+            'not iterable: %r' % src))
     return
 
 
@@ -546,12 +563,12 @@ class IterType(BuiltinAggregateType):
     return
 
   def __repr__(self):
-    return '(%s ...)' % self.elem
+    return '(%s, ...)' % self.elem
 
   def desc1(self, done):
-    return '(%s ...)' % self.elem.desc1(done)
+    return '(%s, ...)' % self.elem.desc1(done)
 
-  def get_iter(self):
+  def get_iter(self, caller):
     return self.elem
 
 
@@ -560,8 +577,7 @@ class IterType(BuiltinAggregateType):
 class GeneratorSlot(CompoundTypeNode):
 
   def __init__(self, value):
-    CompoundTypeNode.__init__(self)
-    self.types.add(self)
+    CompoundTypeNode.__init__(self, [self])
     self.value = value
     return
 

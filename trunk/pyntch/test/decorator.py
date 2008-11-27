@@ -12,6 +12,6 @@ class A:
   def bar():
     return
 
+  @baa
   def baz(self):
     return
-

@@ -163,8 +163,7 @@ class CompareOp(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, expr0, comps):
     from builtin_types import BoolType
-    CompoundTypeNode.__init__(self)
-    self.types.add(BoolType.get())
+    CompoundTypeNode.__init__(self, [BoolType.get()])
     self.expr0 = expr0
     self.comps = comps
     ExceptionRaiser.__init__(self, parent_frame, loc)
@@ -188,8 +187,7 @@ class BooleanOp(CompoundTypeNode):
   
   def __init__(self, op, nodes):
     from builtin_types import BoolType
-    CompoundTypeNode.__init__(self)
-    self.types.add(BoolType.get())
+    CompoundTypeNode.__init__(self, [BoolType.get()])
     self.op = op
     self.nodes = nodes
     for node in self.nodes:
@@ -220,7 +218,7 @@ class SubRef(CompoundTypeNode, ExceptionRaiser):
     self.objs.update(src.types)
     for obj in self.objs:
       try:
-        obj.get_element(self.subs).connect(self)
+        obj.get_element(self, self.subs).connect(self)
       except NodeTypeError:
         self.raise_expt(ExceptionType(
           'TypeError',
@@ -249,7 +247,8 @@ class SubAssign(CompoundTypeNode, ExceptionRaiser):
     self.objs.update(src.types)
     for obj in self.objs:
       try:
-        self.value.connect(obj.get_element(self.subs, write=True))
+        elem = obj.get_element(self, self.subs, write=True)
+        self.value.connect(elem)
       except NodeTypeError:
         self.raise_expt(ExceptionType(
           'TypeError',
@@ -274,10 +273,9 @@ class IterRef(CompoundTypeNode, ExceptionRaiser):
   def recv_target(self, src):
     for obj in src.types:
       try:
-        obj.get_iter().connect(self)
+        obj.get_iter(self).connect(self)
       except NodeTypeError:
         self.raise_expt(ExceptionType(
           'TypeError',
-          '%r might not be an iterator: %r' % (self.target, obj)))
-        continue
+          '%r is not an iterator: %r' % (self.target, obj)))
     return
