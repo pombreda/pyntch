@@ -287,6 +287,23 @@ class ListType(BuiltinAggregateType):
       return self.listobj.elem
 
   class ExtendMethod(BuiltinFunc):
+    
+    class ElementExtender(CompoundTypeNode, ExceptionRaiser):
+      def __init__(self, parent_frame, elem):
+        self.elem = elem
+        CompoundTypeNode.__init__(self)
+        ExceptionRaiser.__init__(self, parent_frame)
+        return
+      def recv(self, src):
+        for obj in src.types:
+          try:
+            obj.get_iter(self).connect(self.elem)
+          except NodeTypeError:
+            self.raise_expt(ExceptionType(
+              'TypeError',
+              '%r is not iterable: %r' % (src, obj)))
+        return
+
     def __init__(self, listobj):
       BuiltinFunc.__init__(self, 'list.extend', NoneType.get(), [ANY_ARG])
       self.listobj = listobj
@@ -294,8 +311,7 @@ class ListType(BuiltinAggregateType):
     def __repr__(self):
       return '%r.extend' % self.listobj
     def accept_arg(self, caller, i):
-      XXX
-      return ElementExtender(caller, self.listobj.elem)
+      return self.ElementExtender(caller, self.listobj.elem)
     
   class InsertMethod(BuiltinFunc):
     def __init__(self, listobj):
@@ -379,6 +395,19 @@ class DictType(BuiltinAggregateType):
         obj.connect(self)
       return
 
+  class SetDefault(BultinFunc):
+    def __init__(self, dictobj):
+      self.dictobj = dictobj
+      BuiltinFunc.__init__(self, 'dict.setdefault', CompoundTypeNode(), [ANY_ARG], [ANY_ARG])
+      return
+    def __repr__(self):
+      return '%r.setdefault' % self.dictobj
+    def accept_arg(self, caller, i):
+      if i == 0:
+        return self.dictobj.default
+      else:
+        return self.retval
+
   def __init__(self, items):
     self.items = items
     self.default = CompoundTypeNode()
@@ -425,10 +454,11 @@ class DictType(BuiltinAggregateType):
       return BuiltinFunc('dict.keys', ListType([ TupleType([self.key]) ]))
     elif name == 'pop':
       return XXX
+      return BuiltinFunc('dict.pop', self.value, [ANY_ARG])
     elif name == 'popitem':
       return BuiltinFunc('dict.popitem', TupleType([self.key, self.value]))
     elif name == 'setdefault':
-      return XXX
+      return self.SetDefault()
     elif name == 'update':
       return XXX
     elif name == 'values':
@@ -582,6 +612,67 @@ class GeneratorSlot(CompoundTypeNode):
     return
 
 
+##  SetType
+##
+class SetType(BuiltinAggregateType):
+
+  ##  Item
+  class Item(CompoundTypeNode):
+    def __init__(self, objs):
+      CompoundTypeNode.__init__(self)
+      for obj in objs:
+        obj.connect(self)
+      return
+
+  def __init__(self, elems):
+    self.elem = CompoundTypeNode()
+    for elem in elems:
+      elem.connect(self.elem)
+    BuiltinAggregateType.__init__(self)
+    return
+  
+  def __repr__(self):
+    return '([%s])' % (self.elem)
+
+  def copy(self):
+    return SetType([self.elem])
+
+  def get_attr(self, name):
+    if name == 'add':
+      return XXX
+    elif name == 'clear':
+      return XXX
+    elif name == 'copy':
+      return XXX
+    elif name == 'difference':
+      return XXX
+    elif name == 'difference_update':
+      return XXX
+    elif name == 'discard':
+      return XXX
+    elif name == 'intersection':
+      return XXX
+    elif name == 'intersection_update':
+      return XXX
+    elif name == 'issubset':
+      return XXX
+    elif name == 'issuperset':
+      return XXX
+    elif name == 'pop':
+      return XXX
+    elif name == 'remove':
+      return XXX
+    elif name == 'symmetric_difference':
+      return XXX
+    elif name == 'symmetric_difference_update':
+      return XXX
+    elif name == 'union':
+      return XXX
+    elif name == 'update':
+      return XXX
+    raise NodeTypeError
+
+
 ##  FileType
 ##
 class FileType(BuiltinType):
@@ -589,6 +680,49 @@ class FileType(BuiltinType):
   def __init__(self, args):
     BuiltinType.__init__(self)
     return
+
+  def get_attr(self, name):
+    if name == 'close':
+      return XXX
+    elif name == 'closed':
+      return XXX
+    elif name == 'encoding':
+      return XXX
+    elif name == 'fileno':
+      return XXX
+    elif name == 'flush':
+      return XXX
+    elif name == 'isatty':
+      return XXX
+    elif name == 'mode':
+      return XXX
+    elif name == 'name':
+      return XXX
+    elif name == 'newlines':
+      return XXX
+    elif name == 'next':
+      return XXX
+    elif name == 'read':
+      return XXX
+    elif name == 'readline':
+      return XXX
+    elif name == 'readlines':
+      return XXX
+    elif name == 'seek':
+      return XXX
+    elif name == 'softspace':
+      return XXX
+    elif name == 'tell':
+      return XXX
+    elif name == 'truncate':
+      return XXX
+    elif name == 'write':
+      return XXX
+    elif name == 'writelines':
+      return XXX
+    elif name == 'xreadlines':
+      return XXX
+    raise NodeTypeError
 
 
 ##  ObjectType

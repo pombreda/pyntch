@@ -110,5 +110,3 @@ class UndefinedTypeNode(TypeNode):
     return self
   def call(self, caller, args):
     return self
-  
-  

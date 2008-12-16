@@ -93,8 +93,7 @@ class ExceptionCatcher(ExceptionFrame):
     (t,_) = self.handlers[src]
     for expt in src.types:
       if isinstance(expt, TupleType):
-        XXX
-        expt.get_element(None).connect(t)
+        expt.elemall.connect(t)
       else:
         expt.connect(t)
     return

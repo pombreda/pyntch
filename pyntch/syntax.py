@@ -96,8 +96,7 @@ def build_expr(reporter, frame, space, tree, evals):
         isinstance(tree, ast.Mul) or isinstance(tree, ast.Div) or
         isinstance(tree, ast.Mod) or isinstance(tree, ast.FloorDiv) or
         isinstance(tree, ast.LeftShift) or isinstance(tree, ast.RightShift) or
-        isinstance(tree, ast.Power) or isinstance(tree, ast.Bitand) or
-        isinstance(tree, ast.Bitor) or isinstance(tree, ast.Bitxor)):
+        isinstance(tree, ast.Power)):
     op = tree.__class__.__name__
     left = build_expr(reporter, frame, space, tree.left, evals)
     right = build_expr(reporter, frame, space, tree.right, evals)
@@ -115,7 +114,9 @@ def build_expr(reporter, frame, space, tree, evals):
     expr = UnaryOp(frame, tree.__class__, value)
 
   # and, or
-  elif (isinstance(tree, ast.And) or isinstance(tree, ast.Or)):
+  elif (isinstance(tree, ast.And) or isinstance(tree, ast.Or) or
+        isinstance(tree, ast.Bitand) or
+        isinstance(tree, ast.Bitor) or isinstance(tree, ast.Bitxor)):
     nodes = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
     expr = BooleanOp(tree.__class__.__name__, nodes)
 
@@ -165,14 +166,38 @@ def build_expr(reporter, frame, space, tree, evals):
   return expr
 
 
+##  build_typecheck
+##
+def build_typecheck(reporter, frame, space, tree, evals):
+  # "assert isinstance() and isinstance() and ...
+  if isinstance(tree, ast.CallFunc):
+    tests = [ tree ]
+  elif isinstance(tree, ast.And):
+    tests = tree.nodes
+  else:
+    return
+  for node in tests:
+    if (isinstance(node, ast.CallFunc) and
+        isinstance(node.node, ast.Name) and
+        node.node.name == 'isinstance' and
+        len(node.args) == 2):
+      (a,b) = node.args
+      tc = TypeChecker(frame, [build_expr(reporter, frame, space, b, evals)], a)
+      build_expr(reporter, frame, space, a, evals).connect(tc)
+  return
+
+
 ##  build_stmt
 ##
 def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   from builtin_types import NoneType
   assert isinstance(frame, ExceptionFrame)
 
+  if isinstance(tree, ast.Module):
+    build_stmt(reporter, frame, space, tree.node, evals)
+  
   # def
-  if isinstance(tree, ast.Function):
+  elif isinstance(tree, ast.Function):
     name = tree.name
     defaults = [ build_expr(reporter, frame, space, value, evals) for value in tree.defaults ]
     func = FuncType(reporter, frame, space, name, tree.argnames,
@@ -313,12 +338,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     build_expr(reporter, frame, space, tree.expr, evals)
 
   elif isinstance(tree, ast.Assert):
-    if (isinstance(tree.test, ast.CallFunc) and
-        isinstance(tree.test.node, ast.Name) and
-        tree.test.node.name == 'isinstance'):
-      (a,b) = tree.test.args
-      tc = TypeChecker(frame, build_expr(reporter, frame, space, b, evals))
-      build_expr(reporter, frame, space, a, evals).connect(tc)
+    build_typecheck(reporter, frame, space, tree.test, evals)
 
   else:
     raise SyntaxError('unsupported syntax: %r' % tree)
