@@ -9,9 +9,9 @@ from exception import ExceptionType, ExceptionFrame, ExceptionRaiser
 class FunCall(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, func, args):
-    CompoundTypeNode.__init__(self)
     self.func = func
     self.args = args
+    CompoundTypeNode.__init__(self)
     ExceptionRaiser.__init__(self, parent_frame, loc)
     func.connect(self, self.recv_func)
     return
@@ -38,10 +38,10 @@ class FunCall(CompoundTypeNode, ExceptionRaiser):
 class AttrRef(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, target, attrname):
-    CompoundTypeNode.__init__(self)
     self.target = target
     self.attrname = attrname
     self.objs = set()
+    CompoundTypeNode.__init__(self)
     ExceptionRaiser.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
     return
@@ -74,12 +74,12 @@ class AttrRef(CompoundTypeNode, ExceptionRaiser):
 class AttrAssign(CompoundTypeNode):
   
   def __init__(self, tree, target, attrname, value):
-    CompoundTypeNode.__init__(self)
     self.tree = tree
     self.target = target
     self.objs = set()
     self.attrname = attrname
     self.value = value
+    CompoundTypeNode.__init__(self)
     self.target.connect(self, self.recv_target)
     return
 
@@ -99,11 +99,11 @@ class AttrAssign(CompoundTypeNode):
 class BinaryOp(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, op, left, right):
-    CompoundTypeNode.__init__(self)
     self.op = op
     self.left_types = set()
     self.right_types = set()
     self.combinations = set()
+    CompoundTypeNode.__init__(self)
     ExceptionRaiser.__init__(self, parent_frame, loc)
     left.connect(self, self.recv_left)
     right.connect(self, self.recv_right)
@@ -163,9 +163,9 @@ class CompareOp(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, expr0, comps):
     from builtin_types import BoolType
-    CompoundTypeNode.__init__(self, [BoolType.get()])
     self.expr0 = expr0
     self.comps = comps
+    CompoundTypeNode.__init__(self, [BoolType.get()])
     ExceptionRaiser.__init__(self, parent_frame, loc)
     self.expr0.connect(self)
     for (_,expr) in self.comps:
@@ -187,9 +187,9 @@ class BooleanOp(CompoundTypeNode):
   
   def __init__(self, op, nodes):
     from builtin_types import BoolType
-    CompoundTypeNode.__init__(self, [BoolType.get()])
     self.op = op
     self.nodes = nodes
+    CompoundTypeNode.__init__(self, [BoolType.get()])
     for node in self.nodes:
       node.connect(self)
     return
@@ -203,11 +203,11 @@ class BooleanOp(CompoundTypeNode):
 class SubRef(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, target, subs):
-    CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
     self.target = target
     self.objs = set()
     self.subs = subs
+    CompoundTypeNode.__init__(self)
+    ExceptionRaiser.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
     return
 
@@ -231,12 +231,12 @@ class SubRef(CompoundTypeNode, ExceptionRaiser):
 class SubAssign(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, target, subs, value):
-    CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
     self.target = target
     self.objs = set()
     self.subs = subs
     self.value = value
+    CompoundTypeNode.__init__(self)
+    ExceptionRaiser.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
     return
 
@@ -261,9 +261,9 @@ class SubAssign(CompoundTypeNode, ExceptionRaiser):
 class IterRef(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, target):
+    self.target = target
     CompoundTypeNode.__init__(self)
     ExceptionRaiser.__init__(self, parent_frame, loc)
-    self.target = target
     self.target.connect(self, self.recv_target)
     return
 

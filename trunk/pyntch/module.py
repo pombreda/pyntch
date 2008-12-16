@@ -1,15 +1,15 @@
 #!/usr/bin/env python
-import sys
+import sys, os.path
 stderr = sys.stderr
-from namespace import Namespace
 from typenode import SimpleTypeNode, CompoundTypeNode
-from function import FuncType
+from function import TreeReporter
 from exception import ExceptionFrame
+from namespace import Namespace
 
 
 ##  ModuleType
 ##
-class ModuleType(FuncType, ExceptionFrame):
+class ModuleType(SimpleTypeNode, TreeReporter, ExceptionFrame):
   
   ##  Attr
   ##
@@ -24,17 +24,29 @@ class ModuleType(FuncType, ExceptionFrame):
     def __repr__(self):
       return '%r.@%s' % (self.module, self.name)
 
-  def __init__(self, reporter, tree, parent_space, name):
-    from expression import FunCall
-    FuncType.__init__(self, reporter, self, parent_space,
-                      name, (), (), False, False, tree.node)
-    ExceptionFrame.__init__(self)
+  def __init__(self, parent_reporter, parent_space, name, path):
+    self.name = name
+    self.path = path
     self.attrs = {}
-    FunCall(self, tree, self, ())
+    self.space = Namespace(parent_space, name)
+    SimpleTypeNode.__init__(self)
+    TreeReporter.__init__(self, parent_reporter)
+    ExceptionFrame.__init__(self)
     return
   
   def __repr__(self):
-    return '<Module %s>' % self.name
+    return '<Module %s (%s)>' % (self.name, self.path)
+
+  def raise_expt(self, expt):
+    print expt
+    return
+  
+  def load(self, tree):
+    from syntax import build_stmt
+    evals = []
+    self.space.register_names(tree)
+    build_stmt(self, self, self.space, tree, evals, isfuncdef=True)
+    return
 
   def get_attr(self, name):
     if name not in self.attrs:
@@ -52,95 +64,57 @@ class ModuleType(FuncType, ExceptionFrame):
     p('[%s]' % self.name)
     for (k,v) in sorted(self.space):
       p('  %s = %s' % (k, v.describe()))
-    self.body.show(p)
+    #self.body.show(p)
     return
   
 
-##  BuiltinModuleType
-##
-class BuiltinModuleType(ModuleType):
+MODULE_CACHE = {}
 
-  def __init__(self, name):
-    SimpleTypeNode.__init__(self)
-    self.name = name
-    self.attrs = {}
-    return
-
-  def get_attr(self, name):
-    if name not in self.attrs:
-      attr = ModuleType.Attr(name, self)
-      self.attrs[name] = attr
-    else:
-      attr = self.attrs[name]
-    return attr
-
-  def __repr__(self):
-    return '<BuiltinModule %s>' % self.name
-
-
-##  BuiltinNamespace
-##
-class BuiltinNamespace(Namespace):
-
-  def __init__(self):
-    import builtin_types
-    import builtin_funcs
-    Namespace.__init__(self, None, '')
-    self.register_var('True').bind(builtin_types.BoolType.get())
-    self.register_var('False').bind(builtin_types.BoolType.get())
-    self.register_var('None').bind(builtin_types.NoneType.get())
-    self.register_var('__name__').bind(builtin_types.StrType.get())
-
-    # int,long,float,bool,chr,dict,file,open,list,set,frozenset,
-    # object,xrange,type,unicode,tuple,str,staticmethod,classmethod,reversed
-    self.register_var('int').bind(builtin_funcs.IntFunc())
-    self.register_var('str').bind(builtin_funcs.StrFunc())
-
-    # abs,all,any,apply,basestring,callable,chr,
-    # cmp,coerce,compile,complex,delattr,dir,divmod,enumerate,eval,
-    # execfile,filter,getattr,globals,hasattr,hash,
-    # hex,id,input,intern,isinstance,issubclass,iter,len,locals,
-    # long,map,max,min,oct,ord,pow,property,range,raw_input,
-    # reduce,reload,repr,round,setattr,sorted,
-    # sum,unichr,vars,xrange,zip
-    self.register_var('range').bind(builtin_funcs.RangeFunc())
-    
-    return
-
-
-##  Global stuff
-##
-BUILTIN_NAMESPACE = BuiltinNamespace()
-
-
-# find_module
 class ModuleNotFound(Exception): pass
-
-def find_module(name, paths, debug=0):
-  # XXX support hierarchical packages
-  import os.path
+# find_module(name, modpath, debug=0)
+#   return the full path for a given module name.
+def find_module(name, modpath, debug=0):
   if debug:
-    print >>stderr, 'find_module: name=%r' % name
-  for dirname in paths+['stub']:
-    for fname in (name, name+'.py', name+'.pyi'):
+    print >>stderr, 'find_module: name=%r' % name, modpath
+  for dirname in ['stub']+modpath:
+    for fname in (name+'.py', name+'.pyi'):
       path = os.path.join(dirname, fname)
-      if os.path.exists(path):
+      if os.path.isfile(path):
+        return path
+    path = os.path.join(dirname, name)
+    if os.path.isdir(path):
+      path = os.path.join(path, '__init__.py')
+      if os.path.isfile(path):
         return path
   raise ModuleNotFound(name)
 
 # load_module
-def load_module(modname, asname=None, paths=['.'], debug=0):
+def load_module(fullname, modpath=['.'], debug=0):
   from compiler import parseFile
+  from builtin_funcs import BUILTIN_NAMESPACE
   def rec(n):
-    n._modname = modname
+    n._modname = fullname
     for c in n.getChildNodes():
       rec(c)
     return
-  path = find_module(modname, paths)
-  name = asname or modname
   if debug:
-    print >>stderr, 'load_module: %r' % path
-  tree = parseFile(path)
-  rec(tree)
-  return ModuleType(None, tree, BUILTIN_NAMESPACE, name)
-
+    print >>stderr, 'load_module: %r...' % fullname
+  if fullname in MODULE_CACHE:
+    module = MODULE_CACHE[fullname]
+  else:
+    try:
+      i = fullname.rindex('.')
+      parent = load_module(fullname[:i], modpath=modpath, debug=debug)
+      modpath = [ os.path.dirname(parent.path) ]
+      name = fullname[i+1:]
+    except ValueError:
+      name = fullname
+    path = find_module(name, modpath, debug=debug)
+    module = ModuleType(None, BUILTIN_NAMESPACE, fullname, path)
+    MODULE_CACHE[fullname] = module
+    if debug:
+      print >>stderr, 'found_module: %r' % module
+    tree = parseFile(path)
+    rec(tree)
+    module.load(tree)
+  return module

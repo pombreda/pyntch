@@ -3,8 +3,6 @@ README
 
 
 # TODO:
-#  builtin functions
-#  builtin methods
 #  +=
 #  __add__ etc.
 #  automatic coercion

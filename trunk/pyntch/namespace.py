@@ -29,6 +29,9 @@ class Variable(CompoundTypeNode):
 ##
 class Namespace:
 
+  debug = 0
+  modpath = []
+
   def __init__(self, parent_space, name):
     self.parent_space = parent_space
     self.name = name
@@ -72,10 +75,13 @@ class Namespace:
   def register_names(self, tree):
     from module import load_module
     
+    if isinstance(tree, ast.Module):
+      self.register_names(tree.node)
+      
     # global
-    if isinstance(tree, ast.Global):
+    elif isinstance(tree, ast.Global):
       for name in tree.names:
-        self.vars[name] = self.global_place.register_var(name)
+        self.vars[name] = self.global_space.register_var(name)
 
     # def
     elif isinstance(tree, ast.Function):
@@ -173,13 +179,13 @@ class Namespace:
     elif isinstance(tree, ast.Import):
       for (modname,name) in tree.names:
         asname = name or modname
-        module = load_module(modname)
+        module = load_module(modname, modpath=self.modpath, debug=self.debug)
         self.register_var(asname)
         self[asname].bind(module)
 
     # from
     elif isinstance(tree, ast.From):
-      module = load_module(tree.modname)
+      module = load_module(tree.modname, modpath=self.modpath, debug=self.debug)
       for (name0,name1) in tree.names:
         if name0 == '*':
           self.import_all(module.space)
@@ -244,8 +250,7 @@ class Namespace:
           isinstance(tree, ast.Mul) or isinstance(tree, ast.Div) or
           isinstance(tree, ast.Mod) or isinstance(tree, ast.FloorDiv) or
           isinstance(tree, ast.LeftShift) or isinstance(tree, ast.RightShift) or
-          isinstance(tree, ast.Power) or isinstance(tree, ast.Bitand) or
-          isinstance(tree, ast.Bitor) or isinstance(tree, ast.Bitxor)):
+          isinstance(tree, ast.Power)):
       self.register_names(tree.left)
       self.register_names(tree.right)
     elif isinstance(tree, ast.Compare):
@@ -254,7 +259,9 @@ class Namespace:
         self.register_names(node)
     elif (isinstance(tree, ast.UnaryAdd) or isinstance(tree, ast.UnarySub)):
       self.register_names(tree.expr)
-    elif (isinstance(tree, ast.And) or isinstance(tree, ast.Or)):
+    elif (isinstance(tree, ast.And) or isinstance(tree, ast.Or) or
+          isinstance(tree, ast.Bitand) or
+          isinstance(tree, ast.Bitor) or isinstance(tree, ast.Bitxor)):
       for node in tree.nodes:
         self.register_names(node)
     elif isinstance(tree, ast.Not):
@@ -272,7 +279,7 @@ class Namespace:
         for qif in qual.ifs:
           self.register_names(qif.test)
     
-  # generator expression
+    # generator expression
     elif isinstance(tree, ast.GenExpr):
       gen = tree.code
       self.register_names(gen.expr)
@@ -283,7 +290,7 @@ class Namespace:
           self.register_names(qif.test)
     
     else:
-      raise SyntaxError('unsupported syntax: %r (%s:%d)' % (tree, tree._modname, tree.lineno))
+      raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._modname, tree.lineno))
     return
 
   def import_all(self, space):
