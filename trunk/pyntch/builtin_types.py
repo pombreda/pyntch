@@ -395,7 +395,7 @@ class DictType(BuiltinAggregateType):
         obj.connect(self)
       return
 
-  class SetDefault(BultinFunc):
+  class SetDefault(BuiltinFunc):
     def __init__(self, dictobj):
       self.dictobj = dictobj
       BuiltinFunc.__init__(self, 'dict.setdefault', CompoundTypeNode(), [ANY_ARG], [ANY_ARG])

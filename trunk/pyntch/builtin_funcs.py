@@ -4,7 +4,7 @@
 ##  as it causes circular imports!
 
 from typenode import SimpleTypeNode, CompoundTypeNode
-from exception import ExceptionType, ExceptionRaiser
+from exception import ExceptionType, ExceptionRaiser, TypeChecker
 from namespace import Namespace
 from function import ClassType, InstanceType
 from builtin_types import NumberType, BoolType, IntType, LongType, StrType, ListType, BuiltinFunc, INT_ARG, STR_ARG, ANY_ARG
@@ -53,17 +53,20 @@ class IntFunc(BuiltinFunc):
 ##
 class StrFunc(BuiltinFunc):
 
-  class StrConversion(CompoundTypeNode):
+  class StrConversion(CompoundTypeNode, ExceptionRaiser):
     
     def __init__(self, parent_frame):
       CompoundTypeNode.__init__(self)
-      self.parent_frame = parent_frame
+      ExceptionRaiser.__init__(self, parent_frame)
       return
     
     def recv(self, src):
       for obj in src.types:
         if isinstance(obj, InstanceType):
-          ClassType.OptionalAttr(obj, '__str__').call(self, ())
+          value = ClassType.OptionalAttr(obj, '__str__').call(self, ())
+          value.connect(TypeChecker(self, STR_ARG, 'the return value of __str__ method'))
+          value = ClassType.OptionalAttr(obj, '__repr__').call(self, ())
+          value.connect(TypeChecker(self, STR_ARG, 'the return value of __repr__ method'))
       return
 
   def accept_arg(self, caller, _):
