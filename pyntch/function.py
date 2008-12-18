@@ -1,32 +1,10 @@
 #!/usr/bin/env python
 
-from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError
+from typenode import TreeReporter, SimpleTypeNode, CompoundTypeNode, NodeTypeError
 from namespace import Namespace, Variable
 from exception import ExceptionType, ExceptionFrame
 
 
-##  TreeReporter
-##
-class TreeReporter(object):
-
-  def __init__(self, parent=None):
-    self.children = []
-    if parent:
-      parent.children.append(self)
-    return
-
-  def show(self, p):
-    return
-
-  def showrec(self, out, i=0):
-    h = '  '*i
-    self.show(lambda s: out.write(h+s+'\n'))
-    out.write('\n')
-    for reporter in self.children:
-      reporter.showrec(out, i+1)
-    return
-  
-  
 ##  KeywordArg
 ##
 class KeywordArg(SimpleTypeNode):
@@ -80,7 +58,7 @@ class FuncType(SimpleTypeNode, TreeReporter):
       else:
         return func(x)
     SimpleTypeNode.__init__(self)
-    TreeReporter.__init__(self, parent_reporter)
+    TreeReporter.__init__(self, parent_reporter, name)
     self.name = name
     # prepare local variables that hold passed arguments.
     self.space = Namespace(parent_space, name)
@@ -202,6 +180,7 @@ class FuncType(SimpleTypeNode, TreeReporter):
     if self.kwarg:
       r.append('**'+self.kwarg)
     p('def %s(%s):' % (self.name, ', '.join(r)) )
+    names.update( name for (name,_) in self.children )
     for (k,v) in sorted(self.space):
       if k not in names:
         p('  %s = %s' % (k, v.describe()))
@@ -337,7 +316,7 @@ class ClassType(SimpleTypeNode, TreeReporter):
   def __init__(self, parent_reporter, parent_frame, parent_space, name, bases, code, evals):
     from syntax import build_stmt
     SimpleTypeNode.__init__(self)
-    TreeReporter.__init__(self, parent_reporter)
+    TreeReporter.__init__(self, parent_reporter, name)
     self.name = name
     self.bases = bases
     self.boundmethods = {}
@@ -377,10 +356,13 @@ class ClassType(SimpleTypeNode, TreeReporter):
   
   def show(self, p):
     p('class %s:' % self.name)
-    for (_, attr) in sorted(self.attrs.iteritems()):
-      p('  class.%s = %s' % (attr.name, attr.describe()))
-    for (_, attr) in sorted(self.instance.attrs.iteritems()):
-      p('  instance.%s = %s' % (attr.name, attr.describe()))
+    blocks = set( name for (name,_) in self.children )
+    for (name, attr) in sorted(self.attrs.iteritems()):
+      if name in blocks or not attr.types: continue
+      p('  class.%s = %s' % (name, attr.describe()))
+    for (name, attr) in sorted(self.instance.attrs.iteritems()):
+      if name in blocks or not attr.types: continue
+      p('  instance.%s = %s' % (name, attr.describe()))
     return
 
 

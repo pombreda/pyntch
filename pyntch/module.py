@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 import sys, os.path
 stderr = sys.stderr
-from typenode import SimpleTypeNode, CompoundTypeNode
-from function import TreeReporter
+from typenode import TreeReporter, SimpleTypeNode, CompoundTypeNode
 from exception import ExceptionFrame
 from namespace import Namespace
 
@@ -30,7 +29,7 @@ class ModuleType(SimpleTypeNode, TreeReporter, ExceptionFrame):
     self.attrs = {}
     self.space = Namespace(parent_space, name)
     SimpleTypeNode.__init__(self)
-    TreeReporter.__init__(self, parent_reporter)
+    TreeReporter.__init__(self, parent_reporter, name)
     ExceptionFrame.__init__(self)
     return
   
@@ -62,9 +61,12 @@ class ModuleType(SimpleTypeNode, TreeReporter, ExceptionFrame):
   
   def show(self, p):
     p('[%s]' % self.name)
-    for (k,v) in sorted(self.space):
-      p('  %s = %s' % (k, v.describe()))
-    #self.body.show(p)
+    blocks = set( name for (name,_) in self.children )
+    for (name,v) in sorted(self.space):
+      if name in blocks: continue
+      p('  %s = %s' % (name, v.describe()))
+    for expt in self.expts:
+      p('  raises %r' % expt)
     return
   
 
