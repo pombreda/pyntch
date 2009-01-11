@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError
+from typenode import CompoundTypeNode, NodeTypeError
 from exception import ExceptionType, ExceptionFrame, ExceptionRaiser
 
 
@@ -131,20 +131,20 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
       for robj in self.right_types:
         if (lobj,robj) in self.combinations: continue
         self.combinations.add((lobj,robj))
-        if (isinstance(lobj, NumberType) and
-            isinstance(robj, NumberType)):
+        if (lobj.is_type(NumberType) and
+            robj.is_type(NumberType)):
           if self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv'):
-            if lobj.rank < robj.rank:
+            if lobj.get_rank() < robj.get_rank():
               self.update_types(set([robj]))
             else:
               self.update_types(set([lobj]))
             continue
-        if (isinstance(lobj, BaseStringType) and
-            isinstance(robj, BaseStringType) and
+        if (lobj.is_type(BaseStringType) and
+            lobj.is_type(BaseStringType) and
             self.op == 'Add'):
           self.update_types(set([robj]))
           continue
-        k = (lobj.NAME, self.op, robj.NAME)
+        k = (lobj.get_name(), self.op, robj.get_name())
         if k in self.VALID_TYPES:
           v = BUILTIN_TYPE[self.VALID_TYPES[k]]
           self.update_types(set([v]))
@@ -165,7 +165,7 @@ class CompareOp(CompoundTypeNode, ExceptionRaiser):
     from builtin_types import BoolType
     self.expr0 = expr0
     self.comps = comps
-    CompoundTypeNode.__init__(self, [BoolType.get()])
+    CompoundTypeNode.__init__(self, [BoolType.get_object()])
     ExceptionRaiser.__init__(self, parent_frame, loc)
     self.expr0.connect(self)
     for (_,expr) in self.comps:
@@ -189,7 +189,7 @@ class BooleanOp(CompoundTypeNode):
     from builtin_types import BoolType
     self.op = op
     self.nodes = nodes
-    CompoundTypeNode.__init__(self, [BoolType.get()])
+    CompoundTypeNode.__init__(self, [BoolType.get_object()])
     for node in self.nodes:
       node.connect(self)
     return

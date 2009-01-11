@@ -8,7 +8,7 @@ class A:
     self.x = x
     self.a = 'a'
     A.b = 2
-    return self.b
+    return
   
   def foo(self, x):
     self.y = x

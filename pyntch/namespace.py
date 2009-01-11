@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from compiler import ast
-from typenode import SimpleTypeNode, CompoundTypeNode
+from typenode import CompoundTypeNode
 
 
 ##  Variable

@@ -74,14 +74,22 @@ class TypeNode(object):
 ##
 class SimpleTypeNode(TypeNode):
 
-  NAME = None
-
-  def __init__(self):
+  def __init__(self, typeklass):
+    self.typeklass = typeklass
     TypeNode.__init__(self, [self])
     return
 
   def __repr__(self):
-    raise NotImplementedError, self.__class__
+    return '<%s>' % self.get_name()
+
+  def get_name(self):
+    return self.typeklass.get_name()
+
+  def get_rank(self):
+    return self.typeklass.rank
+
+  def is_type(self, typeklass):
+    return issubclass(self.typeklass, typeklass)
 
   def desc1(self, _):
     return repr(self)
