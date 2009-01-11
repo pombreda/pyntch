@@ -151,7 +151,7 @@ class ExceptionRaiser(ExceptionFrame):
 class ExceptionType(SimpleTypeNode):
 
   def __init__(self, name, msg, loc=None):
-    SimpleTypeNode.__init__(self)
+    SimpleTypeNode.__init__(self, self.__class__)
     assert not loc or isinstance(loc, ast.Node), loc
     self.loc = loc
     self.name = name
@@ -229,7 +229,7 @@ class TypeChecker(CompoundTypeNode):
   def recv(self, src):
     types = set()
     for obj in src.types:
-      if obj in self.validtypes:
+      if isinstance(obj, tuple(self.validtypes)):
         types.add(obj)
       elif self.blame:
         self.parent_frame.raise_expt(ExceptionType(

@@ -7,23 +7,26 @@ from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeTypeError
 from exception import ExceptionType, ExceptionRaiser, TypeChecker, ElementTypeChecker
 from function import KeywordArg
 
+ANY_TYPE = True
+
 
 ##  BuiltinType
 ##
 class BuiltinType(SimpleTypeNode):
 
-  NAME = None
-  SINGLETON = None
-
-  def __repr__(self):
-    return '<%s>' % self.NAME
+  PYTHON_TYPE = type
+  
+  def __init__(self):
+    SimpleTypeNode.__init__(self, BuiltinType)
+    return
 
   @classmethod
-  def get(klass):
-    if not klass.SINGLETON:
-      klass.SINGLETON = klass()
-    return klass.SINGLETON
+  def get_name(klass):
+    return klass.PYTHON_TYPE.__name__
 
+  @classmethod
+  def get_object(klass):
+    return SimpleTypeNode(klass)
 
 class BuiltinAggregateType(BuiltinType):
   pass
@@ -33,19 +36,19 @@ class BuiltinAggregateType(BuiltinType):
 ##
 class BuiltinFunc(SimpleTypeNode):
 
-  def __init__(self, name, retval, args=None, optargs=None, expts=None):
-    SimpleTypeNode.__init__(self)
+  def __init__(self, name, retype, args=None, optargs=None, expts=None):
+    SimpleTypeNode.__init__(self, self.__class__)
     args = (args or [])
     optargs = (optargs or [])
     self.name = name
-    self.retval = retval
+    self.retype = retype
     self.minargs = len(args)
     self.args = args+optargs
     self.expts = (expts or [])
     return
 
   def __repr__(self):
-    return '<builtin %s>' % self.NAME
+    return '<builtin %s>' % self.name
 
   def connect_expt(self, frame):
     return
@@ -57,11 +60,11 @@ class BuiltinFunc(SimpleTypeNode):
     if len(args) < self.minargs:
       caller.raise_expt(ExceptionType(
         'TypeError',
-        'too few argument: %d (at least %d)' % (len(args), self.minargs)))
+        'too few argument for %s: %d or more' % (self.name, self.minargs)))
     elif len(self.args) < len(args):
       caller.raise_expt(ExceptionType(
         'TypeError',
-        'too many argument: %d (at most %d)' % (len(args), len(self.args))))
+        'too many argument for %s: at most %d' % (self.name, len(self.args))))
     else:
       for (i,arg1) in enumerate(args):
         if isinstance(arg1, KeywordArg):
@@ -73,37 +76,72 @@ class BuiltinFunc(SimpleTypeNode):
           arg1.connect(self.accept_arg(caller, i))
     for expt in self.expts:
       caller.raise_expt(expt)
-    return self.retval
+    return self.retype
 
 
 ##  NoneType
 ##
 class NoneType(BuiltinType):
-  NAME = 'NoneType'
-  def __repr__(self):
-    return '<None>'
+  PYTHON_TYPE = type(None)
 
 class BoolType(BuiltinType):
-  NAME = 'bool'
+  PYTHON_TYPE = bool
 
 class NumberType(BuiltinType):
-  NAME = 'number'
   rank = 0
-class IntType(NumberType):
-  NAME = 'int'
+  
+class IntType(NumberType, BuiltinFunc):
+  PYTHON_TYPE = int
   rank = 1
+
+  class IntConversion(CompoundTypeNode):
+    
+    def __init__(self, parent_frame, obj):
+      CompoundTypeNode.__init__(self)
+      self.parent_frame = parent_frame
+      obj.connect(self)
+      return
+    
+    def recv(self, src):
+      for obj in src.types:
+        if isinstance(obj, BaseStringType):
+          self.parent_frame.raise_expt(ExceptionType(
+            'ValueError',
+            'might be conversion error'))
+        elif isinstance(obj, (NumberType, BoolType)):
+          pass
+        else:
+          self.parent_frame.raise_expt(ExceptionType(
+            'TypeError',
+            'cannot convert: %s' % obj))
+      return
+
+  def accept_arg(self, caller, i):
+    if i == 0:
+      return self.IntConversion(caller, self.args[i])
+    else:
+      return BuiltinFunc.accept_arg(self, caller, i)
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'int', IntType,
+                         [],
+                         [ANY_TYPE, IntType])
+    return
+  
 class LongType(IntType):
-  NAME = 'long'
+  PYTHON_TYPE = long
   rank = 2
+  
 class FloatType(NumberType):
-  NAME = 'float'
+  PYTHON_TYPE = float
   rank = 3
+  
 class ComplexType(NumberType):
-  NAME = 'complex'
+  PYTHON_TYPE = complex
   rank = 4
 
 class BaseStringType(BuiltinType):
-  NAME = 'basestring'
+  PYTHON_TYPE = basestring
 
   class JoinFunc(BuiltinFunc):
     def accept_arg(self, caller, i):
@@ -111,148 +149,150 @@ class BaseStringType(BuiltinType):
 
   def get_attr(self, name):
     if name == 'capitalize':
-      return BuiltinFunc('str.capitalize', self.get())
+      return BuiltinFunc('str.capitalize', self.get_object())
     elif name == 'center':
-      return BuiltinFunc('str.center', self.get(),
-                         [INT_ARG], 
-                         [STR_ARG])
+      return BuiltinFunc('str.center', self.get_object(),
+                         [IntType], 
+                         [BaseStringType])
     elif name == 'count':
-      return BuiltinFunc('str.count', IntType.get(),
-                         [STR_ARG],
-                         [INT_ARG, INT_ARG])
+      return BuiltinFunc('str.count', IntType.get_object(),
+                         [BaseStringType],
+                         [IntType, IntType])
     elif name == 'decode':
-      return BuiltinFunc('str.decode', UnicodeType.get(),
+      return BuiltinFunc('str.decode', UnicodeType.get_object(),
                          [],
-                         [STR_ARG, STR_ARG],
+                         [BaseStringType, BaseStringType],
                          [ExceptionType('UnicodeDecodeError', 'might not able to decode')])
     elif name == 'encode':
-      return BuiltinFunc('str.encode', StrType.get(),
+      return BuiltinFunc('str.encode', StrType.get_object(),
                          [],
-                         [STR_ARG, STR_ARG],
+                         [BaseStringType, BaseStringType],
                          [ExceptionType('UnicodeEncodeError', 'might not able to encode')])
     elif name == 'endswith':
-      return BuiltinFunc('str.endswith', BoolType.get(),
-                         [STR_ARG],
-                         [INT_ARG, INT_ARG])
+      return BuiltinFunc('str.endswith', BoolType.get_object(),
+                         [BaseStringType],
+                         [IntType, IntType])
     elif name == 'expandtabs':
-      return BuiltinFunc('str.expandtabs', self.get(),
+      return BuiltinFunc('str.expandtabs', self.get_object(),
                          [],
-                         [INT_ARG])
+                         [IntType])
     elif name == 'find':
-      return BuiltinFunc('str.find', IntType.get(),
-                         [STR_ARG],
-                         [INT_ARG, INT_ARG])
+      return BuiltinFunc('str.find', IntType.get_object(),
+                         [BaseStringType],
+                         [IntType, IntType])
     elif name == 'index':
-      return BuiltinFunc('str.index', IntType.get(),
-                         [STR_ARG],
-                         [INT_ARG, INT_ARG],
+      return BuiltinFunc('str.index', IntType.get_object(),
+                         [BaseStringType],
+                         [IntType, IntType],
                          [ExceptionType('ValueError', 'might not able to find the substring')])             
     elif name == 'isalnum':
-      return BuiltinFunc('str.isalnum', BoolType.get())
+      return BuiltinFunc('str.isalnum', BoolType.get_object())
     elif name == 'isalpha':
-      return BuiltinFunc('str.isalpha', BoolType.get())
+      return BuiltinFunc('str.isalpha', BoolType.get_object())
     elif name == 'isdigit':
-      return BuiltinFunc('str.isdigit', BoolType.get())
+      return BuiltinFunc('str.isdigit', BoolType.get_object())
     elif name == 'islower':
-      return BuiltinFunc('str.islower', BoolType.get())
+      return BuiltinFunc('str.islower', BoolType.get_object())
     elif name == 'isspace':
-      return BuiltinFunc('str.isspace', BoolType.get())
+      return BuiltinFunc('str.isspace', BoolType.get_object())
     elif name == 'istitle':
-      return BuiltinFunc('str.istitle', BoolType.get())
+      return BuiltinFunc('str.istitle', BoolType.get_object())
     elif name == 'isupper':
-      return BuiltinFunc('str.isupper', BoolType.get())
+      return BuiltinFunc('str.isupper', BoolType.get_object())
     elif name == 'join':
-      return self.JoinFunc('str.join', self.get(),
-                           [STR_ARG])
+      return self.JoinFunc('str.join', self.get_object(),
+                           [BaseStringType])
     elif name == 'ljust':
-      return BuiltinFunc('str.ljust', self.get(),
-                         [INT_ARG], 
-                         [STR_ARG])
+      return BuiltinFunc('str.ljust', self.get_object(),
+                         [IntType], 
+                         [BaseStringType])
     elif name == 'lower':
-      return BuiltinFunc('str.lower', self.get())
+      return BuiltinFunc('str.lower', self.get_object())
     elif name == 'lstrip':
-      return BuiltinFunc('str.lstrip', self.get(),
-                         [STR_ARG])
+      return BuiltinFunc('str.lstrip', self.get_object(),
+                         [BaseStringType])
     elif name == 'partition':
-      return BuiltinFunc('str.partiion', TupleType([self.get(), self.get(), self.get()]),
-                         [STR_ARG])
+      return BuiltinFunc('str.partiion', TupleType([self.get_object(), self.get_object(), self.get_object()]),
+                         [BaseStringType])
     elif name == 'replace':
-      return BuiltinFunc('str.replace', self.get(),
+      return BuiltinFunc('str.replace', self.get_object(),
                          [BaseStringType, BaseStringType], [IntType])
     elif name == 'rfind':
-      return BuiltinFunc('str.rfind', IntType.get(),
-                         [STR_ARG],
-                         [INT_ARG, INT_ARG])
+      return BuiltinFunc('str.rfind', IntType.get_object(),
+                         [BaseStringType],
+                         [IntType, IntType])
     elif name == 'rindex':
-      return BuiltinFunc('str.rindex', IntType.get(),
-                         [STR_ARG],
-                         [INT_ARG, INT_ARG],
+      return BuiltinFunc('str.rindex', IntType.get_object(),
+                         [BaseStringType],
+                         [IntType, IntType],
                          [ExceptionType('ValueError', 'might not able to find the substring')])             
     elif name == 'rjust':
-      return BuiltinFunc('str.rjust', self.get(),
-                         [INT_ARG], 
-                         [STR_ARG])
+      return BuiltinFunc('str.rjust', self.get_object(),
+                         [IntType], 
+                         [BaseStringType])
     elif name == 'rpartition':
-      return BuiltinFunc('str.rpartiion', TupleType([self.get(), self.get(), self.get()]),
-                         [STR_ARG])
+      return BuiltinFunc('str.rpartiion', TupleType([self.get_object(), self.get_object(), self.get_object()]),
+                         [BaseStringType])
     elif name == 'rsplit':
-      return BuiltinFunc('str.rsplit', ListType([self.get()]),
+      return BuiltinFunc('str.rsplit', ListType([self.get_object()]),
                          [],
-                         [STR_ARG, INT_ARG])
+                         [BaseStringType, IntType])
     elif name == 'rstrip':
-      return BuiltinFunc('str.rstrip', self.get(),
-                         [STR_ARG])
+      return BuiltinFunc('str.rstrip', self.get_object(),
+                         [BaseStringType])
     elif name == 'split':
-      return BuiltinFunc('str.split', ListType([self.get()]),
+      return BuiltinFunc('str.split', ListType([self.get_object()]),
                          [],
-                         [STR_ARG, INT_ARG])
+                         [BaseStringType, IntType])
     elif name == 'splitlines':
-      return BuiltinFunc('str.splitlines', ListType([self.get()]),
+      return BuiltinFunc('str.splitlines', ListType([self.get_object()]),
                          [],
                          [ANY_ARG])
     elif name == 'startswith':
-      return BuiltinFunc('str.startswith', BoolType.get(),
-                         [STR_ARG],
-                         [INT_ARG, INT_ARG])
+      return BuiltinFunc('str.startswith', BoolType.get_object(),
+                         [BaseStringType],
+                         [IntType, IntType])
     elif name == 'strip':
-      return BuiltinFunc('str.strip', self.get(),
-                         [STR_ARG])
+      return BuiltinFunc('str.strip', self.get_object(),
+                         [BaseStringType])
     elif name == 'swapcase':
-      return BuiltinFunc('str.swapcase', self.get())
+      return BuiltinFunc('str.swapcase', self.get_object())
     elif name == 'title':
-      return BuiltinFunc('str.title', self.get())
+      return BuiltinFunc('str.title', self.get_object())
     elif name == 'upper':
-      return BuiltinFunc('str.upper', self.get())
+      return BuiltinFunc('str.upper', self.get_object())
     elif name == 'zfill':
-      return BuiltinFunc('str.zfill', self.get(),
-                         [INT_ARG])
+      return BuiltinFunc('str.zfill', self.get_object(),
+                         [IntType])
     raise NodeTypeError
 
   def get_iter(self, caller):
-    return self.get()
+    return self.get_object()
 
 
 class StrType(BaseStringType):
-  NAME = 'str'
+  PYTHON_TYPE = str
+  
   def get_attr(self, name):
     if name == 'translate':
-      return BuiltinFunc('str.translate', self.get(),
-                         [STR_ARG],
-                         [STR_ARG],
+      return BuiltinFunc('str.translate', self.get_object(),
+                         [BaseStringType],
+                         [BaseStringType],
                          [ExceptionType('ValueError', 'table must be 256 chars long')])
     return BaseStringType.get_attr(self, name)
     
 class UnicodeType(BaseStringType):
-  NAME = 'unicode'
+  PYTHON_TYPE = unicode
+
   def get_attr(self, name):
     if name == 'isdecimal':
-      return BuiltinFunc('unicode.isdecimal', BoolType.get())
+      return BuiltinFunc('unicode.isdecimal', BoolType.get_object())
     elif name == 'isnumeric':
-      return BuiltinFunc('unicode.isnumeric', BoolType.get())
+      return BuiltinFunc('unicode.isnumeric', BoolType.get_object())
     elif name == 'translate':
       return XXX
-      return BuiltinFunc('unicode.translate', self.get(),
-                         [STR_ARG])
+      return BuiltinFunc('unicode.translate', self.get_object(),
+                         [BaseStringType])
     return BaseStringType.get_attr(self, name)
 
 
@@ -260,6 +300,8 @@ class UnicodeType(BaseStringType):
 ##
 class ListType(BuiltinAggregateType):
 
+  PYTHON_TYPE = list
+  
   ##  Element
   ##
   class Element(CompoundTypeNode):
@@ -278,7 +320,7 @@ class ListType(BuiltinAggregateType):
   ##
   class AppendMethod(BuiltinFunc):
     def __init__(self, listobj):
-      BuiltinFunc.__init__(self, 'list.append', NoneType.get(), [ANY_ARG])
+      BuiltinFunc.__init__(self, 'list.append', NoneType.get_object(), [ANY_ARG])
       self.listobj = listobj
       return
     def __repr__(self):
@@ -305,7 +347,7 @@ class ListType(BuiltinAggregateType):
         return
 
     def __init__(self, listobj):
-      BuiltinFunc.__init__(self, 'list.extend', NoneType.get(), [ANY_ARG])
+      BuiltinFunc.__init__(self, 'list.extend', NoneType.get_object(), [ANY_ARG])
       self.listobj = listobj
       return
     def __repr__(self):
@@ -315,7 +357,7 @@ class ListType(BuiltinAggregateType):
     
   class InsertMethod(BuiltinFunc):
     def __init__(self, listobj):
-      BuiltinFunc.__init__(self, 'list.insert', NoneType.get(), [INT_ARG, ANY_ARG], [],
+      BuiltinFunc.__init__(self, 'list.insert', NoneType.get_object(), [IntType, ANY_ARG], [],
                            [ExceptionType('IndexError', 'might be out of range')])
       self.listobj = listobj
       return
@@ -347,30 +389,30 @@ class ListType(BuiltinAggregateType):
     if name == 'append':
       return self.AppendMethod(self)
     elif name == 'count':
-      return BuiltinFunc('list.count', IntType.get(),
+      return BuiltinFunc('list.count', IntType.get_object(),
                          [ANY_ARG])
     elif name == 'extend':
       return self.ExtendMethod(self)
     elif name == 'index':
-      return BuiltinFunc('list.index', IntType.get(),
+      return BuiltinFunc('list.index', IntType.get_object(),
                          [ANY_ARG],
-                         [INT_ARG, INT_ARG],
+                         [IntType, IntType],
                          [ExceptionType('ValueError', 'might not able to find the element')])
     elif name == 'insert':
       return self.InsertMethod(self)
     elif name == 'pop':
-      return BuiltinFunc('list.pop', NoneType.get(),
+      return BuiltinFunc('list.pop', NoneType.get_object(),
                          [],
-                         [INT_ARG],
+                         [IntType],
                          [ExceptionType('IndexError', 'might be out of range')])
     elif name == 'remove':
-      return BuiltinFunc('list.remove', NoneType.get(),
+      return BuiltinFunc('list.remove', NoneType.get_object(),
                          [ANY_ARG],
                          [ExceptionType('ValueError', 'might not able to remove the element')])
     elif name == 'reverse':
-      return BuiltinFunc('list.remove', NoneType.get())
+      return BuiltinFunc('list.remove', NoneType.get_object())
     elif name == 'sort':
-      return self.SortMethod(NoneType.get())
+      return self.SortMethod(NoneType.get_object())
     raise NodeTypeError
 
   def get_element(self, caller, subs, write=False):
@@ -387,6 +429,8 @@ class ListType(BuiltinAggregateType):
 ##
 class DictType(BuiltinAggregateType):
 
+  PYTHON_TYPE = dict
+  
   ##  Item
   class Item(CompoundTypeNode):
     def __init__(self, objs):
@@ -413,7 +457,7 @@ class DictType(BuiltinAggregateType):
     self.default = CompoundTypeNode()
     self.key = self.Item( k for (k,v) in items )
     self.value = self.Item( v for (k,v) in items )
-    NoneType.get().connect(self.default)
+    NoneType.get_object().connect(self.default)
     BuiltinAggregateType.__init__(self)
     return
   
@@ -433,7 +477,7 @@ class DictType(BuiltinAggregateType):
 
   def get_attr(self, name):
     if name == 'clear':
-      return BuiltinFunc('dict.claer', NoneType.get())
+      return BuiltinFunc('dict.claer', NoneType.get_object())
     elif name == 'copy':
       return BuiltinFunc('dict.copy', self.copy())
     elif name == 'fromkeys':
@@ -441,7 +485,7 @@ class DictType(BuiltinAggregateType):
     elif name == 'get':
       return XXX
     elif name == 'has_key':
-      return BuiltinFunc('dict.has_key', BoolType.get(), [ANY_ARG])
+      return BuiltinFunc('dict.has_key', BoolType.get_object(), [ANY_ARG])
     elif name == 'items':
       return BuiltinFunc('dict.items', ListType([ TupleType([self.key, self.value]) ]))
     elif name == 'iteritems':
@@ -484,6 +528,8 @@ class DictType(BuiltinAggregateType):
 ##
 class TupleType(BuiltinAggregateType):
 
+  PYTHON_TYPE = tuple
+  
   ##  ElementAll
   ##
   class ElementAll(CompoundTypeNode):
@@ -499,7 +545,7 @@ class TupleType(BuiltinAggregateType):
       return '|'.join(map(str, self.elements))
 
   def __init__(self, elements, loc=None):
-    SimpleTypeNode.__init__(self)
+    SimpleTypeNode.__init__(self, self.__class__)
     self.elements = elements
     self.loc = loc
     self.elemall = self.ElementAll(elements)
@@ -616,6 +662,8 @@ class GeneratorSlot(CompoundTypeNode):
 ##
 class SetType(BuiltinAggregateType):
 
+  PYTHON_TYPE = set
+
   ##  Item
   class Item(CompoundTypeNode):
     def __init__(self, objs):
@@ -728,14 +776,13 @@ class FileType(BuiltinType):
 ##  ObjectType
 ##
 class ObjectType(BuiltinType):
-  pass
+
+  PYTHON_TYPE = object
+
 
 
 #
 BUILTIN_TYPE = dict(
-  (cls.NAME, cls.get()) for cls in
+  (cls.get_name(), cls.get_object()) for cls in
   ( NoneType, BoolType, IntType, LongType, FloatType, StrType, UnicodeType )
   )
-INT_ARG = ( IntType.get(), LongType.get() )
-STR_ARG = ( StrType.get(), UnicodeType.get() )
-ANY_ARG = True

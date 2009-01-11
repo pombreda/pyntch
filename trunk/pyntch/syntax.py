@@ -161,12 +161,12 @@ def build_expr(reporter, frame, space, tree, evals):
   else:
     raise SyntaxError(tree)
 
-  assert isinstance(expr, TypeNode) or isinstance(expr, tuple), expr
+  assert isinstance(expr, (TypeNode, KeywordArg, tuple)), expr
   evals.append((None, expr))
   return expr
 
 
-##  build_typecheck
+##  build_typecheck(reporter, frame, space, tree, evals)
 ##
 def build_typecheck(reporter, frame, space, tree, evals):
   # "assert isinstance() and isinstance() and ...
@@ -246,7 +246,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     if isfuncdef:
       # if the last statement is not a Return
       if not isinstance(stmt, ast.Return):
-        value = NoneType.get()
+        value = NoneType.get_object()
         evals.append(('r', value))
 
   # if, elif, else

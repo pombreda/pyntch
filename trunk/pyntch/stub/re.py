@@ -16,7 +16,8 @@ class rematch:
     return
 
 class compile:
-  def __init__(self, pattern, flags=0):
+  def __init__(self, pattern='', flags=0):
+    assert isinstance(pattern, str)
     return
   def search(self, string, flags=0):
     if 1:
@@ -34,8 +35,6 @@ class compile:
     return (string, 0)
   def split(self, string, maxsplit=0):
     return ['']
-  def findall(self, string, flags=0):
-    return 
   def findall(self, string, flags=0):
     return [rematch()]
   def finditer(self, string, flags=0):

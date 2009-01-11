@@ -7,10 +7,9 @@ from exception import ExceptionType, ExceptionFrame
 
 ##  KeywordArg
 ##
-class KeywordArg(SimpleTypeNode):
+class KeywordArg(object):
 
   def __init__(self, name, value):
-    SimpleTypeNode.__init__(self)
     self.name = name
     self.value = value
     return
@@ -57,7 +56,7 @@ class FuncType(SimpleTypeNode, TreeReporter):
         return tuple( maprec(func, y) for y in x )
       else:
         return func(x)
-    SimpleTypeNode.__init__(self)
+    SimpleTypeNode.__init__(self, self.__class__)
     TreeReporter.__init__(self, parent_reporter, name)
     self.name = name
     # prepare local variables that hold passed arguments.
@@ -110,7 +109,8 @@ class FuncType(SimpleTypeNode, TreeReporter):
 
   def call(self, caller, args):
     from builtin_types import StrType, DictType, TupleType, TupleUnpack
-    # bind args.
+    # assign(var1,arg1):
+    #  Assign a actual parameter arg1 to a local variable var1.
     def assign(var1, arg1):
       assert not isinstance(var1, list), var1
       assert not isinstance(arg1, list), arg1
@@ -132,9 +132,11 @@ class FuncType(SimpleTypeNode, TreeReporter):
     argvars = list(self.argvars)
     kwargs = []
     varargs = []
+    # Handle each argument one by one.
     for arg1 in args:
       if isinstance(arg1, KeywordArg):
         (name, value) = (arg1.name, arg1.value)
+        # When a keyword argument is given, remove that name from the remaining arguments.
         if name in [ var1.name for var1 in argvars if isinstance(var1, Variable) ]:
           value.connect(self.space[name])
           argvars = [ var1 for var1 in argvars
@@ -144,7 +146,7 @@ class FuncType(SimpleTypeNode, TreeReporter):
         else:
           caller.raise_expt(ExceptionType(
             'TypeError',
-            'invalid keyword argument: %r' % name))
+            'invalid keyword argument for %s: %r' % (self.name, name)))
       elif argvars:
         var1 = argvars.pop(0)
         assign(var1, arg1)
@@ -153,15 +155,16 @@ class FuncType(SimpleTypeNode, TreeReporter):
       else:
         caller.raise_expt(ExceptionType(
           'TypeError',
-          'too many argument: more than %r' % len(self.argvars)))
+          'too many argument for %s: at most %d' % (self.name, len(self.argvars))))
+    # Handle remaining arguments: kwargs and varargs.
     if kwargs:
-      self.space[self.kwarg].bind(DictType([ (StrType.get(), obj) for obj in kwargs ]))
+      self.space[self.kwarg].bind(DictType([ (StrType.get_object(), obj) for obj in kwargs ]))
     if varargs:
       self.space[self.vararg].bind(TupleType(tuple(varargs)))
-    if argvars:
+    if len(self.defaults) < len(argvars):
       caller.raise_expt(ExceptionType(
         'TypeError',
-        'too few argument: %r more' % (len(argvars))))
+        'too few argument for %s: %d or more' % (self.name, len(argvars))))
     return self.body
 
   def show(self, p):
@@ -223,7 +226,7 @@ class BoundMethod(SimpleTypeNode):
   def __init__(self, arg0, func):
     self.arg0 = arg0
     self.func = func
-    SimpleTypeNode.__init__(self)
+    SimpleTypeNode.__init__(self, FuncType)
     return
 
   def __repr__(self):
@@ -315,7 +318,7 @@ class ClassType(SimpleTypeNode, TreeReporter):
 
   def __init__(self, parent_reporter, parent_frame, parent_space, name, bases, code, evals):
     from syntax import build_stmt
-    SimpleTypeNode.__init__(self)
+    SimpleTypeNode.__init__(self, self.__class__)
     TreeReporter.__init__(self, parent_reporter, name)
     self.name = name
     self.bases = bases
@@ -326,7 +329,9 @@ class ClassType(SimpleTypeNode, TreeReporter):
       build_stmt(self, parent_frame, space, code, evals)
     self.attrs = {}
     for (name,var) in space:
-      attr = self.ClassAttr(name, self, self.bases)
+      # Do not inherit attributes from the base class
+      # if they are explicitly overriden.
+      attr = self.ClassAttr(name, self, [])
       var.connect(attr)
       self.attrs[name] = attr
     self.instance = InstanceType(self)
@@ -410,7 +415,7 @@ class InstanceType(SimpleTypeNode):
     pass
     
   def __init__(self, klass):
-    SimpleTypeNode.__init__(self)
+    SimpleTypeNode.__init__(self, self.__class__)
     self.klass = klass
     self.attrs = {}
     self.boundmethods = {}

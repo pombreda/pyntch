@@ -5,7 +5,7 @@ class A:
   def __init__(self, x):
     print 'init A'
     self.x = x
-    return 'A'
+    return
   
   def foo(self):
     print 'foo!'
