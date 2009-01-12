@@ -5,9 +5,9 @@
 
 from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeTypeError
 from exception import ExceptionType, ExceptionRaiser, TypeChecker, ElementTypeChecker
-from function import KeywordArg
+from function import KeywordArg, ClassType, InstanceType
 
-ANY_TYPE = True
+ANY_TYPE = False
 
 
 ##  BuiltinType
@@ -15,6 +15,7 @@ ANY_TYPE = True
 class BuiltinType(SimpleTypeNode):
 
   PYTHON_TYPE = type
+  RANK = None
   
   def __init__(self):
     SimpleTypeNode.__init__(self, BuiltinType)
@@ -23,6 +24,10 @@ class BuiltinType(SimpleTypeNode):
   @classmethod
   def get_name(klass):
     return klass.PYTHON_TYPE.__name__
+
+  @classmethod
+  def get_rank(klass):
+    return klass.RANK
 
   @classmethod
   def get_object(klass):
@@ -88,18 +93,17 @@ class BoolType(BuiltinType):
   PYTHON_TYPE = bool
 
 class NumberType(BuiltinType):
-  rank = 0
+  RANK = 0
   
 class IntType(NumberType, BuiltinFunc):
   PYTHON_TYPE = int
-  rank = 1
+  RANK = 1
 
   class IntConversion(CompoundTypeNode):
     
-    def __init__(self, parent_frame, obj):
+    def __init__(self, parent_frame):
       CompoundTypeNode.__init__(self)
       self.parent_frame = parent_frame
-      obj.connect(self)
       return
     
     def recv(self, src):
@@ -118,29 +122,29 @@ class IntType(NumberType, BuiltinFunc):
 
   def accept_arg(self, caller, i):
     if i == 0:
-      return self.IntConversion(caller, self.args[i])
+      return self.IntConversion(caller)
     else:
       return BuiltinFunc.accept_arg(self, caller, i)
 
   def __init__(self):
-    BuiltinFunc.__init__(self, 'int', IntType,
+    BuiltinFunc.__init__(self, 'int', IntType.get_object(),
                          [],
                          [ANY_TYPE, IntType])
     return
   
 class LongType(IntType):
   PYTHON_TYPE = long
-  rank = 2
+  RANK = 2
   
 class FloatType(NumberType):
   PYTHON_TYPE = float
-  rank = 3
+  RANK = 3
   
 class ComplexType(NumberType):
   PYTHON_TYPE = complex
-  rank = 4
+  RANK = 4
 
-class BaseStringType(BuiltinType):
+class BaseStringType(BuiltinType, BuiltinFunc):
   PYTHON_TYPE = basestring
 
   class JoinFunc(BuiltinFunc):
@@ -247,7 +251,7 @@ class BaseStringType(BuiltinType):
     elif name == 'splitlines':
       return BuiltinFunc('str.splitlines', ListType([self.get_object()]),
                          [],
-                         [ANY_ARG])
+                         [ANY_TYPE])
     elif name == 'startswith':
       return BuiltinFunc('str.startswith', BoolType.get_object(),
                          [BaseStringType],
@@ -269,6 +273,30 @@ class BaseStringType(BuiltinType):
   def get_iter(self, caller):
     return self.get_object()
 
+  class StrConversion(CompoundTypeNode, ExceptionRaiser):
+    
+    def __init__(self, parent_frame):
+      CompoundTypeNode.__init__(self)
+      ExceptionRaiser.__init__(self, parent_frame)
+      return
+    
+    def recv(self, src):
+      for obj in src.types:
+        if isinstance(obj, InstanceType):
+          value = ClassType.OptionalAttr(obj, '__str__').call(self, ())
+          value.connect(TypeChecker(self, BaseStringType(), 'the return value of __str__ method'))
+          value = ClassType.OptionalAttr(obj, '__repr__').call(self, ())
+          value.connect(TypeChecker(self, BaseStringType(), 'the return value of __repr__ method'))
+      return
+
+  def accept_arg(self, caller, _):
+    return self.StrConversion(caller)
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'str', StrType.get_object(),
+                         [],
+                         [ANY_TYPE])
+    return
 
 class StrType(BaseStringType):
   PYTHON_TYPE = str
@@ -320,7 +348,7 @@ class ListType(BuiltinAggregateType):
   ##
   class AppendMethod(BuiltinFunc):
     def __init__(self, listobj):
-      BuiltinFunc.__init__(self, 'list.append', NoneType.get_object(), [ANY_ARG])
+      BuiltinFunc.__init__(self, 'list.append', NoneType.get_object(), [ANY_TYPE])
       self.listobj = listobj
       return
     def __repr__(self):
@@ -347,7 +375,7 @@ class ListType(BuiltinAggregateType):
         return
 
     def __init__(self, listobj):
-      BuiltinFunc.__init__(self, 'list.extend', NoneType.get_object(), [ANY_ARG])
+      BuiltinFunc.__init__(self, 'list.extend', NoneType.get_object(), [ANY_TYPE])
       self.listobj = listobj
       return
     def __repr__(self):
@@ -357,7 +385,7 @@ class ListType(BuiltinAggregateType):
     
   class InsertMethod(BuiltinFunc):
     def __init__(self, listobj):
-      BuiltinFunc.__init__(self, 'list.insert', NoneType.get_object(), [IntType, ANY_ARG], [],
+      BuiltinFunc.__init__(self, 'list.insert', NoneType.get_object(), [IntType, ANY_TYPE], [],
                            [ExceptionType('IndexError', 'might be out of range')])
       self.listobj = listobj
       return
@@ -369,6 +397,13 @@ class ListType(BuiltinAggregateType):
       else:
         return BuiltinFunc.accept_arg(self, caller, i)
       
+  class SortMethod(BuiltinFunc):
+    def __init__(self, listobj):
+      BuiltinFunc.__init__(self, 'list.sort', NoneType.get_object())
+      self.listobj = listobj
+      return
+    def __repr__(self):
+      return '%r.sort' % self.listobj
   #
   def __init__(self, elems):
     BuiltinAggregateType.__init__(self)
@@ -390,12 +425,12 @@ class ListType(BuiltinAggregateType):
       return self.AppendMethod(self)
     elif name == 'count':
       return BuiltinFunc('list.count', IntType.get_object(),
-                         [ANY_ARG])
+                         [ANY_TYPE])
     elif name == 'extend':
       return self.ExtendMethod(self)
     elif name == 'index':
       return BuiltinFunc('list.index', IntType.get_object(),
-                         [ANY_ARG],
+                         [ANY_TYPE],
                          [IntType, IntType],
                          [ExceptionType('ValueError', 'might not able to find the element')])
     elif name == 'insert':
@@ -407,7 +442,7 @@ class ListType(BuiltinAggregateType):
                          [ExceptionType('IndexError', 'might be out of range')])
     elif name == 'remove':
       return BuiltinFunc('list.remove', NoneType.get_object(),
-                         [ANY_ARG],
+                         [ANY_TYPE],
                          [ExceptionType('ValueError', 'might not able to remove the element')])
     elif name == 'reverse':
       return BuiltinFunc('list.remove', NoneType.get_object())
@@ -442,7 +477,7 @@ class DictType(BuiltinAggregateType):
   class SetDefault(BuiltinFunc):
     def __init__(self, dictobj):
       self.dictobj = dictobj
-      BuiltinFunc.__init__(self, 'dict.setdefault', CompoundTypeNode(), [ANY_ARG], [ANY_ARG])
+      BuiltinFunc.__init__(self, 'dict.setdefault', CompoundTypeNode(), [ANY_TYPE], [ANY_TYPE])
       return
     def __repr__(self):
       return '%r.setdefault' % self.dictobj
@@ -485,7 +520,7 @@ class DictType(BuiltinAggregateType):
     elif name == 'get':
       return XXX
     elif name == 'has_key':
-      return BuiltinFunc('dict.has_key', BoolType.get_object(), [ANY_ARG])
+      return BuiltinFunc('dict.has_key', BoolType.get_object(), [ANY_TYPE])
     elif name == 'items':
       return BuiltinFunc('dict.items', ListType([ TupleType([self.key, self.value]) ]))
     elif name == 'iteritems':
@@ -498,7 +533,7 @@ class DictType(BuiltinAggregateType):
       return BuiltinFunc('dict.keys', ListType([ TupleType([self.key]) ]))
     elif name == 'pop':
       return XXX
-      return BuiltinFunc('dict.pop', self.value, [ANY_ARG])
+      return BuiltinFunc('dict.pop', self.value, [ANY_TYPE])
     elif name == 'popitem':
       return BuiltinFunc('dict.popitem', TupleType([self.key, self.value]))
     elif name == 'setdefault':
@@ -776,7 +811,6 @@ class FileType(BuiltinType):
 ##  ObjectType
 ##
 class ObjectType(BuiltinType):
-
   PYTHON_TYPE = object
 
 

@@ -86,7 +86,7 @@ class SimpleTypeNode(TypeNode):
     return self.typeklass.get_name()
 
   def get_rank(self):
-    return self.typeklass.rank
+    return self.typeklass.get_rank()
 
   def is_type(self, typeklass):
     return issubclass(self.typeklass, typeklass)

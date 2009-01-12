@@ -4,9 +4,8 @@ from compiler import ast
 from typenode import TypeNode, UndefinedTypeNode
 from exception import ExceptionType, ExceptionFrame, ExceptionCatcher, ExceptionMaker, TypeChecker
 from function import KeywordArg, FuncType, LambdaFuncType, ClassType
-from expression import AttrAssign, SubAssign, AttrRef, SubRef, IterRef, \
-     FunCall, BinaryOp, CompareOp, BooleanOp, AssignOp
-#from expression import SliceRef, UnaryOp, NotOp
+from expression import AttrAssign, AttrRef, SubAssign, SubRef, IterRef, SliceAssign, SliceRef, \
+     FunCall, BinaryOp, CompareOp, BooleanOp, AssignOp, UnaryOp, NotOp
 
 
 ##  build_assign(reporter, frame, namespace, node1, node2, evals)
@@ -27,7 +26,16 @@ def build_assign(reporter, frame, space, n, v, evals):
     obj = build_expr(reporter, frame, space, n.expr, evals)
     subs = [ build_expr(reporter, frame, space, expr, evals) for expr in n.subs ]
     SubAssign(frame, n, obj, subs, v)
+  elif isinstance(n, ast.Slice):
+    obj = build_expr(reporter, frame, space, n.expr, evals)
+    lower = upper = None
+    if n.lower:
+      lower = build_expr(reporter, frame, space, n.lower, evals)
+    if n.upper:
+      upper = build_expr(reporter, frame, space, n.upper, evals)
+    SliceAssign(frame, n, obj, lower, upper, v)
   else:
+    assert 0, (n._modname, n.lineno)
     raise SyntaxError(n)
   return
 
@@ -92,11 +100,9 @@ def build_expr(reporter, frame, space, tree, evals):
     expr = DictType(items)
 
   # +, -, *, /, %, //, <<, >>, **, &, |, ^
-  elif (isinstance(tree, ast.Add) or isinstance(tree, ast.Sub) or
-        isinstance(tree, ast.Mul) or isinstance(tree, ast.Div) or
-        isinstance(tree, ast.Mod) or isinstance(tree, ast.FloorDiv) or
-        isinstance(tree, ast.LeftShift) or isinstance(tree, ast.RightShift) or
-        isinstance(tree, ast.Power)):
+  elif isinstance(tree, (ast.Add, ast.Sub, ast.Mul, ast.Div,
+                         ast.Mod, ast.FloorDiv, ast.Power,
+                         ast.LeftShift, ast.RightShift)):
     op = tree.__class__.__name__
     left = build_expr(reporter, frame, space, tree.left, evals)
     right = build_expr(reporter, frame, space, tree.right, evals)
@@ -109,16 +115,17 @@ def build_expr(reporter, frame, space, tree, evals):
     expr = CompareOp(frame, tree, expr0, comps)
 
   # +,-
-  elif (isinstance(tree, ast.UnaryAdd) or isinstance(tree, ast.UnarySub)):
+  elif isinstance(tree, (ast.UnaryAdd, ast.UnarySub)):
+    op = tree.__class__.__name__
     value = build_expr(reporter, frame, space, tree.expr, evals)
-    expr = UnaryOp(frame, tree.__class__, value)
+    expr = UnaryOp(frame, tree, op, value)
 
   # and, or
-  elif (isinstance(tree, ast.And) or isinstance(tree, ast.Or) or
-        isinstance(tree, ast.Bitand) or
-        isinstance(tree, ast.Bitor) or isinstance(tree, ast.Bitxor)):
+  elif isinstance(tree, (ast.And, ast.Or,
+                         ast.Bitand, ast.Bitor, ast.Bitxor)):
+    op = tree.__class__.__name__
     nodes = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
-    expr = BooleanOp(tree.__class__.__name__, nodes)
+    expr = BooleanOp(frame, tree, op, nodes)
 
   # not
   elif isinstance(tree, ast.Not):
@@ -190,7 +197,7 @@ def build_typecheck(reporter, frame, space, tree, evals):
 ##  build_stmt
 ##
 def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
-  from builtin_types import NoneType
+  from builtin_types import NoneType, StrType
   assert isinstance(frame, ExceptionFrame)
 
   if isinstance(tree, ast.Module):
@@ -300,15 +307,17 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
       exctype = build_expr(reporter, frame, space, tree.expr1, evals)
       excarg = build_expr(reporter, frame, space, tree.expr2, evals)
       exc = ExceptionMaker(frame, tree.expr1, exctype, (excarg,))
-    else:
+      frame.add_expt(tree, exc)
+    elif tree.expr1:
       exctype = build_expr(reporter, frame, space, tree.expr1, evals)
       exc = ExceptionMaker(frame, tree.expr1, exctype, ())
-    frame.add_expt(tree, exc)
+      frame.add_expt(tree, exc)
 
   # printnl
-  elif isinstance(tree, ast.Printnl):
+  elif isinstance(tree, (ast.Print, ast.Printnl)):
     for node in tree.nodes:
       value = build_expr(reporter, frame, space, node, evals)
+      value.connect(StrType.StrConversion(frame))
 
   # discard
   elif isinstance(tree, ast.Discard):

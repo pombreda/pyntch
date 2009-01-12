@@ -210,9 +210,10 @@ class TypeChecker(CompoundTypeNode):
   def __init__(self, parent_frame, types, blame=None):
     CompoundTypeNode.__init__(self)
     self.parent_frame = parent_frame
-    self.types = types
     self.validtypes = set()
     self.blame = blame
+    if not isinstance(types, (tuple,list)):
+      types = (types,)
     for obj in types:
       obj.connect(self, self.recv_type)
     return
@@ -229,12 +230,15 @@ class TypeChecker(CompoundTypeNode):
   def recv(self, src):
     types = set()
     for obj in src.types:
-      if isinstance(obj, tuple(self.validtypes)):
-        types.add(obj)
-      elif self.blame:
-        self.parent_frame.raise_expt(ExceptionType(
-          'TypeError',
-          '%s (%s) must be {%s}' % (self.blame, obj, '|'.join(map(repr, self.validtypes)))))
+      for typeklass in self.validtypes:
+        if obj.is_type(typeklass.__class__):
+          types.add(obj)
+          break
+      else:
+        if self.blame:
+          self.parent_frame.raise_expt(ExceptionType(
+            'TypeError',
+            '%s (%s) must be {%s}' % (self.blame, obj, '|'.join(map(repr, self.validtypes)))))
     self.update_types(types)
     return
 
