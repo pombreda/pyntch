@@ -360,7 +360,10 @@ class ClassType(SimpleTypeNode, TreeReporter):
     return self.InitMethodBody(self.instance).call(caller, args)
   
   def show(self, p):
-    p('class %s:' % self.name)
+    if self.bases:
+      p('class %s(%s):' % (self.name, ', '.join( var.name for var in self.bases )))
+    else:
+      p('class %s:' % self.name)
     blocks = set( name for (name,_) in self.children )
     for (name, attr) in sorted(self.attrs.iteritems()):
       if name in blocks or not attr.types: continue

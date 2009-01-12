@@ -123,6 +123,7 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
 
   VALID_TYPES = {
     ('str', 'Mul', 'int'): 'str',
+    ('int', 'Mul', 'str'): 'str',
     ('unicode', 'Mul', 'int'): 'unicode',
     }
   def update(self):
@@ -144,6 +145,10 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
             self.op == 'Add'):
           self.update_types(set([robj]))
           continue
+        if (lobj.is_type(BaseStringType) and
+            self.op == 'Mod'):
+          self.update_types(set([lobj]))
+          continue
         k = (lobj.get_name(), self.op, robj.get_name())
         if k in self.VALID_TYPES:
           v = BUILTIN_TYPE[self.VALID_TYPES[k]]
@@ -156,6 +161,25 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
 
 class AssignOp(BinaryOp): pass
 
+
+##  UnaryOp
+##
+class UnaryOp(CompoundTypeNode, ExceptionRaiser):
+  
+  def __init__(self, parent_frame, loc, op, value):
+    self.value = value
+    if op == 'UnaryAdd':
+      self.op = '+'
+    else:
+      self.op = '-'
+    CompoundTypeNode.__init__(self)
+    ExceptionRaiser.__init__(self, parent_frame, loc)
+    self.value.connect(self)
+    return
+  
+  def __repr__(self):
+    return '%s%r' % (self.op, self.value)
+  
 
 ##  CompareOp
 ##
@@ -183,19 +207,40 @@ class CompareOp(CompoundTypeNode, ExceptionRaiser):
 
 ##  BooleanOp
 ##
-class BooleanOp(CompoundTypeNode):
+class BooleanOp(CompoundTypeNode, ExceptionRaiser):
   
-  def __init__(self, op, nodes):
+  def __init__(self, parent_frame, loc, op, nodes):
     from builtin_types import BoolType
     self.op = op
     self.nodes = nodes
     CompoundTypeNode.__init__(self, [BoolType.get_object()])
+    ExceptionRaiser.__init__(self, parent_frame, loc)
     for node in self.nodes:
       node.connect(self)
     return
   
   def __repr__(self):
     return '%s(%s)' % (self.op, ','.join(map(repr, self.nodes)))
+
+
+##  NotOp
+##
+class NotOp(CompoundTypeNode, ExceptionRaiser):
+  
+  def __init__(self, parent_frame, loc, value):
+    from builtin_types import BoolType
+    self.value = value
+    CompoundTypeNode.__init__(self, [BoolType.get_object()])
+    ExceptionRaiser.__init__(self, parent_frame, loc)
+    self.value.connect(self)
+    return
+  
+  def __repr__(self):
+    return 'not %r' % (self.value)
+  
+  def recv(self, _):
+    # ignore because NotOp always returns bool.
+    return
 
 
 ##  SubRef
@@ -279,3 +324,72 @@ class IterRef(CompoundTypeNode, ExceptionRaiser):
           'TypeError',
           '%r is not an iterator: %r' % (self.target, obj)))
     return
+
+
+##  SliceRef
+##
+class SliceRef(CompoundTypeNode, ExceptionRaiser):
+  
+  def __init__(self, parent_frame, loc, target, lower, upper):
+    self.target = target
+    self.objs = set()
+    self.lower = lower
+    self.upper = upper
+    CompoundTypeNode.__init__(self)
+    ExceptionRaiser.__init__(self, parent_frame, loc)
+    self.target.connect(self, self.recv_target)
+    return
+
+  def __repr__(self):
+    if self.lower and self.upper:
+      return '%r[%r:%r]' % (self.target, self.lower, self.upper)
+    elif self.lower:
+      return '%r[%r:]' % (self.target, self.lower)
+    elif self.upper:
+      return '%r[:%r]' % (self.target, self.upper)
+    else:
+      return '%r[:]' % self.target
+
+  def recv_target(self, src):
+    self.objs.update(src.types)
+    for obj in self.objs:
+      try:
+        obj.get_element(self, [self.lower, self.upper]).connect(self)
+      except NodeTypeError:
+        self.raise_expt(ExceptionType(
+          'TypeError',
+          'unsubscriptable object: %r' % obj))
+    return
+
+
+##  SliceAssign
+##
+class SliceAssign(CompoundTypeNode, ExceptionRaiser):
+  
+  def __init__(self, parent_frame, loc, target, lower, upper, value):
+    self.target = target
+    self.objs = set()
+    self.lower = lower
+    self.upper = upper
+    self.value = value
+    CompoundTypeNode.__init__(self)
+    ExceptionRaiser.__init__(self, parent_frame, loc)
+    self.target.connect(self, self.recv_target)
+    return
+
+  def __repr__(self):
+    return 'assign(%r[%r:%r], %r)' % (self.target, self.lower, self.upper, self.value)
+
+  def recv_target(self, src):
+    self.objs.update(src.types)
+    for obj in self.objs:
+      try:
+        elem = obj.get_element(self, [self.lower, self.upper], write=True)
+        self.value.connect(elem)
+      except NodeTypeError:
+        self.raise_expt(ExceptionType(
+          'TypeError',
+          'unsubscriptable object: %r' % obj))
+    return
+
+

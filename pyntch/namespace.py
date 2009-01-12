@@ -18,7 +18,7 @@ class Variable(CompoundTypeNode):
     return '@'+self.fullname()
 
   def fullname(self):
-    return '%s.%s' % (self.space.name, self.name)
+    return '%s.%s' % (self.space.fullname(), self.name)
 
   def bind(self, obj):
     obj.connect(self)
@@ -34,11 +34,10 @@ class Namespace:
 
   def __init__(self, parent_space, name):
     self.parent_space = parent_space
-    self.name = name
     self.vars = {}
     self.msgs = []
+    self.name = name
     if parent_space:
-      self.name = parent_space.name+'.'+name
       self.global_space = parent_space.global_space
     else:
       self.global_space = self
@@ -55,6 +54,12 @@ class Namespace:
 
   def __iter__(self):
     return self.vars.iteritems()
+
+  def fullname(self):
+    if self.parent_space:
+      return '%s.%s' % (self.parent_space.fullname(), self.name)
+    else:
+      return self.name
 
   def get_var(self, name):
     while self:
@@ -194,8 +199,8 @@ class Namespace:
           self.register_var(asname)
           self[asname].bind(module)
 
-    # printnl
-    elif isinstance(tree, ast.Printnl):
+    # print, printnl
+    elif isinstance(tree, (ast.Print, ast.Printnl)):
       for node in tree.nodes:
         self.register_names(node)
     
@@ -246,22 +251,19 @@ class Namespace:
       for (k,v) in tree.items:
         self.register_names(k)
         self.register_names(v)
-    elif (isinstance(tree, ast.Add) or isinstance(tree, ast.Sub) or
-          isinstance(tree, ast.Mul) or isinstance(tree, ast.Div) or
-          isinstance(tree, ast.Mod) or isinstance(tree, ast.FloorDiv) or
-          isinstance(tree, ast.LeftShift) or isinstance(tree, ast.RightShift) or
-          isinstance(tree, ast.Power)):
+    elif isinstance(tree, (ast.Add, ast.Sub, ast.Mul, ast.Div,
+                           ast.Mod, ast.FloorDiv, ast.Power,
+                           ast.LeftShift, ast.RightShift)):
       self.register_names(tree.left)
       self.register_names(tree.right)
     elif isinstance(tree, ast.Compare):
       self.register_names(tree.expr)
       for (_,node) in tree.ops:
         self.register_names(node)
-    elif (isinstance(tree, ast.UnaryAdd) or isinstance(tree, ast.UnarySub)):
+    elif isinstance(tree, (ast.UnaryAdd, ast.UnarySub)):
       self.register_names(tree.expr)
-    elif (isinstance(tree, ast.And) or isinstance(tree, ast.Or) or
-          isinstance(tree, ast.Bitand) or
-          isinstance(tree, ast.Bitor) or isinstance(tree, ast.Bitxor)):
+    elif isinstance(tree, (ast.And, ast.Or,
+                           ast.Bitand, ast.Bitor, ast.Bitxor)):
       for node in tree.nodes:
         self.register_names(node)
     elif isinstance(tree, ast.Not):

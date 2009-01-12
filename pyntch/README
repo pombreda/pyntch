@@ -39,5 +39,6 @@ Pyntch can analyze correctly has to meet the following conditions:
  * not altering __dict__, globals(), locals()
  * not using getattr, setattr
  * not using eval, compile or exec
+ * no metaclass programming
 
 cannot catch UnboundLocalError

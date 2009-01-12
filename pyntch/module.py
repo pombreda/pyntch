@@ -49,9 +49,11 @@ class BuiltinNamespace(Namespace):
     # reduce,reload,repr,round,setattr,sorted,
     # sum,unichr,vars,xrange,zip
     self.register_var('range').bind(builtin_funcs.RangeFunc())
-    
     return
 
+  def fullname(self):
+    return ''
+  
 
 ##  Global stuff
 ##
@@ -163,6 +165,7 @@ def load_module(fullname, modpath=['.'], debug=0):
     except ValueError:
       name = fullname
     path = find_module(name, modpath, debug=debug)
+    fullname = fullname.replace('/','.')
     module = ModuleType(None, BUILTIN_NAMESPACE, fullname, path)
     MODULE_CACHE[fullname] = module
     if debug:
