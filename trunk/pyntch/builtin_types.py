@@ -59,7 +59,7 @@ class BuiltinFunc(SimpleTypeNode):
     return
 
   def accept_arg(self, caller, i):
-    return TypeChecker(caller, self.args[i], 'arg%d' % i)
+    return TypeChecker(caller, self.args[i], caller.loc, 'arg%d' % i)
 
   def call(self, caller, args):
     if len(args) < self.minargs:
@@ -149,7 +149,7 @@ class BaseStringType(BuiltinType, BuiltinFunc):
 
   class JoinFunc(BuiltinFunc):
     def accept_arg(self, caller, i):
-      return ElementTypeChecker(caller, self.args[i], 'arg%d' % i)
+      return ElementTypeChecker(caller, self.args[i], caller.loc, 'arg%d' % i)
 
   def get_attr(self, name):
     if name == 'capitalize':
@@ -275,22 +275,22 @@ class BaseStringType(BuiltinType, BuiltinFunc):
 
   class StrConversion(CompoundTypeNode, ExceptionRaiser):
     
-    def __init__(self, parent_frame):
+    def __init__(self, parent_frame, loc):
       CompoundTypeNode.__init__(self)
-      ExceptionRaiser.__init__(self, parent_frame)
+      ExceptionRaiser.__init__(self, parent_frame, loc)
       return
     
     def recv(self, src):
       for obj in src.types:
         if isinstance(obj, InstanceType):
           value = ClassType.OptionalAttr(obj, '__str__').call(self, ())
-          value.connect(TypeChecker(self, BaseStringType(), 'the return value of __str__ method'))
+          value.connect(TypeChecker(self, BaseStringType(), self.loc, 'the return value of __str__ method'))
           value = ClassType.OptionalAttr(obj, '__repr__').call(self, ())
-          value.connect(TypeChecker(self, BaseStringType(), 'the return value of __repr__ method'))
+          value.connect(TypeChecker(self, BaseStringType(), self.loc, 'the return value of __repr__ method'))
       return
 
   def accept_arg(self, caller, _):
-    return self.StrConversion(caller)
+    return self.StrConversion(caller, caller.loc)
 
   def __init__(self):
     BuiltinFunc.__init__(self, 'str', StrType.get_object(),
@@ -359,10 +359,10 @@ class ListType(BuiltinAggregateType):
   class ExtendMethod(BuiltinFunc):
     
     class ElementExtender(CompoundTypeNode, ExceptionRaiser):
-      def __init__(self, parent_frame, elem):
+      def __init__(self, parent_frame, elem, loc):
         self.elem = elem
         CompoundTypeNode.__init__(self)
-        ExceptionRaiser.__init__(self, parent_frame)
+        ExceptionRaiser.__init__(self, parent_frame, loc)
         return
       def recv(self, src):
         for obj in src.types:
@@ -381,7 +381,7 @@ class ListType(BuiltinAggregateType):
     def __repr__(self):
       return '%r.extend' % self.listobj
     def accept_arg(self, caller, i):
-      return self.ElementExtender(caller, self.listobj.elem)
+      return self.ElementExtender(caller, self.listobj.elem, caller.loc)
     
   class InsertMethod(BuiltinFunc):
     def __init__(self, listobj):

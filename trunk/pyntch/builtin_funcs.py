@@ -26,8 +26,8 @@ class RangeFunc(BuiltinFunc):
 
   def __init__(self):
     BuiltinFunc.__init__(self, 'range', ListType([IntType.get_object()]), 
-                         [IntType],
-                         [IntType, IntType])
+                         [IntType()],
+                         [IntType(), IntType()])
     return
 
 
