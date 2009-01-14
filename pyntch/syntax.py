@@ -55,8 +55,8 @@ def build_expr(reporter, frame, space, tree, evals):
     try:
       expr = space[tree.name]
     except KeyError:
-      frame.add_expt(tree, ExceptionType('NameError',
-                                         'name %r is not defined' % tree.name))
+      expt = ExceptionType('NameError', 'name %r is not defined' % tree.name, tree)
+      frame.add_expt(expt)
       expr = UndefinedTypeNode(tree.name)
 
   elif isinstance(tree, ast.CallFunc):
@@ -189,7 +189,7 @@ def build_typecheck(reporter, frame, space, tree, evals):
         node.node.name == 'isinstance' and
         len(node.args) == 2):
       (a,b) = node.args
-      tc = TypeChecker(frame, [build_expr(reporter, frame, space, b, evals)], a)
+      tc = TypeChecker(frame, [build_expr(reporter, frame, space, b, evals)], node, repr(a))
       build_expr(reporter, frame, space, a, evals).connect(tc)
   return
 
@@ -304,20 +304,20 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, ast.Raise):
     # XXX ignoring tree.expr3 (what is this for anyway?)
     if tree.expr2:
-      exctype = build_expr(reporter, frame, space, tree.expr1, evals)
-      excarg = build_expr(reporter, frame, space, tree.expr2, evals)
-      exc = ExceptionMaker(frame, tree.expr1, exctype, (excarg,))
-      frame.add_expt(tree, exc)
+      expttype = build_expr(reporter, frame, space, tree.expr1, evals)
+      exptarg = build_expr(reporter, frame, space, tree.expr2, evals)
+      expt = ExceptionMaker(frame, tree, expttype, (exptarg,))
+      frame.add_expt(expt)
     elif tree.expr1:
-      exctype = build_expr(reporter, frame, space, tree.expr1, evals)
-      exc = ExceptionMaker(frame, tree.expr1, exctype, ())
-      frame.add_expt(tree, exc)
+      expttype = build_expr(reporter, frame, space, tree.expr1, evals)
+      expt = ExceptionMaker(frame, tree, expttype, ())
+      frame.add_expt(expt)
 
   # printnl
   elif isinstance(tree, (ast.Print, ast.Printnl)):
     for node in tree.nodes:
       value = build_expr(reporter, frame, space, node, evals)
-      value.connect(StrType.StrConversion(frame))
+      value.connect(StrType.StrConversion(frame, node))
 
   # discard
   elif isinstance(tree, ast.Discard):

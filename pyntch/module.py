@@ -91,7 +91,7 @@ class ModuleType(SimpleTypeNode, TreeReporter, ExceptionFrame):
     return '<Module %s (%s)>' % (self.name, self.path)
 
   def raise_expt(self, expt):
-    print expt
+    self.add_expt(expt)
     return
   
   def load(self, tree):

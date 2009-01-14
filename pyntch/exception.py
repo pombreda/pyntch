@@ -30,8 +30,7 @@ class ExceptionFrame(object):
     self.propagate_expts(self.expts)
     return
   
-  def add_expt(self, loc, expt):
-    expt.loc = loc
+  def add_expt(self, expt):
     if self.debug:
       print >>stderr, 'add_expt: %r <- %r' % (self, expt)
     expt.connect(self, self.recv_expt)
@@ -90,24 +89,28 @@ class ExceptionCatcher(ExceptionFrame):
 
   def recv_handler_expt(self, src):
     from builtin_types import TupleType
-    (t,_) = self.handlers[src]
-    for expt in src.types:
-      if isinstance(expt, TupleType):
-        expt.elemall.connect(t)
+    (expt,_) = self.handlers[src]
+    for obj in src.types:
+      if isinstance(obj, TupleType):
+        obj.elemall.connect(expt)
       else:
-        expt.connect(t)
+        obj.connect(expt)
     return
 
   def propagate_expts(self, expts):
     if self.catchall: return
     remainder = set()
-    for expt in expts:
-      for (t,var) in self.handlers.itervalues():
-        if t == expt: # XXX support hierarchical type
-          expt.connect(var)
-          break
+    for expt1 in expts:
+      for (expt0,var) in self.handlers.itervalues():
+        for expttype in expt0.types:
+          if expt1.is_type(expttype):
+            expt1.connect(var)
+            break
+        else:
+          continue
+        break
       else:
-        remainder.add(expt)
+        remainder.add(expt1)
     ExceptionFrame.propagate_expts(self, remainder)
     return
 
@@ -118,7 +121,7 @@ class ExceptionRaiser(ExceptionFrame):
 
   nodes = None
 
-  def __init__(self, parent, loc=None):
+  def __init__(self, parent, loc):
     ExceptionFrame.__init__(self)
     assert not loc or isinstance(loc, ast.Node), loc
     self.loc = loc
@@ -127,7 +130,8 @@ class ExceptionRaiser(ExceptionFrame):
     return
   
   def raise_expt(self, expt):
-    ExceptionFrame.add_expt(self, self.loc, expt)
+    expt.loc = self.loc
+    ExceptionFrame.add_expt(self, expt)
     return
   
   def finish(self):
@@ -207,10 +211,11 @@ class ExceptionMaker(CompoundTypeNode, ExceptionRaiser):
 ##
 class TypeChecker(CompoundTypeNode):
   
-  def __init__(self, parent_frame, types, blame=None):
+  def __init__(self, parent_frame, types, loc=None, blame=None):
     CompoundTypeNode.__init__(self)
     self.parent_frame = parent_frame
     self.validtypes = set()
+    self.loc = loc
     self.blame = blame
     if not isinstance(types, (tuple,list)):
       types = (types,)
@@ -235,10 +240,10 @@ class TypeChecker(CompoundTypeNode):
           types.add(obj)
           break
       else:
-        if self.blame:
-          self.parent_frame.raise_expt(ExceptionType(
-            'TypeError',
-            '%s (%s) must be {%s}' % (self.blame, obj, '|'.join(map(repr, self.validtypes)))))
+        self.parent_frame.raise_expt(ExceptionType(
+          'TypeError',
+          '%s (%s) must be {%s}' % (self.blame, obj, '|'.join(map(repr, self.validtypes))),
+          self.loc))
     self.update_types(types)
     return
 

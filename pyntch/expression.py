@@ -17,7 +17,7 @@ class FunCall(CompoundTypeNode, ExceptionRaiser):
     return
 
   def __repr__(self):
-    return '<%r(%s)>' % (self.func, ','.join(map(repr, self.args)))
+    return '<call %r(%s)>' % (self.func, ','.join(map(repr, self.args)))
 
   def recv_func(self, src):
     for func in src.types:
@@ -159,7 +159,9 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
           'unsupported operand %s for %r and %r' % (self.op, lobj, robj)))
     return
 
-class AssignOp(BinaryOp): pass
+class AssignOp(BinaryOp):
+  # XXX left is evaluated only once!
+  pass
 
 
 ##  UnaryOp
