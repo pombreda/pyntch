@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from typenode import CompoundTypeNode, NodeTypeError
+from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError
 from exception import ExceptionType, ExceptionFrame, ExceptionRaiser
 
 
@@ -55,7 +55,7 @@ class AttrRef(CompoundTypeNode, ExceptionRaiser):
       try:
         attr = obj.get_attr(self.attrname)
         attr.connect(self)
-      except NodeTypeError:
+      except NodeAttrError:
         self.raise_expt(ExceptionType(
           'AttributeError',
           'cannot get attribute: %r might be %r, no attr %s' % (self.target, obj, self.attrname)))
@@ -71,15 +71,15 @@ class AttrRef(CompoundTypeNode, ExceptionRaiser):
 
 ##  AttrAssign
 ##
-class AttrAssign(CompoundTypeNode):
+class AttrAssign(CompoundTypeNode, ExceptionRaiser):
   
-  def __init__(self, tree, target, attrname, value):
-    self.tree = tree
+  def __init__(self, parent_frame, loc, target, attrname, value):
     self.target = target
-    self.objs = set()
     self.attrname = attrname
+    self.objs = set()
     self.value = value
     CompoundTypeNode.__init__(self)
+    ExceptionRaiser.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
     return
 
@@ -89,8 +89,17 @@ class AttrAssign(CompoundTypeNode):
   def recv_target(self, src):
     self.objs.update(src.types)
     for obj in self.objs:
-      attr = obj.get_attr(self.attrname)
-      self.value.connect(attr)
+      try:
+        attr = obj.get_attr(self.attrname)
+        self.value.connect(attr)
+      except NodeAttrError:
+        self.raise_expt(ExceptionType(
+          'AttributeError',
+          'cannot assign attribute: %r might be %r, no attr %s' % (self.target, obj, self.attrname)))
+      except NodeTypeError:
+        self.raise_expt(ExceptionType(
+          'AttributeError',
+          'cannot assign attribute: %r might be %r, readonly %s' % (self.target, obj, self.attrname)))        
     return
 
 

@@ -39,55 +39,81 @@ O_WRONLY = 0
 R_OK = 0
 TMP_MAX = 0
 WCONTINUED = 0
-def WCOREDUMP(*x): return
-
-def WEXITSTATUS(*x): return
-
-def WIFCONTINUED(*x): return
-
-def WIFEXITED(*x): return
-
-def WIFSIGNALED(*x): return
-
-def WIFSTOPPED(*x): return
-
 WNOHANG = 0
-def WSTOPSIG(*x): return
-
-def WTERMSIG(*x): return
-
 WUNTRACED = 0
 W_OK = 0
 X_OK = 0
 
-def _exit(*x): return
+class error(object): pass
+class stat_result(object): pass
+class statvfs_result(object): pass
 
-def abort(*x): return
-
-def access(*x): return
-
-def chdir(*x): return
-
-def chmod(*x): return
-
-def chown(*x): return
-
-def chroot(*x): return
-
-def close(*x): return
-
-def confstr(*x): return
-
+pathconf_names = {'': 0}
+sysconf_names = {'': 0}
 confstr_names = {'': 0}
-def ctermid(*x): return
-
-def dup(*x): return
-
-def dup2(*x): return
-
 environ = {'': ''}
-class error:
-  pass
+
+def WCOREDUMP(x):
+  assert isinstance(x, int)
+  return False
+def WEXITSTATUS(x):
+  assert isinstance(x, int)
+  return 0
+def WIFCONTINUED(x):
+  assert isinstance(x, int)
+  return False
+def WIFEXITED(x):
+  assert isinstance(x, int)
+  return False
+def WIFSIGNALED(x):
+  assert isinstance(x, int)
+  return False
+def WIFSTOPPED(x):
+  assert isinstance(x, int)
+  return False
+def WSTOPSIG(x): 
+  assert isinstance(x, int)
+  return 0
+def WTERMSIG(x):
+  assert isinstance(x, int)
+  return 0
+
+def _exit(x):
+  assert isinstance(x, int)
+
+def abort(): return
+
+def access(path, mode):
+  assert isinstance(path, str)
+  assert isinstance(mode, int)
+  return
+def chdir(path):
+  assert isinstance(path, str)
+  return
+def chmod(path, mode):
+  assert isinstance(path, str)
+  assert isinstance(mode, int)
+  return
+def chown(path, uid, gid):
+  assert isinstance(path, str)
+  assert isinstance(uid, int)
+  assert isinstance(gid, int)
+  return
+def chroot(path):
+  assert isinstance(path, str)
+  return
+def close(fd):
+  assert isinstance(fd, int)
+  return
+def confstr(x): return ''
+def ctermid(): return ''
+def dup(fd):
+  assert isinstance(fd, int)
+  return 0
+def dup2(fd1,fd2):
+  assert isinstance(fd1, int)
+  assert isinstance(fd2, int)
+  return
 
 def execv(*x): return
 
@@ -177,7 +203,6 @@ def openpty(*x): return
 
 def pathconf(*x): return
 
-pathconf_names = {'': 0}
 def pipe(*x): return
 
 def popen(*x): return
@@ -218,13 +243,7 @@ def stat(*x): return
 
 def stat_float_times(*x): return
 
-class stat_result:
-  pass
-
 def statvfs(*x): return
-
-class statvfs_result:
-  pass
 
 def strerror(*x): return
 
@@ -232,7 +251,6 @@ def symlink(*x): return
 
 def sysconf(*x): return
 
-sysconf_names = {'': 0}
 def system(*x): return
 
 def tcgetpgrp(*x): return
