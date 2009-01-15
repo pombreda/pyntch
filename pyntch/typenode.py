@@ -33,6 +33,7 @@ class TreeReporter(object):
 ##
 class NodeError(Exception): pass
 class NodeTypeError(NodeError): pass
+class NodeAttrError(NodeError): pass
 
 class TypeNode(object):
 
@@ -53,10 +54,10 @@ class TypeNode(object):
     return
 
   def recv(self, src):
-    raise TypeError('TypeNode cannot receive a value.')
+    raise NodeTypeError('cannot receive a value.')
 
   def get_attr(self, name):
-    raise NodeTypeError('no attribute')
+    raise NodeAttrError(name)
   def get_element(self, caller, subs, write=False):
     raise NodeTypeError('not subscriptable')
   def get_iter(self, caller):
@@ -75,6 +76,7 @@ class TypeNode(object):
 class SimpleTypeNode(TypeNode):
 
   def __init__(self, typeklass):
+    assert isinstance(typeklass, type) and issubclass(typeklass, TypeNode)
     self.typeklass = typeklass
     TypeNode.__init__(self, [self])
     return
@@ -107,8 +109,7 @@ class CompoundTypeNode(TypeNode):
     if self in done:
       return '...'
     else:
-      done.add(self)
-      return ('{%s}' % '|'.join( obj.desc1(done) for obj in self.types ))
+      return ('{%s}' % '|'.join( obj.desc1(done.union([self])) for obj in self.types ))
                                   
   def recv(self, src):
     self.update_types(src.types)
@@ -126,7 +127,7 @@ class CompoundTypeNode(TypeNode):
 ##
 class UndefinedTypeNode(TypeNode):
   
-  def __init__(self, name):
+  def __init__(self, name=None):
     TypeNode.__init__(self, [])
     return
   

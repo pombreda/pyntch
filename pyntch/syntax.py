@@ -21,7 +21,7 @@ def build_assign(reporter, frame, space, n, v, evals):
       build_assign(reporter, frame, space, c, tup.get_nth(i), evals)
   elif isinstance(n, ast.AssAttr):
     obj = build_expr(reporter, frame, space, n.expr, evals)
-    AttrAssign(n, obj, n.attrname, v)
+    AttrAssign(frame, n, obj, n.attrname, v)
   elif isinstance(n, ast.Subscript):
     obj = build_expr(reporter, frame, space, n.expr, evals)
     subs = [ build_expr(reporter, frame, space, expr, evals) for expr in n.subs ]
@@ -45,7 +45,7 @@ def build_assign(reporter, frame, space, n, v, evals):
 ##  Constructs a TypeNode from a given syntax tree.
 ##
 def build_expr(reporter, frame, space, tree, evals):
-  from builtin_types import BUILTIN_TYPE, ListType, DictType, TupleType, GeneratorSlot
+  from builtin_types import BUILTIN_TYPE, ListObject, DictObject, TupleObject, GeneratorSlot
 
   if isinstance(tree, ast.Const):
     typename = type(tree.value).__name__
@@ -87,17 +87,17 @@ def build_expr(reporter, frame, space, tree, evals):
 
   elif isinstance(tree, ast.Tuple):
     elements = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
-    expr = TupleType(elements, tree)
+    expr = TupleObject(elements, tree)
 
   elif isinstance(tree, ast.List):
     elems = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
-    expr = ListType(elems)
+    expr = ListObject(elems)
 
   elif isinstance(tree, ast.Dict):
     items = [ (build_expr(reporter, frame, space, k, evals),
                build_expr(reporter, frame, space, v, evals))
               for (k,v) in tree.items ]
-    expr = DictType(items)
+    expr = DictObject(items)
 
   # +, -, *, /, %, //, <<, >>, **, &, |, ^
   elif isinstance(tree, (ast.Add, ast.Sub, ast.Mul, ast.Div,
@@ -141,7 +141,7 @@ def build_expr(reporter, frame, space, tree, evals):
   # list comprehension
   elif isinstance(tree, ast.ListComp):
     elems = [ build_expr(reporter, frame, space, tree.expr, evals) ]
-    expr = ListType(elems)
+    expr = ListObject(elems)
     for qual in tree.quals:
       seq = build_expr(reporter, frame, space, qual.list, evals)
       build_assign(reporter, frame, space, qual.assign, IterRef(frame, qual.list, seq), evals)
@@ -152,7 +152,7 @@ def build_expr(reporter, frame, space, tree, evals):
   elif isinstance(tree, ast.GenExpr):
     gen = tree.code
     elems = [ build_expr(reporter, frame, space, gen.expr, evals) ]
-    expr = ListType(elems)
+    expr = ListObject(elems)
     for qual in gen.quals:
       seq = build_expr(reporter, frame, space, qual.iter, evals)
       build_assign(reporter, frame, space, qual.assign, IterRef(frame, qual.iter, seq), evals)
@@ -323,8 +323,8 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, ast.Discard):
     value = build_expr(reporter, frame, space, tree.expr, evals)
 
-  # pass
-  elif isinstance(tree, ast.Pass):
+  # pass, break, continue
+  elif isinstance(tree, (ast.Pass, ast.Break, ast.Continue)):
     pass
 
   # import

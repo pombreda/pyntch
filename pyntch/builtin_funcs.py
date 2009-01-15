@@ -7,25 +7,36 @@ from typenode import SimpleTypeNode, CompoundTypeNode
 from exception import ExceptionType, ExceptionRaiser, TypeChecker
 from namespace import Namespace
 from function import ClassType, InstanceType
-from builtin_types import NumberType, BoolType, IntType, LongType, StrType, ListType, BuiltinFunc, BaseStringType, ANY_TYPE
+from builtin_types import NumberType, BoolType, IntType, LongType, StrType, ListObject, \
+     BuiltinFunc, BuiltinConstFunc, BaseStringType, ANY_TYPE
 
 
 ##  ReprFunc
 ##
-class ReprFunc(BuiltinFunc):
+class ReprFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinFunc.__init__(self, 'repr', StrType.get_object(),
+    BuiltinConstFunc.__init__(self, 'repr', StrType.get_object(),
                          [ANY_TYPE])
+    return
+
+
+##  LenFunc
+##
+class LenFunc(BuiltinConstFunc):
+
+  def __init__(self):
+    BuiltinConstFunc.__init__(self, 'len', IntType.get_object(),
+                              [ANY_TYPE])
     return
 
 
 ##  RangeFunc
 ##
-class RangeFunc(BuiltinFunc):
+class RangeFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinFunc.__init__(self, 'range', ListType([IntType.get_object()]), 
+    BuiltinConstFunc.__init__(self, 'range', ListObject([IntType.get_object()]), 
                          [IntType()],
                          [IntType(), IntType()])
     return

@@ -25,24 +25,26 @@ version = ''
 version_info = (0, 0, 0, '', 0)
 warnoptions = []
 
+class frame(object): pass
 
-def _current_frames(*x): return
-def _getframe(*x): return
-def call_tracing(*x): return
-def callstats(*x): return
-def displayhook(*x): return
-def exc_clear(*x): return
-def exc_info(*x): return
-def exit(*x): return
-def getcheckinterval(*x): return
-def getdefaultencoding(*x): return
-def getdlopenflags(*x): return
-def getfilesystemencoding(*x): return
-def getrecursionlimit(*x): return
-def getrefcount(*x): return
-def setcheckinterval(*x): return
-def setdefaultencoding(*x): return
-def setdlopenflags(*x): return
-def setprofile(*x): return
-def setrecursionlimit(*x): return
-def settrace(*x): return
+def _current_frames(): return { 0: frame() }
+def _getframe(): return frame()
+def call_tracing(f,a): return
+def callstats(): return None
+def displayhook(x): return 0
+def exc_clear(): return
+def exc_info(): return (None, None, None)
+def excepthook(x,y,z): return
+def exit(x=None): return
+def getcheckinterval(): return 0
+def getdefaultencoding(): return ''
+def getdlopenflags(): return 0
+def getfilesystemencoding(): return ''
+def getrecursionlimit(): return 0
+def getrefcount(x): return 0
+def setcheckinterval(x): assert isinstance(x, int)
+def setdefaultencoding(x): assert isinstance(x, str)
+def setdlopenflags(x): assert isinstance(x, int)
+def setprofile(x): return
+def setrecursionlimit(x): assert isinstance(x, int)
+def settrace(x): assert isinstance(x, int)

@@ -88,10 +88,10 @@ class ExceptionCatcher(ExceptionFrame):
     return var
 
   def recv_handler_expt(self, src):
-    from builtin_types import TupleType
+    from builtin_types import TupleObject
     (expt,_) = self.handlers[src]
     for obj in src.types:
-      if isinstance(obj, TupleType):
+      if isinstance(obj, TupleObject):
         obj.elemall.connect(expt)
       else:
         obj.connect(expt)

@@ -18,7 +18,7 @@ class Variable(CompoundTypeNode):
     return '@'+self.fullname()
 
   def fullname(self):
-    return '%s.%s' % (self.space.fullname(), self.name)
+    return '%s.%s' % (self.space.fullname()[1:], self.name)
 
   def bind(self, obj):
     obj.connect(self)
@@ -34,13 +34,10 @@ class Namespace:
 
   def __init__(self, parent_space, name):
     self.parent_space = parent_space
+    self.name = name
     self.vars = {}
     self.msgs = []
-    self.name = name
-    if parent_space:
-      self.global_space = parent_space.global_space
-    else:
-      self.global_space = self
+    self.global_space = parent_space.global_space
     return
   
   def __repr__(self):

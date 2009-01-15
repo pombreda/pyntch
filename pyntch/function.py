@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from typenode import TreeReporter, SimpleTypeNode, CompoundTypeNode, NodeTypeError
+from typenode import TreeReporter, SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError
 from namespace import Namespace, Variable
 from exception import ExceptionType, ExceptionFrame
 
@@ -35,13 +35,17 @@ class FuncType(SimpleTypeNode, TreeReporter):
     def __repr__(self):
       return '<FuncBody %s>' % self.name
 
+    def raise_expt(self, expt):
+      self.add_expt(expt)
+      return
+
     def set_retval(self, evals):
-      from builtin_types import IterType
+      from builtin_types import IterObject
       returns = [ obj for (t,obj) in evals if t == 'r' ]
       yields = [ obj for (t,obj) in evals if t == 'y' ]
       assert returns
       if yields:
-        retvals = [ IterType([ slot.value for slot in yields ]) ]
+        retvals = [ IterObject([ slot.value for slot in yields ]) ]
       else:
         retvals = returns
       for obj in retvals:
@@ -108,7 +112,7 @@ class FuncType(SimpleTypeNode, TreeReporter):
     return ('<Function %s>' % (self.name))
 
   def call(self, caller, args):
-    from builtin_types import StrType, DictType, TupleType, TupleUnpack
+    from builtin_types import StrType, DictObject, TupleObject, TupleUnpack
     # assign(var1,arg1):
     #  Assign a actual parameter arg1 to a local variable var1.
     def assign(var1, arg1):
@@ -158,9 +162,9 @@ class FuncType(SimpleTypeNode, TreeReporter):
           'too many argument for %s: at most %d' % (self.name, len(self.argvars))))
     # Handle remaining arguments: kwargs and varargs.
     if kwargs:
-      self.space[self.kwarg].bind(DictType([ (StrType.get_object(), obj) for obj in kwargs ]))
+      self.space[self.kwarg].bind(DictObject([ (StrType.get_object(), obj) for obj in kwargs ]))
     if varargs:
-      self.space[self.vararg].bind(TupleType(tuple(varargs)))
+      self.space[self.vararg].bind(TupleObject(tuple(varargs)))
     if len(self.defaults) < len(argvars):
       caller.raise_expt(ExceptionType(
         'TypeError',
@@ -258,7 +262,10 @@ class ClassType(SimpleTypeNode, TreeReporter):
 
     def recv_base(self, src):
       for klass in src.types:
-        klass.get_attr(self.name).connect(self)
+        try:
+          klass.get_attr(self.name).connect(self)
+        except NodeAttrError:
+          pass
       return
 
   ##  OptionalMethod
@@ -396,7 +403,10 @@ class InstanceType(SimpleTypeNode):
 
     def recv_klass(self, src):
       for obj in src.types:
-        obj.get_attr(self.name).connect(self)
+        try:
+          obj.get_attr(self.name).connect(self)
+        except NodeAttrError:
+          pass
       return
 
     def recv(self, src):
