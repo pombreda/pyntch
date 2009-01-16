@@ -87,7 +87,7 @@ class FuncType(SimpleTypeNode, TreeReporter):
       assert not isinstance(var1, list), var1
       assert not isinstance(arg1, list), arg1
       if isinstance(var1, tuple):
-        tup = TupleUnpack(parent_frame, arg1, len(var1))
+        tup = TupleUnpack(parent_frame, code, arg1, len(var1))
         for (i,v) in enumerate(var1):
           assign(v, tup.get_nth(i))
       else:
@@ -127,7 +127,7 @@ class FuncType(SimpleTypeNode, TreeReporter):
         else:
           arg1.value.connect(self.space[name])
       elif isinstance(var1, tuple):
-        tup = TupleUnpack(caller, arg1, len(var1))
+        tup = TupleUnpack(caller, None, arg1, len(var1))
         for (i,v) in enumerate(var1):
           assign(v, tup.get_nth(i))
       else:

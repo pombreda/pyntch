@@ -16,7 +16,7 @@ def build_assign(reporter, frame, space, n, v, evals):
   if isinstance(n, ast.AssName) or isinstance(n, ast.Name):
     space[n.name].bind(v)
   elif isinstance(n, ast.AssTuple):
-    tup = TupleUnpack(frame, v, len(n.nodes))
+    tup = TupleUnpack(frame, n, v, len(n.nodes))
     for (i,c) in enumerate(n.nodes):
       build_assign(reporter, frame, space, c, tup.get_nth(i), evals)
   elif isinstance(n, ast.AssAttr):
