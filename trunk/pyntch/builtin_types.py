@@ -132,11 +132,11 @@ class IntType(NumberType, BuiltinConstFunc):
     
     def recv(self, src):
       for obj in src.types:
-        if isinstance(obj, BaseStringType):
+        if obj.is_type(BaseStringType):
           self.parent_frame.raise_expt(ExceptionType(
             'ValueError',
             'might be conversion error'))
-        elif isinstance(obj, (NumberType, BoolType)):
+        elif obj.is_type((NumberType, BoolType)):
           pass
         else:
           self.parent_frame.raise_expt(ExceptionType(
@@ -306,7 +306,7 @@ class BaseStringType(BuiltinType, BuiltinConstFunc):
     
     def recv(self, src):
       for obj in src.types:
-        if isinstance(obj, InstanceType):
+        if obj.is_type(InstanceType):
           value = ClassType.OptionalAttr(obj, '__str__').call(self, ())
           value.connect(TypeChecker(self, BaseStringType.get_type(), self.loc, 'the return value of __str__ method'))
           value = ClassType.OptionalAttr(obj, '__repr__').call(self, ())
@@ -316,6 +316,18 @@ class BaseStringType(BuiltinType, BuiltinConstFunc):
   def accept_arg(self, caller, _):
     return self.StrConversion(caller, caller.loc)
 
+  def call(self, caller, args):
+    if self.PYTHON_TYPE is basestring:
+      caller.raise_expt(ExceptionType(
+        'TypeError',
+        'cannot instantiate a basestring type'))
+      return UndefinedTypeNode()
+    return BuiltinConstFunc.call(self, caller, args)
+  
+  def __init__(self):
+    BuiltinConstFunc.__init__(self, 'basestring', None)
+    return
+  
 class StrType(BaseStringType):
   PYTHON_TYPE = str
   
@@ -359,9 +371,18 @@ class UnicodeType(BaseStringType):
   
 ##  ListObject
 ##
+class ListType(BuiltinType, BuiltinFunc):
+  
+  def process_args(self, caller, args):
+    return ListObject(args)
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'list', [], [ANY_TYPE])
+    return
+  
 class ListObject(BuiltinAggregateType):
 
-  PYTHON_TYPE = list
+  PYTHON_TYPE = ListType
   
   ##  Element
   ##
@@ -492,21 +513,21 @@ class ListObject(BuiltinAggregateType):
   def get_iter(self, caller):
     return self.elem
 
-class ListType(BuiltinType, BuiltinFunc):
-  
-  def process_args(self, caller, args):
-    return ListObject(args)
-
-  def __init__(self):
-    BuiltinFunc.__init__(self, 'list', [], [ANY_TYPE])
-    return
-  
 
 ##  DictObject
 ##
+class DictType(BuiltinType, BuiltinFunc):
+  
+  def process_args(self, caller, args):
+    return DictObject(args)
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'dict', [], [ANY_TYPE]) # XXX take keyword argument!
+    return
+
 class DictObject(BuiltinAggregateType):
 
-  PYTHON_TYPE = dict
+  PYTHON_TYPE = DictType
   
   ##  Item
   class Item(CompoundTypeNode):
@@ -599,22 +620,22 @@ class DictObject(BuiltinAggregateType):
 
   def get_iter(self, caller):
     return self.key
-
-class DictType(BuiltinType, BuiltinFunc):
-  
-  def process_args(self, caller, args):
-    return DictObject(args)
-
-  def __init__(self):
-    BuiltinFunc.__init__(self, 'dict', [], [ANY_TYPE]) # XXX take keyword argument!
-    return
   
 
 ##  TupleObject
 ##
+class TupleType(BuiltinType, BuiltinFunc):
+  
+  def process_args(self, caller, args):
+    return TupleObject(args)
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'tuple', [], [ANY_TYPE]) # XXX take keyword argument!
+    return
+
 class TupleObject(BuiltinAggregateType):
 
-  PYTHON_TYPE = tuple
+  PYTHON_TYPE = TupleType
   
   ##  ElementAll
   ##
@@ -647,7 +668,7 @@ class TupleObject(BuiltinAggregateType):
     if write:
       caller.raise_expt(ExceptionType(
         'TypeError',
-        'tuple does not support assignment.'))
+        'cannot assign to a tuple.'))
     else:
       caller.raise_expt(ExceptionType(
         'IndexError',
@@ -656,15 +677,6 @@ class TupleObject(BuiltinAggregateType):
 
   def get_iter(self, caller):
     return self.elemall
-
-class TupleType(BuiltinType, BuiltinFunc):
-  
-  def process_args(self, caller, args):
-    return TupleObject(args)
-
-  def __init__(self):
-    BuiltinFunc.__init__(self, 'tuple', [], [ANY_TYPE]) # XXX take keyword argument!
-    return
   
 
 ##  TupleUnpack
@@ -684,11 +696,8 @@ class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
     def __repr__(self):
       return '<TupleElement: %r[%d]>' % (self.tup, self.i)
 
-  def __init__(self, parent_frame, tupobj, nelems):
+  def __init__(self, parent_frame, loc, tupobj, nelems):
     CompoundTypeNode.__init__(self)
-    loc = None
-    if isinstance(tupobj, TupleObject):
-      loc = tupobj.loc
     self.tupobj = tupobj
     self.elems = [ self.Element(self, i) for i in xrange(nelems) ]
     ExceptionRaiser.__init__(self, parent_frame, loc)
@@ -704,11 +713,11 @@ class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
   def recv_tupobj(self, src):
     assert src is self.tupobj
     for obj in src.types:
-      if isinstance(obj, TupleObject):
+      if obj.is_type(TupleObject):
         if len(obj.elements) != len(self.elems):
           self.raise_expt(ExceptionType(
             'ValueError',
-            'tuple elements mismatch: len(%r) != %r' % (obj, len(self.elems))))
+            'tuple unpackable: len(%r) != %r' % (obj, len(self.elems))))
         else:
           for (i,elem) in enumerate(obj.elements):
             elem.connect(self.elems[i])

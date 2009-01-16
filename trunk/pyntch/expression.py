@@ -134,13 +134,21 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
     ('str', 'Mul', 'int'): 'str',
     ('int', 'Mul', 'str'): 'str',
     ('unicode', 'Mul', 'int'): 'unicode',
+    ('int', 'Mul', 'unicode'): 'unicode',
     }
   def update(self):
-    from builtin_types import NumberType, BaseStringType, BUILTIN_TYPE
+    from builtin_types import BUILTIN_TYPE, NumberType, IntType, BaseStringType
+    from builtin_types import ListType, ListObject, TupleType, TupleObject
     for lobj in self.left_types:
       for robj in self.right_types:
         if (lobj,robj) in self.combinations: continue
         self.combinations.add((lobj,robj))
+        # special handling for a formatting (%) operator
+        if (lobj.is_type(BaseStringType) and
+            self.op == 'Mod'):
+          self.update_types(set([lobj]))
+          continue
+        # for numeric operation, the one with a higher rank is chosen.
         if (lobj.is_type(NumberType) and
             robj.is_type(NumberType)):
           if self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv'):
@@ -149,15 +157,45 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
             else:
               self.update_types(set([lobj]))
             continue
+        # for string operation, only Add is supported.
         if (lobj.is_type(BaseStringType) and
-            lobj.is_type(BaseStringType) and
+            robj.is_type(BaseStringType) and
             self.op == 'Add'):
-          self.update_types(set([robj]))
-          continue
-        if (lobj.is_type(BaseStringType) and
-            self.op == 'Mod'):
           self.update_types(set([lobj]))
           continue
+        # for list operation, only Add and Mul is supported.
+        if (lobj.is_type(ListType) and
+            robj.is_type(ListType) and
+            self.op == 'Add'):
+          self.update_types(set([ListObject.add(lobj, robj)]))
+          continue
+        if (lobj.is_type(ListType) and
+            robj.is_type(IntType) and
+            self.op == 'Mul'):
+          self.update_types(set([lobj]))
+          continue
+        if (lobj.is_type(IntType) and
+            robj.is_type(ListType) and
+            self.op == 'Mul'):
+          self.update_types(set([robj]))
+          continue
+        # for tuple operation, only Add and Mul is supported.
+        if (lobj.is_type(TupleType) and
+            robj.is_type(TupleType) and
+            self.op == 'Add'):
+          self.update_types(set([TupleObject.add(lobj, robj)]))
+          continue
+        if (lobj.is_type(TupleType) and
+            robj.is_type(IntType) and
+            self.op == 'Mul'):
+          self.update_types(set([TupleObject.collapse(lobj)]))
+          continue
+        if (lobj.is_type(IntType) and
+            robj.is_type(TupleType) and
+            self.op == 'Mul'):
+          self.update_types(set([TupleObject.collapse(robj)]))
+          continue
+        # other operations.
         k = (lobj.get_name(), self.op, robj.get_name())
         if k in self.VALID_TYPES:
           v = BUILTIN_TYPE[self.VALID_TYPES[k]]
@@ -168,9 +206,16 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
           'unsupported operand %s for %r and %r' % (self.op, lobj, robj)))
     return
 
+
+##  AssignOp
+##
 class AssignOp(BinaryOp):
-  # XXX left is evaluated only once!
-  pass
+
+  def update_types(self, types):
+    # whatever the value of this operation is assigned to the lefthand.
+    self.left_types.update(types)
+    self.update()
+    return
 
 
 ##  UnaryOp

@@ -36,6 +36,8 @@ class ExceptionFrame(object):
     expt.connect(self, self.recv_expt)
     return
 
+  raise_expt = add_expt
+
   def recv_expt(self, expt):
     if expt in self.expts: return
     self.expts.update(expt.types)
@@ -131,7 +133,7 @@ class ExceptionRaiser(ExceptionFrame):
   
   def raise_expt(self, expt):
     expt.loc = self.loc
-    ExceptionFrame.add_expt(self, expt)
+    ExceptionFrame.raise_expt(self, expt)
     return
   
   def finish(self):
@@ -240,9 +242,10 @@ class TypeChecker(CompoundTypeNode):
           types.add(obj)
           break
       else:
+        s = '|'.join( typeobj.get_name() for typeobj in self.validtypes )
         self.parent_frame.raise_expt(ExceptionType(
           'TypeError',
-          '%s (%s) must be {%s}' % (self.blame, obj, '|'.join(map(repr, self.validtypes))),
+          '%s (%s) must be {%s}' % (self.blame, obj, s),
           self.loc))
     self.update_types(types)
     return
