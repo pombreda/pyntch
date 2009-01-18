@@ -92,7 +92,7 @@ class SimpleTypeNode(TypeNode):
 
   def is_type(self, *typeobjs):
     for typeobj in typeobjs:
-      if issubclass(self.typeobj.__class__, typeobj): return True
+      if issubclass(self.typeobj.__class__, typeobj.__class__): return True
     return False
 
   def desc1(self, _):

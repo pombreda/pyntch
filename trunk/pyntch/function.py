@@ -348,6 +348,9 @@ class ClassType(SimpleTypeNode, TreeReporter):
   def __repr__(self):
     return ('<Class %s>' % (self.name,))
 
+  def get_type(self):
+    return self
+
   def get_attr(self, name):
     if name not in self.attrs:
       attr = self.ClassAttr(name, self, self.bases)
@@ -439,6 +442,9 @@ class InstanceType(SimpleTypeNode):
   
   def __repr__(self):
     return ('<Instance %s>' % (self.klass.name,))
+
+  def get_type(self):
+    return self.klass
 
   def get_attr(self, name):
     if name not in self.attrs:
