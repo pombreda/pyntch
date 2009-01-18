@@ -6,6 +6,34 @@ from compiler import ast
 from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError
 
 
+##  ExceptionType
+##
+##  ExceptionType is a built-in Python type so it should be
+##  defined within the builtin_types module, but it's used
+##  throughout the entire program so we define it here for a
+##  convenience.
+##
+class ExceptionType(SimpleTypeNode):
+
+  def __init__(self, name, msg, loc=None):
+    SimpleTypeNode.__init__(self, self)
+    assert not loc or isinstance(loc, ast.Node), loc
+    self.loc = loc
+    self.name = name
+    self.msg = msg
+    return
+
+  def __repr__(self):
+    if self.loc:
+      return '<%s: %s> at %s(%d)' % (self.name, self.msg, self.loc._modname, self.loc.lineno)
+    else:
+      return '<%s: %s>' % (self.name, self.msg)
+
+  @classmethod
+  def get_typename(klass):
+    return 'Exception'
+  
+
 ##  ExceptionFrame
 ##
 ##  An ExceptionFrame object is a place where an exception belongs.
@@ -90,10 +118,10 @@ class ExceptionCatcher(ExceptionFrame):
     return var
 
   def recv_handler_expt(self, src):
-    from builtin_types import TupleObject
+    from aggregate_types import TupleType
     (expt,_) = self.handlers[src]
     for obj in src.types:
-      if isinstance(obj, TupleObject):
+      if obj.is_type(TupleType):
         obj.elemall.connect(expt)
       else:
         obj.connect(expt)
@@ -104,8 +132,8 @@ class ExceptionCatcher(ExceptionFrame):
     remainder = set()
     for expt1 in expts:
       for (expt0,var) in self.handlers.itervalues():
-        for expttype in expt0.types:
-          if expt1.is_type(expttype):
+        for exptobj in expt0.types:
+          if expt1.is_type(exptobj.get_type().__class__):
             expt1.connect(var)
             break
         else:
@@ -150,25 +178,6 @@ class ExceptionRaiser(ExceptionFrame):
     for node in klass.nodes:
       node.finish()
     return
-
-
-##  ExceptionType
-##
-class ExceptionType(SimpleTypeNode):
-
-  def __init__(self, name, msg, loc=None):
-    SimpleTypeNode.__init__(self, self.__class__)
-    assert not loc or isinstance(loc, ast.Node), loc
-    self.loc = loc
-    self.name = name
-    self.msg = msg
-    return
-
-  def __repr__(self):
-    if self.loc:
-      return '<%s: %s> at %s(%d)' % (self.name, self.msg, self.loc._modname, self.loc.lineno)
-    else:
-      return '<%s: %s>' % (self.name, self.msg)
 
 
 ##  ExceptinoMaker
@@ -242,7 +251,7 @@ class TypeChecker(CompoundTypeNode):
           types.add(obj)
           break
       else:
-        s = '|'.join( typeobj.get_name() for typeobj in self.validtypes )
+        s = '|'.join( typeobj.get_typename() for typeobj in self.validtypes )
         self.parent_frame.raise_expt(ExceptionType(
           'TypeError',
           '%s (%s) must be {%s}' % (self.blame, obj, s),
