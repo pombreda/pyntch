@@ -76,7 +76,7 @@ class TypeNode(object):
 class SimpleTypeNode(TypeNode):
 
   def __init__(self, typeobj):
-    assert isinstance(typeobj, type) and issubclass(typeobj, TypeNode)
+    assert isinstance(typeobj, type) and issubclass(typeobj, TypeNode), typeobj
     self.typeobj = typeobj
     TypeNode.__init__(self, [self])
     return
@@ -104,8 +104,17 @@ class SimpleTypeNode(TypeNode):
 class CompoundTypeNode(TypeNode):
 
   def __init__(self, types=None):
+    self._hashval = 0
     TypeNode.__init__(self, types or [])
     return
+
+  def __repr__(self):
+    return self.describe()
+
+  def __eq__(self, obj):
+    return isinstance(obj, CompoundTypeNode) and self.types == obj.types
+  def __hash__(self):
+    return self._hashval
 
   def desc1(self, done):
     if self in done:
@@ -118,10 +127,14 @@ class CompoundTypeNode(TypeNode):
     return
 
   def update_types(self, types):
-    if types.difference(self.types):
-      self.types.update(types)
-      for receiver in self.sendto:
-        receiver(self)
+    diff = types.difference(self.types)
+    if not diff: return
+    self.types.update(diff)
+    self._hashval = 0
+    for obj in self.types:
+      self._hashval ^= hash(obj)
+    for receiver in self.sendto:
+      receiver(self)
     return
 
 

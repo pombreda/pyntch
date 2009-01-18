@@ -29,7 +29,7 @@ class frame(object): pass
 
 def _current_frames(): return { 0: frame() }
 def _getframe(): return frame()
-def call_tracing(f,a): return
+def call_tracing(func,args): return func(*args)
 def callstats(): return None
 def displayhook(x): return 0
 def exc_clear(): return
