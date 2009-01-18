@@ -4,7 +4,8 @@ def foo(x):
   return x
 
 if __name__ == '__main__':
-  b = ('a',None,99)
+  a = 99
+  b = ('a',None,a)
   (x,y) = foo(b)
   (x,y,z) = foo(b)
   (x,(y,z)) = (1,(2,'a'))

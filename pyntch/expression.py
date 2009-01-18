@@ -137,10 +137,10 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
     ('int', 'Mul', 'unicode'): 'unicode',
     }
   def update(self):
-    from builtin_types import BUILTIN_TYPE, NumberType, IntType, BaseStringType
+    from builtin_types import BUILTIN_OBJECTS, NumberType, IntType, BaseStringType
     from builtin_types import ListType, ListObject, TupleType, TupleObject
-    for lobj in self.left_types:
-      for robj in self.right_types:
+    for lobj in list(self.left_types):
+      for robj in list(self.right_types):
         if (lobj,robj) in self.combinations: continue
         self.combinations.add((lobj,robj))
         # special handling for a formatting (%) operator
@@ -149,56 +149,52 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
           self.update_types(set([lobj]))
           continue
         # for numeric operation, the one with a higher rank is chosen.
-        if (lobj.is_type(NumberType) and
-            robj.is_type(NumberType)):
-          if self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv'):
-            if lobj.get_rank() < robj.get_rank():
-              self.update_types(set([robj]))
-            else:
-              self.update_types(set([lobj]))
-            continue
+        if (lobj.is_type(NumberType) and robj.is_type(NumberType) and
+            self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power')):
+          if lobj.get_rank() < robj.get_rank():
+            self.update_types(set([robj]))
+          else:
+            self.update_types(set([lobj]))
+          continue
+        if (lobj.is_type(IntType) and robj.is_type(IntType) and
+            self.op in ('Bitand','Bitor','Bitxor')):
+          self.update_types(set([robj]))
+          continue
         # for string operation, only Add is supported.
-        if (lobj.is_type(BaseStringType) and
-            robj.is_type(BaseStringType) and
+        if (lobj.is_type(BaseStringType) and robj.is_type(BaseStringType) and
             self.op == 'Add'):
           self.update_types(set([lobj]))
           continue
         # for list operation, only Add and Mul is supported.
-        if (lobj.is_type(ListType) and
-            robj.is_type(ListType) and
+        if (lobj.is_type(ListType) and robj.is_type(ListType) and
             self.op == 'Add'):
-          self.update_types(set([ListObject.add(lobj, robj)]))
+          self.update_types(set([ListObject.concat(lobj, robj)]))
           continue
-        if (lobj.is_type(ListType) and
-            robj.is_type(IntType) and
+        if (lobj.is_type(ListType) and robj.is_type(IntType) and
             self.op == 'Mul'):
-          self.update_types(set([lobj]))
+          self.update_types(set([ListObject.multiply(lobj)]))
           continue
-        if (lobj.is_type(IntType) and
-            robj.is_type(ListType) and
+        if (lobj.is_type(IntType) and robj.is_type(ListType) and
             self.op == 'Mul'):
-          self.update_types(set([robj]))
+          self.update_types(set([ListObject.multiply(robj)]))
           continue
         # for tuple operation, only Add and Mul is supported.
-        if (lobj.is_type(TupleType) and
-            robj.is_type(TupleType) and
+        if (lobj.is_type(TupleType) and robj.is_type(TupleType) and
             self.op == 'Add'):
-          self.update_types(set([TupleObject.add(lobj, robj)]))
+          self.update_types(set([TupleObject.concat(lobj, robj)]))
           continue
-        if (lobj.is_type(TupleType) and
-            robj.is_type(IntType) and
+        if (lobj.is_type(TupleType) and robj.is_type(IntType) and
             self.op == 'Mul'):
-          self.update_types(set([TupleObject.collapse(lobj)]))
+          self.update_types(set([TupleObject.multiply(lobj)]))
           continue
-        if (lobj.is_type(IntType) and
-            robj.is_type(TupleType) and
+        if (lobj.is_type(IntType) and robj.is_type(TupleType) and
             self.op == 'Mul'):
-          self.update_types(set([TupleObject.collapse(robj)]))
+          self.update_types(set([TupleObject.multiply(robj)]))
           continue
         # other operations.
         k = (lobj.get_name(), self.op, robj.get_name())
         if k in self.VALID_TYPES:
-          v = BUILTIN_TYPE[self.VALID_TYPES[k]]
+          v = BUILTIN_OBJECTS[self.VALID_TYPES[k]]
           self.update_types(set([v]))
           continue
         self.raise_expt(ExceptionType(
@@ -211,10 +207,22 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
 ##
 class AssignOp(BinaryOp):
 
-  def update_types(self, types):
-    # whatever the value of this operation is assigned to the lefthand.
-    self.left_types.update(types)
-    self.update()
+  BINOP = {
+    '+=': 'Add',
+    '-=': 'Sub',
+    '*=': 'Mul',
+    '/=': 'Div',
+    '%=': 'Mod',
+    '//=': 'FloorDiv',
+    '**=': 'Power',
+    '&=': 'Bitand',
+    '|=': 'Bitor',
+    '^=': 'Bitxor',
+    }
+  
+  def __init__(self, parent_frame, loc, op, left, right):
+    BinaryOp.__init__(self, parent_frame, loc, self.BINOP[op], left, right)
+    self.connect(left)
     return
 
 

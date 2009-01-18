@@ -19,7 +19,7 @@ def build_assign(reporter, frame, space, n, v, evals):
     tup = TupleUnpack(frame, n, v, len(n.nodes))
     for (i,c) in enumerate(n.nodes):
       build_assign(reporter, frame, space, c, tup.get_nth(i), evals)
-  elif isinstance(n, ast.AssAttr):
+  elif isinstance(n, (ast.AssAttr, ast.Getattr)):
     obj = build_expr(reporter, frame, space, n.expr, evals)
     AttrAssign(frame, n, obj, n.attrname, v)
   elif isinstance(n, ast.Subscript):
@@ -45,17 +45,17 @@ def build_assign(reporter, frame, space, n, v, evals):
 ##  Constructs a TypeNode from a given syntax tree.
 ##
 def build_expr(reporter, frame, space, tree, evals):
-  from builtin_types import BUILTIN_TYPE, ListObject, DictObject, TupleObject, GeneratorSlot
+  from builtin_types import BUILTIN_OBJECTS, ListObject, DictObject, TupleObject, GeneratorSlot
 
   if isinstance(tree, ast.Const):
     typename = type(tree.value).__name__
-    expr = BUILTIN_TYPE[typename]
+    expr = BUILTIN_OBJECTS[typename]
 
   elif isinstance(tree, ast.Name):
     try:
       expr = space[tree.name]
     except KeyError:
-      expt = ExceptionType('NameError', 'name %r is not defined' % tree.name, tree)
+      expt = ExceptionType('NameError', 'name %r is not defined.' % tree.name, tree)
       frame.add_expt(expt)
       expr = UndefinedTypeNode(tree.name)
 
@@ -99,7 +99,7 @@ def build_expr(reporter, frame, space, tree, evals):
               for (k,v) in tree.items ]
     expr = DictObject(items)
 
-  # +, -, *, /, %, //, <<, >>, **, &, |, ^
+  # +, -, *, /, %, //, **, <<, >>
   elif isinstance(tree, (ast.Add, ast.Sub, ast.Mul, ast.Div,
                          ast.Mod, ast.FloorDiv, ast.Power,
                          ast.LeftShift, ast.RightShift)):
@@ -107,7 +107,15 @@ def build_expr(reporter, frame, space, tree, evals):
     left = build_expr(reporter, frame, space, tree.left, evals)
     right = build_expr(reporter, frame, space, tree.right, evals)
     expr = BinaryOp(frame, tree, op, left, right)
-
+    
+  # &, |, ^
+  elif isinstance(tree, (ast.Bitand, ast.Bitor, ast.Bitxor)):
+    op = tree.__class__.__name__
+    nodes = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
+    expr = nodes.pop(0)
+    for right in nodes:
+      expr = BinaryOp(frame, tree, op, expr, right)
+  
   # ==, !=, <=, >=, <, >
   elif isinstance(tree, ast.Compare):
     expr0 = build_expr(reporter, frame, space, tree.expr, evals)
@@ -121,8 +129,7 @@ def build_expr(reporter, frame, space, tree, evals):
     expr = UnaryOp(frame, tree, op, value)
 
   # and, or
-  elif isinstance(tree, (ast.And, ast.Or,
-                         ast.Bitand, ast.Bitor, ast.Bitxor)):
+  elif isinstance(tree, (ast.And, ast.Or)):
     op = tree.__class__.__name__
     nodes = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
     expr = BooleanOp(frame, tree, op, nodes)
@@ -231,9 +238,13 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   # augassign
   elif isinstance(tree, ast.AugAssign):
     left = build_expr(reporter, frame, space, tree.node, evals)
-    right = build_expr(reporter, frame, space, tree.expr, evals)
-    value = AssignOp(frame, tree, tree.op, left, right)
-    build_assign(reporter, frame, space, tree.node, value, evals)
+    if isinstance(left, UndefinedTypeNode):
+      expt = ExceptionType('NameError', 'cannot assign to an undefined variable.', tree)
+      frame.add_expt(expt)
+    else:
+      right = build_expr(reporter, frame, space, tree.expr, evals)
+      value = AssignOp(frame, tree, tree.op, left, right)
+      build_assign(reporter, frame, space, tree.node, value, evals)
 
   # return
   elif isinstance(tree, ast.Return):
