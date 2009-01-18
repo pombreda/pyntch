@@ -144,50 +144,50 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
         if (lobj,robj) in self.combinations: continue
         self.combinations.add((lobj,robj))
         # special handling for a formatting (%) operator
-        if (lobj.is_type(BaseStringType) and
+        if (lobj.is_type(BaseStringType.get_type()) and
             self.op == 'Mod'):
           self.update_types(set([lobj]))
           continue
         # for numeric operation, the one with a higher rank is chosen.
-        if (lobj.is_type(NumberType) and robj.is_type(NumberType) and
+        if (lobj.is_type(NumberType.get_type()) and robj.is_type(NumberType.get_type()) and
             self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power')):
           if lobj.get_type().get_rank() < robj.get_type().get_rank():
             self.update_types(set([robj]))
           else:
             self.update_types(set([lobj]))
           continue
-        if (lobj.is_type(IntType) and robj.is_type(IntType) and
+        if (lobj.is_type(IntType.get_type()) and robj.is_type(IntType.get_type()) and
             self.op in ('Bitand','Bitor','Bitxor')):
           self.update_types(set([robj]))
           continue
         # for string operation, only Add is supported.
-        if (lobj.is_type(BaseStringType) and robj.is_type(BaseStringType) and
+        if (lobj.is_type(BaseStringType.get_type()) and robj.is_type(BaseStringType.get_type()) and
             self.op == 'Add'):
           self.update_types(set([lobj]))
           continue
         # for list operation, only Add and Mul is supported.
-        if (lobj.is_type(ListType) and robj.is_type(ListType) and
+        if (lobj.is_type(ListType.get_type()) and robj.is_type(ListType.get_type()) and
             self.op == 'Add'):
           self.update_types(set([ListObject.concat(lobj, robj)]))
           continue
-        if (lobj.is_type(ListType) and robj.is_type(IntType) and
+        if (lobj.is_type(ListType.get_type()) and robj.is_type(IntType.get_type()) and
             self.op == 'Mul'):
           self.update_types(set([ListObject.multiply(lobj)]))
           continue
-        if (lobj.is_type(IntType) and robj.is_type(ListType) and
+        if (lobj.is_type(IntType.get_type()) and robj.is_type(ListType.get_type()) and
             self.op == 'Mul'):
           self.update_types(set([ListObject.multiply(robj)]))
           continue
         # for tuple operation, only Add and Mul is supported.
-        if (lobj.is_type(TupleType) and robj.is_type(TupleType) and
+        if (lobj.is_type(TupleType.get_type()) and robj.is_type(TupleType.get_type()) and
             self.op == 'Add'):
           self.update_types(set([TupleObject.concat(lobj, robj)]))
           continue
-        if (lobj.is_type(TupleType) and robj.is_type(IntType) and
+        if (lobj.is_type(TupleType.get_type()) and robj.is_type(IntType.get_type()) and
             self.op == 'Mul'):
           self.update_types(set([TupleObject.multiply(lobj)]))
           continue
-        if (lobj.is_type(IntType) and robj.is_type(TupleType) and
+        if (lobj.is_type(IntType.get_type()) and robj.is_type(TupleType.get_type()) and
             self.op == 'Mul'):
           self.update_types(set([TupleObject.multiply(robj)]))
           continue

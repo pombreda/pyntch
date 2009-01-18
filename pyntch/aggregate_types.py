@@ -3,7 +3,7 @@
 from exception import ExceptionType, ExceptionRaiser, TypeChecker
 from builtin_types import BuiltinType, BuiltinFunc, BuiltinConstFunc, \
      BoolType, IntType, NoneType, ANY_TYPE
-from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError
+from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError
 
 
 ##  BuiltinAggregateObject
@@ -30,6 +30,14 @@ class BuiltinAggregateObject(SimpleTypeNode):
       klass.NULL = klass([])
     return klass.NULL
 
+# ElementAll
+class ElementAll(CompoundTypeNode):
+  def __init__(self, elements):
+    CompoundTypeNode.__init__(self)
+    for elem in elements:
+      elem.connect(self)
+    return
+
 
 ##  Aggregate Types
 ##
@@ -49,9 +57,9 @@ class ListType(BuiltinType, BuiltinFunc):
     
     def recv(self, src):
       for obj in src.types:
-        if obj.is_type(ListType):
+        if obj.is_type(ListType.get_type()):
           self.update_types(set([obj]))
-        elif obj.is_type(TupleType):
+        elif obj.is_type(TupleType.get_type()):
           self.update_types(set([ListObject(elemall=obj.elemall)]))
         else:
           self.raise_expt(ExceptionType(
@@ -75,22 +83,13 @@ class ListObject(BuiltinAggregateObject):
 
   TYPEOBJ = ListType.get_type()
   
-  # ElementAll
-  class ElementAll(CompoundTypeNode):
-    def __init__(self, elements):
-      CompoundTypeNode.__init__(self)
-      for elem in elements:
-        elem.connect(self)
-      return
-
-  #
   def __init__(self, elements=None, elemall=None):
     if elements == None:
       assert elemall != None
       self.elemall = elemall
     else:
       assert elements != None
-      self.elemall = self.ElementAll(elements)
+      self.elemall = ElementAll(elements)
     BuiltinAggregateObject.__init__(self)
     return
   
@@ -240,9 +239,9 @@ class TupleType(BuiltinType, BuiltinFunc):
     
     def recv(self, src):
       for obj in src.types:
-        if obj.is_type(TupleType):
+        if obj.is_type(TupleType.get_type()):
           self.update_types(set([obj]))
-        elif obj.is_type(ListType):
+        elif obj.is_type(ListType.get_type()):
           self.update_types(set([TupleObject(elemall=obj.elemall)]))
         else:
           self.raise_expt(ExceptionType(
@@ -266,15 +265,6 @@ class TupleObject(BuiltinAggregateObject):
 
   TYPEOBJ = TupleType.get_type()
   
-  # ElementAll
-  class ElementAll(CompoundTypeNode):
-    def __init__(self, elements):
-      CompoundTypeNode.__init__(self)
-      for elem in elements:
-        elem.connect(self)
-      return
-
-  #
   def __init__(self, elements=None, loc=None, elemall=None):
     self.elements = elements
     self.loc = loc
@@ -283,7 +273,7 @@ class TupleObject(BuiltinAggregateObject):
       self.elemall = elemall
     else:
       assert elemall == None
-      self.elemall = self.ElementAll(elements)
+      self.elemall = ElementAll(elements)
     BuiltinAggregateObject.__init__(self)
     return
   
@@ -302,9 +292,9 @@ class TupleObject(BuiltinAggregateObject):
   def concat(klass, obj1, obj2):
     assert isinstance(obj1, klass) and isinstance(obj2, klass)
     if obj1.elements == None or obj2.elements == None:
-      return klass(elemall=self.ElementAll(obj1.elemall, obj2.elemall))
+      return klass(elemall=ElementAll([obj1.elemall, obj2.elemall]))
     else:
-      return klass(obj1.elements+obj2.elements)
+      return klass(elements=obj1.elements+obj2.elements)
 
   @classmethod
   def multiply(klass, obj):
@@ -367,7 +357,7 @@ class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
   def recv_tupobj(self, src):
     assert src is self.tupobj
     for obj in src.types:
-      if obj.is_type(TupleObject):
+      if obj.is_type(TupleType.get_type()):
         if len(obj.elements) != len(self.elems):
           self.raise_expt(ExceptionType(
             'ValueError',
@@ -391,22 +381,13 @@ class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
 ##
 class IterObject(SimpleTypeNode):
 
-  # ElementAll
-  class ElementAll(CompoundTypeNode):
-    def __init__(self, elements):
-      CompoundTypeNode.__init__(self)
-      for elem in elements:
-        elem.connect(self)
-      return
-
-  #
   def __init__(self, elements=None, elemall=None):
     if elements == None:
       assert elemall != None
       self.elemall = elemall
     else:
       assert elements != None
-      self.elemall = self.ElementAll(elements)
+      self.elemall = ElementAll(elements)
     SimpleTypeNode.__init__(self, self)
     return
   
@@ -580,7 +561,7 @@ class SetObject(BuiltinAggregateObject):
     return '([%s])' % (self.elem)
 
   def copy(self):
-    return SetType([self.elem])
+    return SetObject([self.elem])
 
   def get_attr(self, name):
     if name == 'add':

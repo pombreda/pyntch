@@ -70,6 +70,9 @@ class BuiltinFunc(SimpleTypeNode):
   def connect_expt(self, frame):
     return
 
+  def process_args(self, caller, args):
+    raise NotImplementedError
+  
   def call(self, caller, args):
     if len(args) < self.minargs:
       caller.raise_expt(ExceptionType(
@@ -143,11 +146,11 @@ class IntType(NumberType, BuiltinConstFunc):
     
     def recv(self, src):
       for obj in src.types:
-        if obj.is_type(BaseStringType):
+        if obj.is_type(BaseStringType.get_type()):
           self.parent_frame.raise_expt(ExceptionType(
             'ValueError',
             'might be conversion error'))
-        elif obj.is_type((NumberType, BoolType)):
+        elif obj.is_type((NumberType.get_type(), BoolType.get_type())):
           pass
         else:
           self.parent_frame.raise_expt(ExceptionType(
@@ -188,6 +191,7 @@ class BaseStringType(BuiltinType, BuiltinConstFunc):
       return ElementTypeChecker(caller, self.args[i].get_type(), caller.loc, 'arg%d' % i)
 
   def get_attr(self, name):
+    from aggregate_types import TupleObject, ListObject
     if name == 'capitalize':
       return BuiltinConstFunc('str.capitalize', self.get_object())
     elif name == 'center':
@@ -318,7 +322,7 @@ class BaseStringType(BuiltinType, BuiltinConstFunc):
     
     def recv(self, src):
       for obj in src.types:
-        if obj.is_type(InstanceType):
+        if isinstance(obj, InstanceType):
           value = ClassType.OptionalAttr(obj, '__str__').call(self, ())
           value.connect(TypeChecker(self, BaseStringType.get_type(), self.loc, 'the return value of __str__ method'))
           value = ClassType.OptionalAttr(obj, '__repr__').call(self, ())

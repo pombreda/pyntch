@@ -121,7 +121,7 @@ class ExceptionCatcher(ExceptionFrame):
     from aggregate_types import TupleType
     (expt,_) = self.handlers[src]
     for obj in src.types:
-      if obj.is_type(TupleType):
+      if obj.is_type(TupleType.get_type()):
         obj.elemall.connect(expt)
       else:
         obj.connect(expt)
@@ -133,7 +133,7 @@ class ExceptionCatcher(ExceptionFrame):
     for expt1 in expts:
       for (expt0,var) in self.handlers.itervalues():
         for exptobj in expt0.types:
-          if expt1.is_type(exptobj.get_type().__class__):
+          if expt1.is_type(exptobj.get_type()):
             expt1.connect(var)
             break
         else:
@@ -246,8 +246,8 @@ class TypeChecker(CompoundTypeNode):
   def recv(self, src):
     types = set()
     for obj in src.types:
-      for typeklass in self.validtypes:
-        if obj.is_type(typeklass.__class__):
+      for typeobj in self.validtypes:
+        if obj.is_type(typeobj):
           types.add(obj)
           break
       else:

@@ -10,7 +10,7 @@ from function import ClassType, InstanceType
 from builtin_types import NumberType, BoolType, IntType, LongType, \
      BaseStringType, StrType, UnicodeType, ANY_TYPE, \
      BuiltinFunc, BuiltinConstFunc
-from aggregate_types import ListObject, IterObject
+from aggregate_types import ListObject, TupleObject, IterObject
 
 
 ##  ReprFunc
