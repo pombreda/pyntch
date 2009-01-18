@@ -11,7 +11,7 @@ from expression import AttrAssign, AttrRef, SubAssign, SubRef, IterRef, SliceAss
 ##  build_assign(reporter, frame, namespace, node1, node2, evals)
 ##
 def build_assign(reporter, frame, space, n, v, evals):
-  from builtin_types import TupleUnpack
+  from aggregate_types import TupleUnpack
   
   if isinstance(n, ast.AssName) or isinstance(n, ast.Name):
     space[n.name].bind(v)
@@ -45,7 +45,8 @@ def build_assign(reporter, frame, space, n, v, evals):
 ##  Constructs a TypeNode from a given syntax tree.
 ##
 def build_expr(reporter, frame, space, tree, evals):
-  from builtin_types import BUILTIN_OBJECTS, ListObject, DictObject, TupleObject, GeneratorSlot
+  from builtin_types import BUILTIN_OBJECTS
+  from aggregate_types import ListObject, DictObject, TupleObject, GeneratorSlot
 
   if isinstance(tree, ast.Const):
     typename = type(tree.value).__name__
@@ -172,7 +173,13 @@ def build_expr(reporter, frame, space, tree, evals):
     expr = GeneratorSlot(value)
     evals.append(('y', expr)) # XXX ???
 
+  elif isinstance(tree, ast.Backquote):
+    expt = ExceptionType('RuntimeError', 'backquote is not supported.', tree)
+    frame.add_expt(expt)
+    expr = UndefinedTypeNode('backquote')
+
   else:
+    # unsupported AST.
     raise SyntaxError(tree)
 
   assert isinstance(expr, (TypeNode, KeywordArg, tuple)), expr
@@ -360,6 +367,11 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, ast.Assert):
     build_typecheck(reporter, frame, space, tree.test, evals)
 
+  # unsupported
+  elif isinstance(tree, ast.Exec):
+    expt = ExceptionType('RuntimeError', 'exec is not supported.', tree)
+    frame.add_expt(expt)
+  
   else:
     raise SyntaxError('unsupported syntax: %r' % tree)
 

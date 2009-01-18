@@ -5,6 +5,7 @@ from typenode import TreeReporter, SimpleTypeNode, CompoundTypeNode
 from exception import ExceptionFrame
 from namespace import Namespace
 import builtin_types
+import aggregate_types
 import builtin_funcs
 
 
@@ -25,38 +26,44 @@ class BuiltinNamespace(Namespace):
     self.register_var('__name__').bind(builtin_types.StrType.get_object())
     self.register_var('__file__').bind(builtin_types.StrType.get_object())
 
-    # int,long,float,bool,chr,dict,file,open,list,set,frozenset,
-    # object,xrange,type,unicode,tuple,str,staticmethod,classmethod,reversed
     self.register_var('int').bind(builtin_types.IntType.get_type())
     self.register_var('long').bind(builtin_types.LongType.get_type())
     self.register_var('float').bind(builtin_types.FloatType.get_type())
+    self.register_var('complex').bind(builtin_types.ComplexType.get_type())
     self.register_var('bool').bind(builtin_types.BoolType.get_type())
+    self.register_var('basestring').bind(builtin_types.BaseStringType.get_type())
     self.register_var('str').bind(builtin_types.StrType.get_type())
     self.register_var('unicode').bind(builtin_types.UnicodeType.get_type())
-    self.register_var('list').bind(builtin_types.ListType.get_type())
-    self.register_var('tuple').bind(builtin_types.TupleType.get_type())
     self.register_var('object').bind(builtin_types.ObjectType.get_type())
-    self.register_var('dict').bind(builtin_types.DictType.get_type())
-    self.register_var('set').bind(builtin_types.SetType.get_type())
     self.register_var('file').bind(builtin_types.FileType.get_type())
     self.register_var('open').bind(builtin_types.FileType.get_type())
+    self.register_var('list').bind(aggregate_types.ListType.get_type())
+    self.register_var('tuple').bind(aggregate_types.TupleType.get_type())
+    self.register_var('dict').bind(aggregate_types.DictType.get_type())
+    self.register_var('set').bind(aggregate_types.SetType.get_type())
     
     #self.register_var('xrange').bind(builtin_types.XRangeFunc())
     #self.register_var('type').bind(builtin_types.TypeFunc())
     #self.register_var('staticmethod').bind(builtin_types.StaticMethodFunc())
     #self.register_var('classmethod').bind(builtin_types.ClassMethodFunc())
     #self.register_var('reversed').bind(builtin_types.ReversedFunc())
+    #self.register_var('frozenset').bind(builtin_types.FrozenSetType())
 
-    # abs,all,any,apply,basestring,callable,chr,
-    # cmp,coerce,compile,complex,delattr,dir,divmod,enumerate,eval,
-    # execfile,filter,getattr,globals,hasattr,hash,
-    # hex,id,input,intern,isinstance,issubclass,iter,len,locals,
-    # long,map,max,min,oct,ord,pow,property,range,raw_input,
-    # reduce,reload,repr,round,setattr,sorted,
-    # sum,unichr,vars,xrange,zip
-    #self.register_var('chr').bind(builtin_funcs.ChrFunc())
+    # abs,all,any,apply,callable,
+    # cmp,dir,divmod,enumerate,
+    # filter,hasattr,hash,
+    # hex,id,isinstance,issubclass,
+    # map,max,min,oct,ord,pow,property,raw_input,
+    # reduce,round,sorted,sum,zip
+    self.register_var('repr').bind(builtin_funcs.ReprFunc())
     self.register_var('len').bind(builtin_funcs.LenFunc())
+    self.register_var('iter').bind(builtin_funcs.IterFunc())
     self.register_var('range').bind(builtin_funcs.RangeFunc())
+    self.register_var('chr').bind(builtin_funcs.ChrFunc())
+    self.register_var('unichr').bind(builtin_funcs.UnichrFunc())
+
+    # buffer, coerce, intern
+    # vars,eval,locals,globals,compile,getattr,setattr,delattr,reload,__import__,execfile,input
     return
 
   def fullname(self):
@@ -71,7 +78,7 @@ BUILTIN_NAMESPACE = BuiltinNamespace()
 ##  ModuleType
 ##
 class ModuleType(SimpleTypeNode, TreeReporter, ExceptionFrame):
-  
+
   ##  Attr
   ##
   class Attr(CompoundTypeNode):
@@ -90,7 +97,7 @@ class ModuleType(SimpleTypeNode, TreeReporter, ExceptionFrame):
     self.path = path
     self.attrs = {}
     self.space = Namespace(parent_space, name)
-    SimpleTypeNode.__init__(self, self.__class__)
+    SimpleTypeNode.__init__(self, self)
     TreeReporter.__init__(self, parent_reporter, name)
     ExceptionFrame.__init__(self)
     return

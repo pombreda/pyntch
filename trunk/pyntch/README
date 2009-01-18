@@ -18,9 +18,9 @@ Pychecker or Pyflakes, it does not check the style issue.
 Pyntch can detect the following kinds of errors:
 
  * type mismatch (e.g. 1+'a')
- * call of something uncallable (e.g. f(1) where f is a number)
- * subscript access to unsubscriptable objects (e.g. a[1] where a is a number)
- * access to undefined attributes (e.g. obj.attr when "obj" does not have "attr")
+ * call of something uncallable (e.g. f(1) where f is not a function).
+ * subscript access to unsubscriptable objects (e.g. a[1] where a is not an array).
+ * access to undefined attributes (e.g. "obj.attr" when "obj" does not have "attr").
 
 Pyntch supports most of the features in Python language.
 Therefore it can correctly analyze most programs that are written

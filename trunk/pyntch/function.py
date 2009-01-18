@@ -40,7 +40,7 @@ class FuncType(SimpleTypeNode, TreeReporter):
       return
 
     def set_retval(self, evals):
-      from builtin_types import IterObject
+      from aggregate_types import IterObject
       returns = [ obj for (t,obj) in evals if t == 'r' ]
       yields = [ obj for (t,obj) in evals if t == 'y' ]
       assert returns
@@ -54,13 +54,13 @@ class FuncType(SimpleTypeNode, TreeReporter):
 
   def __init__(self, parent_reporter, parent_frame, parent_space,
                name, argnames, defaults, varargs, kwargs, code):
-    from builtin_types import TupleUnpack
+    from aggregate_types import TupleUnpack
     def maprec(func, x):
       if isinstance(x, tuple):
         return tuple( maprec(func, y) for y in x )
       else:
         return func(x)
-    SimpleTypeNode.__init__(self, self.__class__)
+    SimpleTypeNode.__init__(self, self)
     TreeReporter.__init__(self, parent_reporter, name)
     self.name = name
     # prepare local variables that hold passed arguments.
@@ -112,7 +112,8 @@ class FuncType(SimpleTypeNode, TreeReporter):
     return ('<Function %s>' % (self.name))
 
   def call(self, caller, args):
-    from builtin_types import StrType, DictObject, TupleObject, TupleUnpack
+    from builtin_types import StrType
+    from aggregate_types import DictObject, TupleObject, TupleUnpack
     # assign(var1,arg1):
     #  Assign a actual parameter arg1 to a local variable var1.
     def assign(var1, arg1):
@@ -230,7 +231,7 @@ class BoundMethod(SimpleTypeNode):
   def __init__(self, arg0, func):
     self.arg0 = arg0
     self.func = func
-    SimpleTypeNode.__init__(self, FuncType)
+    SimpleTypeNode.__init__(self, self)
     return
 
   def __repr__(self):
@@ -325,7 +326,7 @@ class ClassType(SimpleTypeNode, TreeReporter):
 
   def __init__(self, parent_reporter, parent_frame, parent_space, name, bases, code, evals):
     from syntax import build_stmt
-    SimpleTypeNode.__init__(self, self.__class__)
+    SimpleTypeNode.__init__(self, self)
     TreeReporter.__init__(self, parent_reporter, name)
     self.name = name
     self.bases = bases
@@ -428,7 +429,7 @@ class InstanceType(SimpleTypeNode):
     pass
     
   def __init__(self, klass):
-    SimpleTypeNode.__init__(self, self.__class__)
+    SimpleTypeNode.__init__(self, self)
     self.klass = klass
     self.attrs = {}
     self.boundmethods = {}

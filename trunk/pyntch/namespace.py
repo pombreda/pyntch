@@ -218,6 +218,8 @@ class Namespace:
       pass
     elif isinstance(tree, ast.Pass):
       pass
+    elif isinstance(tree, ast.Exec):
+      pass
 
     # expressions
     elif isinstance(tree, ast.Const):
@@ -268,6 +270,8 @@ class Namespace:
     elif isinstance(tree, ast.Lambda):
       for value in tree.defaults:
         self.register_names(value)
+    elif isinstance(tree, ast.Backquote):
+      self.register_names(tree.expr)
 
     # list comprehension
     elif isinstance(tree, ast.ListComp):

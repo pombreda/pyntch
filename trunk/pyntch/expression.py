@@ -138,7 +138,7 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
     }
   def update(self):
     from builtin_types import BUILTIN_OBJECTS, NumberType, IntType, BaseStringType
-    from builtin_types import ListType, ListObject, TupleType, TupleObject
+    from aggregate_types import ListType, ListObject, TupleType, TupleObject
     for lobj in list(self.left_types):
       for robj in list(self.right_types):
         if (lobj,robj) in self.combinations: continue
@@ -151,7 +151,7 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
         # for numeric operation, the one with a higher rank is chosen.
         if (lobj.is_type(NumberType) and robj.is_type(NumberType) and
             self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power')):
-          if lobj.get_rank() < robj.get_rank():
+          if lobj.get_type().get_rank() < robj.get_type().get_rank():
             self.update_types(set([robj]))
           else:
             self.update_types(set([lobj]))
@@ -192,7 +192,7 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
           self.update_types(set([TupleObject.multiply(robj)]))
           continue
         # other operations.
-        k = (lobj.get_name(), self.op, robj.get_name())
+        k = (lobj.get_typename(), self.op, robj.get_typename())
         if k in self.VALID_TYPES:
           v = BUILTIN_OBJECTS[self.VALID_TYPES[k]]
           self.update_types(set([v]))

@@ -76,23 +76,23 @@ class TypeNode(object):
 class SimpleTypeNode(TypeNode):
 
   def __init__(self, typeobj):
-    assert isinstance(typeobj, type) and issubclass(typeobj, TypeNode), typeobj
+    assert isinstance(typeobj, TypeNode), typeobj
     self.typeobj = typeobj
     TypeNode.__init__(self, [self])
     return
 
   def __repr__(self):
-    return '<%s>' % self.get_name()
+    return '<%s>' % self.get_typename()
 
-  def get_name(self):
+  def get_type(self):
+    return self.typeobj
+
+  def get_typename(self):
     return self.typeobj.get_name()
-
-  def get_rank(self):
-    return self.typeobj.get_rank()
 
   def is_type(self, *typeobjs):
     for typeobj in typeobjs:
-      if issubclass(self.typeobj, typeobj): return True
+      if issubclass(self.typeobj.__class__, typeobj): return True
     return False
 
   def desc1(self, _):
