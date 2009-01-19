@@ -3,9 +3,7 @@ README
 
 
 # TODO:
-#  iter class
-#  __add__, __eq__ etc.
-#  hierarchical types (to handle exception catching)
+#  __add__, __eq__, __iter__ etc.
 #  automatic coercion
 
 Pyntch is a PYthoN Type CHecker.  It examines a Python source code

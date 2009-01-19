@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from typenode import TreeReporter, SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError
+from typenode import TreeReporter, SimpleTypeNode, CompoundTypeNode, BuiltinType, NodeTypeError, NodeAttrError
 from namespace import Namespace, Variable
 from exception import ExceptionType, ExceptionFrame
 
@@ -20,7 +20,7 @@ class KeywordArg(object):
 
 ##  FuncType
 ##
-class FuncType(SimpleTypeNode, TreeReporter):
+class FuncType(BuiltinType, TreeReporter):
   
   ##  FuncBody
   ##
@@ -60,7 +60,7 @@ class FuncType(SimpleTypeNode, TreeReporter):
         return tuple( maprec(func, y) for y in x )
       else:
         return func(x)
-    SimpleTypeNode.__init__(self, self)
+    BuiltinType.__init__(self)
     TreeReporter.__init__(self, parent_reporter, name)
     self.name = name
     # prepare local variables that hold passed arguments.
@@ -111,6 +111,10 @@ class FuncType(SimpleTypeNode, TreeReporter):
   def __repr__(self):
     return ('<Function %s>' % (self.name))
 
+  @classmethod
+  def get_name(klass):
+    return 'function'
+  
   def call(self, caller, args):
     from builtin_types import StrType
     from aggregate_types import DictObject, TupleObject, TupleUnpack
@@ -226,24 +230,28 @@ class LambdaFuncType(FuncType):
 
 ##  BoundMethod
 ##
-class BoundMethod(SimpleTypeNode):
+class BoundMethod(BuiltinType):
 
   def __init__(self, arg0, func):
     self.arg0 = arg0
     self.func = func
-    SimpleTypeNode.__init__(self, self)
+    BuiltinType.__init__(self)
     return
 
   def __repr__(self):
     return '<Bound %r(%s=%r)>' % (self.func, self.func.argnames[0], self.arg0)
 
+  @classmethod
+  def get_name(klass):
+    return 'boundmethod'
+  
   def call(self, caller, args):
     return self.func.call(caller, (self.arg0,)+tuple(args))
 
 
 ##  ClassType
 ##
-class ClassType(SimpleTypeNode, TreeReporter):
+class ClassType(BuiltinType, TreeReporter):
   
   ##  ClassAttr
   ##
@@ -326,7 +334,7 @@ class ClassType(SimpleTypeNode, TreeReporter):
 
   def __init__(self, parent_reporter, parent_frame, parent_space, name, bases, code, evals):
     from syntax import build_stmt
-    SimpleTypeNode.__init__(self, self)
+    BuiltinType.__init__(self)
     TreeReporter.__init__(self, parent_reporter, name)
     self.name = name
     self.bases = bases
@@ -343,13 +351,35 @@ class ClassType(SimpleTypeNode, TreeReporter):
       var.connect(attr)
       self.attrs[name] = attr
     self.instance = InstanceType(self)
+    self.baseklass = set()
+    for base in bases:
+      base.connect(self, self.recv_base)
     return
 
   def __repr__(self):
     return ('<Class %s>' % (self.name,))
 
+  @classmethod
+  def get_name(klass):
+    return 'class'
+  
   def get_type(self):
     return self
+
+  def recv_base(self, src):
+    for klass in src.types:
+      if isinstance(klass, ClassType):
+        self.baseklass.add(klass)
+    return
+  
+  def is_subclass(self, klassobj):
+    if self is klassobj:
+      return True
+    else:
+      for klass in self.baseklass:
+        if klass.is_subclass(klassobj):
+          return True
+      return False
 
   def get_attr(self, name):
     if name not in self.attrs:
@@ -445,6 +475,12 @@ class InstanceType(SimpleTypeNode):
 
   def get_type(self):
     return self.klass
+
+  def is_type(self, *typeobjs):
+    for typeobj in typeobjs:
+      if isinstance(typeobj, ClassType):
+        return self.klass.is_subclass(typeobj)
+    return SimpleTypeNode.is_type(*typeobjs)
 
   def get_attr(self, name):
     if name not in self.attrs:

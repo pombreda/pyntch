@@ -133,6 +133,7 @@ class ExceptionCatcher(ExceptionFrame):
     for expt1 in expts:
       for (expt0,var) in self.handlers.itervalues():
         for exptobj in expt0.types:
+          #print exptobj, exptobj.get_type(), expt1, expt1.get_type()
           if expt1.is_type(exptobj.get_type()):
             expt1.connect(var)
             break

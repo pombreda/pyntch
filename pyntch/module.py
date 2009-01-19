@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import sys, os.path
 stderr = sys.stderr
-from typenode import TreeReporter, SimpleTypeNode, CompoundTypeNode
+from typenode import TreeReporter, SimpleTypeNode, CompoundTypeNode, BuiltinType
 from exception import ExceptionFrame
 from namespace import Namespace
 import builtin_types
@@ -39,8 +39,8 @@ class BuiltinNamespace(Namespace):
     self.register_var('open').bind(builtin_types.FileType.get_type())
     self.register_var('list').bind(aggregate_types.ListType.get_type())
     self.register_var('tuple').bind(aggregate_types.TupleType.get_type())
-    self.register_var('dict').bind(aggregate_types.DictType.get_type())
     self.register_var('set').bind(aggregate_types.SetType.get_type())
+    self.register_var('dict').bind(aggregate_types.DictType.get_type())
     
     #self.register_var('xrange').bind(builtin_types.XRangeFunc())
     #self.register_var('type').bind(builtin_types.TypeFunc())
@@ -77,7 +77,7 @@ BUILTIN_NAMESPACE = BuiltinNamespace()
 
 ##  ModuleType
 ##
-class ModuleType(SimpleTypeNode, TreeReporter, ExceptionFrame):
+class ModuleType(BuiltinType, TreeReporter, ExceptionFrame):
 
   ##  Attr
   ##
@@ -97,13 +97,17 @@ class ModuleType(SimpleTypeNode, TreeReporter, ExceptionFrame):
     self.path = path
     self.attrs = {}
     self.space = Namespace(parent_space, name)
-    SimpleTypeNode.__init__(self, self)
+    BuiltinType.__init__(self)
     TreeReporter.__init__(self, parent_reporter, name)
     ExceptionFrame.__init__(self)
     return
   
   def __repr__(self):
     return '<Module %s (%s)>' % (self.name, self.path)
+
+  @classmethod
+  def get_name(klass):
+    return 'module'
 
   def raise_expt(self, expt):
     self.add_expt(expt)

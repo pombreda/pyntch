@@ -7,15 +7,11 @@ try:
   raise B
 except A:
   print 'A'
-except B:
-  print 'B'
 
 try:
-  raise B
+  raise A
 except B:
   print 'B'
-except A:
-  print 'A'
 
 try:
   raise 'foo'
