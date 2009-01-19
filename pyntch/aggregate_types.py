@@ -256,7 +256,7 @@ class TupleType(BuiltinType, BuiltinFunc):
       return TupleObject.get_null()
 
   def __init__(self):
-    BuiltinFunc.__init__(self, 'tuple', [], [ANY_TYPE]) # XXX take keyword argument!
+    BuiltinFunc.__init__(self, 'tuple', [], [ANY_TYPE])
     return
 
 class TupleObject(BuiltinAggregateObject):
@@ -530,25 +530,46 @@ class DictObject(BuiltinAggregateObject):
         obj.connect(self)
       return
 
+  # dict.get
+  class Get(BuiltinConstFunc):
+    def __init__(self, dictobj):
+      self.dictobj = dictobj
+      self.found = CompoundTypeNode()
+      dictobj.value.connect(self.found)
+      BuiltinConstFunc.__init__(self, 'dict.get', self.found, [ANY_TYPE], [ANY_TYPE])
+      return
+    def __repr__(self):
+      return '%r.get' % self.dictobj
+    def accept_arg(self, caller, i):
+      if i == 0:
+        return None
+      return self.found
+
+  # dict.setdefault
   class SetDefault(BuiltinConstFunc):
     def __init__(self, dictobj):
       self.dictobj = dictobj
-      BuiltinConstFunc.__init__(self, 'dict.setdefault', CompoundTypeNode(), [ANY_TYPE], [ANY_TYPE])
+      BuiltinConstFunc.__init__(self, 'dict.setdefault', dictobj.default, [ANY_TYPE], [ANY_TYPE])
       return
     def __repr__(self):
       return '%r.setdefault' % self.dictobj
     def accept_arg(self, caller, i):
-      if i == 0:
-        return self.dictobj.default
-      else:
-        return self.retval
+      if i == 1:
+        self.args[i].connect(self.dictobj.value)
+      return None
 
-  def __init__(self, items):
-    self.items = items
+  def __init__(self, items=None, key=None, value=None):
+    if items != None:
+      assert key == None and value == None
+      self.key = self.Item( k for (k,v) in items )
+      self.value = self.Item( v for (k,v) in items )
+    else:
+      assert key != None and value != None
+      self.key = CompoundTypeNode([key])
+      self.value = CompoundTypeNode([value])
     self.default = CompoundTypeNode()
-    self.key = self.Item( k for (k,v) in items )
-    self.value = self.Item( v for (k,v) in items )
     NoneType.get_object().connect(self.default)
+    self.value.connect(self.default)
     BuiltinAggregateObject.__init__(self)
     return
   
@@ -556,7 +577,7 @@ class DictObject(BuiltinAggregateObject):
     return '{%s: %s}' % (self.key, self.value)
 
   def copy(self):
-    return DictObject(self.items)
+    return DictObject(key=self.key, value=self.value)
 
   def desc1(self, done):
     return '{%s: %s}' % (self.key.desc1(done), self.value.desc1(done))
@@ -568,13 +589,13 @@ class DictObject(BuiltinAggregateObject):
 
   def get_attr(self, name):
     if name == 'clear':
-      return BuiltinConstFunc('dict.claer', NoneType.get_object())
+      return BuiltinConstFunc('dict.clear', NoneType.get_object())
     elif name == 'copy':
       return BuiltinConstFunc('dict.copy', self.copy())
     elif name == 'fromkeys':
-      return XXX
+      return self.FromKeys()
     elif name == 'get':
-      return XXX
+      return self.Get(self)
     elif name == 'has_key':
       return BuiltinConstFunc('dict.has_key', BoolType.get_object(), [ANY_TYPE])
     elif name == 'items':
@@ -588,14 +609,13 @@ class DictObject(BuiltinAggregateObject):
     elif name == 'keys':
       return BuiltinConstFunc('dict.keys', ListObject([ TupleObject([self.key]) ]))
     elif name == 'pop':
-      return XXX
-      return BuiltinConstFunc('dict.pop', self.value, [ANY_TYPE])
+      return self.Get(self)
     elif name == 'popitem':
       return BuiltinConstFunc('dict.popitem', TupleObject([self.key, self.value]))
     elif name == 'setdefault':
-      return self.SetDefault()
+      return self.SetDefault(self)
     elif name == 'update':
-      return XXX
+      return self.Update(self)
     elif name == 'values':
       return BuiltinConstFunc('dict.keys', ListObject([ TupleObject([self.key]) ]))
     raise NodeAttrError(name)

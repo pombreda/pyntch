@@ -5,7 +5,7 @@ from typenode import TypeNode, UndefinedTypeNode
 from exception import ExceptionType, ExceptionFrame, ExceptionCatcher, ExceptionMaker, TypeChecker
 from function import KeywordArg, FuncType, LambdaFuncType, ClassType
 from expression import AttrAssign, AttrRef, SubAssign, SubRef, IterRef, SliceAssign, SliceRef, \
-     FunCall, BinaryOp, CompareOp, BooleanOp, AssignOp, UnaryOp, NotOp
+     FunCall, BinaryOp, CompareOp, BooleanOp, AssignOp, UnaryOp, NotOp, IfExpOp
 
 
 ##  build_assign(reporter, frame, namespace, node1, node2, evals)
@@ -35,8 +35,7 @@ def build_assign(reporter, frame, space, n, v, evals):
       upper = build_expr(reporter, frame, space, n.upper, evals)
     SliceAssign(frame, n, obj, lower, upper, v)
   else:
-    assert 0, (n._modname, n.lineno)
-    raise SyntaxError(n)
+    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (n, n._modname, n.lineno))
   return
 
 
@@ -173,6 +172,13 @@ def build_expr(reporter, frame, space, tree, evals):
     expr = GeneratorSlot(value)
     evals.append(('y', expr)) # XXX ???
 
+  # ifexp
+  elif isinstance(tree, ast.IfExp):
+    test = build_expr(reporter, frame, space, tree.test, evals)
+    then = build_expr(reporter, frame, space, tree.then, evals)
+    else_ = build_expr(reporter, frame, space, tree.else_, evals)
+    expr = IfExpOp(frame, tree, test, then, else_)
+
   elif isinstance(tree, ast.Backquote):
     expt = ExceptionType('RuntimeError', 'backquote is not supported.', tree)
     frame.add_expt(expt)
@@ -180,7 +186,7 @@ def build_expr(reporter, frame, space, tree, evals):
 
   else:
     # unsupported AST.
-    raise SyntaxError(tree)
+    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._modname, tree.lineno))
 
   assert isinstance(expr, (TypeNode, KeywordArg, tuple)), expr
   evals.append((None, expr))
@@ -373,6 +379,6 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     frame.add_expt(expt)
   
   else:
-    raise SyntaxError('unsupported syntax: %r' % tree)
+    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._modname, tree.lineno))
 
   return
