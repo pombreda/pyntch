@@ -3,47 +3,11 @@
 ##  This module should not be imported as toplevel,
 ##  as it causes circular imports!
 
-from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, UndefinedTypeNode
+from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, BuiltinType, NodeAttrError, UndefinedTypeNode
 from exception import ExceptionType, ExceptionRaiser, TypeChecker, ElementTypeChecker
 from function import KeywordArg, ClassType, InstanceType
 
 ANY_TYPE = False
-
-
-##  BuiltinType
-##
-class BuiltinType(SimpleTypeNode):
-
-  PYTHON_TYPE = 'undefined'
-  
-  def __init__(self):
-    SimpleTypeNode.__init__(self, self)
-    return
-
-  def __repr__(self):
-    return '<type %s>' % self.get_name()
-
-  # get_name()
-  # returns the name of the Python type of this object.
-  @classmethod
-  def get_name(klass):
-    return klass.PYTHON_TYPE.__name__
-
-  # get_type()
-  TYPE = None
-  @classmethod
-  def get_type(klass):
-    if not klass.TYPE:
-      klass.TYPE = klass()
-    return klass.TYPE
-
-  # get_object()
-  OBJECT = None
-  @classmethod
-  def get_object(klass):
-    if not klass.OBJECT:
-      klass.OBJECT = SimpleTypeNode(klass.get_type())
-    return klass.OBJECT
 
 
 ##  BuiltinFunc

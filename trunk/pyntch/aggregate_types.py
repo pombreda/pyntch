@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
+from typenode import SimpleTypeNode, CompoundTypeNode, BuiltinType, NodeTypeError, NodeAttrError
 from exception import ExceptionType, ExceptionRaiser, TypeChecker
-from builtin_types import BuiltinType, BuiltinFunc, BuiltinConstFunc, \
+from builtin_types import BuiltinFunc, BuiltinConstFunc, \
      BoolType, IntType, NoneType, ANY_TYPE
-from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError
 
 
 ##  BuiltinAggregateObject
@@ -57,11 +57,10 @@ class ListType(BuiltinType, BuiltinFunc):
     
     def recv(self, src):
       for obj in src.types:
-        if obj.is_type(ListType.get_type()):
-          self.update_types(set([obj]))
-        elif obj.is_type(TupleType.get_type()):
-          self.update_types(set([ListObject(elemall=obj.elemall)]))
-        else:
+        try:
+          elemall = obj.get_iter(self)
+          self.update_types(set([ListObject(elemall=elemall)]))
+        except NodeTypeError:
           self.raise_expt(ExceptionType(
             'TypeError',
             'cannot convert to list: %s' % obj))
@@ -239,11 +238,10 @@ class TupleType(BuiltinType, BuiltinFunc):
     
     def recv(self, src):
       for obj in src.types:
-        if obj.is_type(TupleType.get_type()):
-          self.update_types(set([obj]))
-        elif obj.is_type(ListType.get_type()):
-          self.update_types(set([TupleObject(elemall=obj.elemall)]))
-        else:
+        try:
+          elemall = obj.get_iter(self)
+          self.update_types(set([TupleObject(elemall=elemall)]))
+        except NodeTypeError:
           self.raise_expt(ExceptionType(
             'TypeError',
             'cannot convert to tuple: %s' % obj))
@@ -415,6 +413,98 @@ class GeneratorSlot(CompoundTypeNode):
     return
 
 
+##  SetObject
+##
+class SetType(BuiltinType, BuiltinFunc):
+
+  PYTHON_TYPE = set
+
+  class SetConversion(CompoundTypeNode, ExceptionRaiser):
+    
+    def __init__(self, parent_frame, loc):
+      CompoundTypeNode.__init__(self)
+      ExceptionRaiser.__init__(self, parent_frame, loc)
+      return
+    
+    def recv(self, src):
+      for obj in src.types:
+        try:
+          elemall = obj.get_iter(self)
+          self.update_types(set([SetObject(elemall=elemall)]))
+        except NodeTypeError:
+          self.raise_expt(ExceptionType(
+            'TypeError',
+            'cannot convert to set: %s' % obj))
+      return
+  
+  def process_args(self, caller, args):
+    if args:
+      setobj = self.SetConversion(caller, caller.loc)
+      args[0].connect(setobj)
+      return setobj
+    else:
+      return SetObject.get_null()
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'set', [], [ANY_TYPE])
+    return
+
+class SetObject(BuiltinAggregateObject):
+
+  TYPEOBJ = SetType.get_type()
+  
+  def __init__(self, elements=None, elemall=None):
+    if elements == None:
+      assert elemall != None
+      self.elemall = elemall
+    else:
+      assert elements != None
+      self.elemall = ElementAll(elements)
+    BuiltinAggregateObject.__init__(self)
+    return
+  
+  def __repr__(self):
+    return '([%s])' % (self.elemall)
+
+  def copy(self):
+    return SetObject(elemall=self.elemall)
+
+  def get_attr(self, name):
+    if name == 'add':
+      return XXX
+    elif name == 'clear':
+      return XXX
+    elif name == 'copy':
+      return XXX
+    elif name == 'difference':
+      return XXX
+    elif name == 'difference_update':
+      return XXX
+    elif name == 'discard':
+      return XXX
+    elif name == 'intersection':
+      return XXX
+    elif name == 'intersection_update':
+      return XXX
+    elif name == 'issubset':
+      return XXX
+    elif name == 'issuperset':
+      return XXX
+    elif name == 'pop':
+      return XXX
+    elif name == 'remove':
+      return XXX
+    elif name == 'symmetric_difference':
+      return XXX
+    elif name == 'symmetric_difference_update':
+      return XXX
+    elif name == 'union':
+      return XXX
+    elif name == 'update':
+      return XXX
+    raise NodeAttrError(name)
+  
+
 ##  DictObject
 ##
 class DictType(BuiltinType, BuiltinFunc):
@@ -523,79 +613,5 @@ class DictObject(BuiltinAggregateObject):
 
   def get_iter(self, caller):
     return self.key
-  
-
-##  SetObject
-##
-class SetType(BuiltinType, BuiltinFunc):
-
-  PYTHON_TYPE = set
-  
-  def process_args(self, caller, args):
-    return SetObject(args)
-
-  def __init__(self):
-    BuiltinFunc.__init__(self, 'set', [], [ANY_TYPE])
-    return
-
-class SetObject(BuiltinAggregateObject):
-
-  TYPEOBJ = SetType
-
-  ##  Item
-  class Item(CompoundTypeNode):
-    def __init__(self, objs):
-      CompoundTypeNode.__init__(self)
-      for obj in objs:
-        obj.connect(self)
-      return
-
-  def __init__(self, elems):
-    self.elem = CompoundTypeNode()
-    for elem in elems:
-      elem.connect(self.elem)
-    BuiltinAggregateObject.__init__(self)
-    return
-  
-  def __repr__(self):
-    return '([%s])' % (self.elem)
-
-  def copy(self):
-    return SetObject([self.elem])
-
-  def get_attr(self, name):
-    if name == 'add':
-      return XXX
-    elif name == 'clear':
-      return XXX
-    elif name == 'copy':
-      return XXX
-    elif name == 'difference':
-      return XXX
-    elif name == 'difference_update':
-      return XXX
-    elif name == 'discard':
-      return XXX
-    elif name == 'intersection':
-      return XXX
-    elif name == 'intersection_update':
-      return XXX
-    elif name == 'issubset':
-      return XXX
-    elif name == 'issuperset':
-      return XXX
-    elif name == 'pop':
-      return XXX
-    elif name == 'remove':
-      return XXX
-    elif name == 'symmetric_difference':
-      return XXX
-    elif name == 'symmetric_difference_update':
-      return XXX
-    elif name == 'union':
-      return XXX
-    elif name == 'update':
-      return XXX
-    raise NodeAttrError(name)
   
 

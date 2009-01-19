@@ -160,3 +160,41 @@ class UndefinedTypeNode(TypeNode):
     return self
   def call(self, caller, args):
     return self
+
+
+##  BuiltinType
+##
+class BuiltinType(SimpleTypeNode):
+
+  PYTHON_TYPE = 'undefined'
+  
+  def __init__(self):
+    SimpleTypeNode.__init__(self, self)
+    return
+
+  def __repr__(self):
+    return '<type %s>' % self.get_name()
+
+  # get_name()
+  # returns the name of the Python type of this object.
+  @classmethod
+  def get_name(klass):
+    return klass.PYTHON_TYPE.__name__
+
+  # get_type()
+  TYPE = None
+  @classmethod
+  def get_type(klass):
+    if not klass.TYPE:
+      klass.TYPE = klass()
+    return klass.TYPE
+
+  # get_object()
+  OBJECT = None
+  @classmethod
+  def get_object(klass):
+    if not klass.OBJECT:
+      klass.OBJECT = SimpleTypeNode(klass.get_type())
+    return klass.OBJECT
+
+
