@@ -307,6 +307,24 @@ class NotOp(CompoundTypeNode, ExceptionRaiser):
     return
 
 
+##  IfExpOp
+##
+class IfExpOp(CompoundTypeNode, ExceptionRaiser):
+  
+  def __init__(self, parent_frame, loc, test, then, else_):
+    self.test = test
+    self.then = then
+    self.else_ = else_
+    CompoundTypeNode.__init__(self)
+    ExceptionRaiser.__init__(self, parent_frame, loc)
+    then.connect(self)
+    else_.connect(self)
+    return
+  
+  def __repr__(self):
+    return '%r if %r else %r' % (self.then, self.test, self.else_)
+
+
 ##  SubRef
 ##
 class SubRef(CompoundTypeNode, ExceptionRaiser):

@@ -270,6 +270,10 @@ class Namespace:
     elif isinstance(tree, ast.Lambda):
       for value in tree.defaults:
         self.register_names(value)
+    elif isinstance(tree, ast.IfExp):
+      self.register_names(tree.test)
+      self.register_names(tree.then)
+      self.register_names(tree.else_)
     elif isinstance(tree, ast.Backquote):
       self.register_names(tree.expr)
 

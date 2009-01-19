@@ -402,7 +402,7 @@ class ClassType(BuiltinType, TreeReporter):
   
   def show(self, p):
     if self.bases:
-      p('class %s(%s):' % (self.name, ', '.join( var.name for var in self.bases )))
+      p('class %s(%s):' % (self.name, ', '.join( repr(base) for base in self.bases )))
     else:
       p('class %s:' % self.name)
     blocks = set( name for (name,_) in self.children )

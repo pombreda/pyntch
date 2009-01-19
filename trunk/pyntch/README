@@ -3,6 +3,7 @@ README
 
 
 # TODO:
+#  it.next(), gen.send(), etc.
 #  __add__, __eq__, __iter__ etc.
 #  automatic coercion
 
