@@ -3,9 +3,9 @@ README
 
 
 # TODO:
-#  it.next(), gen.send(), etc.
-#  __add__, __eq__, __iter__ etc.
-#  automatic coercion
+#  iterator support: it.next(), gen.send(), etc.
+#  optional method: __add__, __eq__, __iter__ etc.
+#  automatic coercion.
 
 Pyntch is a PYthoN Type CHecker.  It examines a Python source code
 and infers possible types of the variables, class attributes, and

@@ -16,3 +16,4 @@ class A:
 
 a = A(123)
 a.foo(456)
+print a.z

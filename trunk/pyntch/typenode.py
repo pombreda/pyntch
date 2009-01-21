@@ -119,8 +119,10 @@ class CompoundTypeNode(TypeNode):
   def desc1(self, done):
     if self in done:
       return '...'
+    elif self.types:
+      return ('|'.join( obj.desc1(done.union([self])) for obj in self.types ))
     else:
-      return ('{%s}' % '|'.join( obj.desc1(done.union([self])) for obj in self.types ))
+      return '?'
                                   
   def recv(self, src):
     self.update_types(src.types)
@@ -196,5 +198,3 @@ class BuiltinType(SimpleTypeNode):
     if not klass.OBJECT:
       klass.OBJECT = SimpleTypeNode(klass.get_type())
     return klass.OBJECT
-
-
