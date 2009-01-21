@@ -150,14 +150,11 @@ class ExceptionCatcher(ExceptionFrame):
 ##
 class ExceptionRaiser(ExceptionFrame):
 
-  nodes = None
-
   def __init__(self, parent, loc):
-    ExceptionFrame.__init__(self)
     assert not loc or isinstance(loc, ast.Node), loc
     self.loc = loc
+    ExceptionFrame.__init__(self)
     ExceptionFrame.connect_expt(self, parent)
-    ExceptionRaiser.nodes.append(self)
     return
   
   def raise_expt(self, expt):
@@ -165,23 +162,33 @@ class ExceptionRaiser(ExceptionFrame):
     ExceptionFrame.raise_expt(self, expt)
     return
   
-  def finish(self):
+
+##  MustBeDefinedNode
+##
+class MustBeDefinedNode(CompoundTypeNode, ExceptionRaiser):
+
+  nodes = None
+  
+  def __init__(self, parent, loc):
+    CompoundTypeNode.__init__(self)
+    ExceptionRaiser.__init__(self, parent, loc)
+    MustBeDefinedNode.nodes.append(self)
     return
   
-  ###
   @classmethod
   def reset(klass):
     klass.nodes = []
     return
   
   @classmethod
-  def runall(klass):
+  def check(klass):
     for node in klass.nodes:
-      node.finish()
+      if not node.types:
+        node.raise_expt(node.undefined())
     return
 
 
-##  ExceptinoMaker
+##  ExceptionMaker
 ##
 ##  Special behaviour on raising an exception.
 ##
@@ -236,7 +243,7 @@ class TypeChecker(CompoundTypeNode):
     return
 
   def __repr__(self):
-    return ('<TypeChecker: %s: {%s}>' % 
+    return ('<TypeChecker: %s: %s>' % 
             (','.join(map(repr, self.types)),
              '|'.join(map(repr, self.validtypes))))
 
@@ -255,7 +262,7 @@ class TypeChecker(CompoundTypeNode):
         s = '|'.join( typeobj.get_typename() for typeobj in self.validtypes )
         self.parent_frame.raise_expt(ExceptionType(
           'TypeError',
-          '%s (%s) must be {%s}' % (self.blame, obj, s),
+          '%s (%s) must be %s' % (self.blame, obj, s),
           self.loc))
     self.update_types(types)
     return
@@ -284,6 +291,6 @@ class ElementTypeChecker(TypeChecker):
       elif self.blame:
         self.parent_frame.raise_expt(ExceptionType(
           'TypeError',
-          '%s (%s) must be [{%s}]' % (self.blame, obj, '|'.join(map(repr, self.validtypes)))))
+          '%s (%s) must be [%s]' % (self.blame, obj, '|'.join(map(repr, self.validtypes)))))
     self.update_types(types)
     return

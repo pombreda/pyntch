@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError
-from exception import ExceptionType, ExceptionFrame, ExceptionRaiser
+from exception import ExceptionType, ExceptionFrame, ExceptionRaiser, MustBeDefinedNode
 
 
 ##  FunCall
@@ -35,14 +35,13 @@ class FunCall(CompoundTypeNode, ExceptionRaiser):
 
 ##  AttrRef
 ##
-class AttrRef(CompoundTypeNode, ExceptionRaiser):
+class AttrRef(MustBeDefinedNode):
   
   def __init__(self, parent_frame, loc, target, attrname):
     self.target = target
     self.attrname = attrname
     self.objs = set()
-    CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    MustBeDefinedNode.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
     return
 
@@ -61,12 +60,9 @@ class AttrRef(CompoundTypeNode, ExceptionRaiser):
           'cannot get attribute: %r might be %r, no attr %s' % (self.target, obj, self.attrname)))
     return
 
-  def finish(self):
-    if not self.types:
-      self.raise_expt(ExceptionType(
-        'AttributeError',
-        'attribute not defined: %r.%s' % (self.target, self.attrname)))
-    return
+  def undefined(self):
+    return ExceptionType('AttributeError',
+                         'attribute not defined: %r.%s' % (self.target, self.attrname))
 
 
 ##  AttrAssign

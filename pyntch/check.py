@@ -2,7 +2,7 @@
 
 import sys
 from typenode import TypeNode
-from exception import ExceptionFrame, ExceptionRaiser
+from exception import ExceptionFrame, MustBeDefinedNode
 from namespace import Namespace
 from module import load_module
 
@@ -31,9 +31,9 @@ def main(argv):
     else:
       name = fname
     print '===', name, '==='
-    ExceptionRaiser.reset()
+    MustBeDefinedNode.reset()
     module = load_module(name, debug=debug, modpath=modpath)
-    ExceptionRaiser.runall()
+    MustBeDefinedNode.check()
     module.showrec(sys.stdout)
   return 0
 
