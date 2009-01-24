@@ -2,7 +2,8 @@
 
 from compiler import ast
 from typenode import TypeNode, UndefinedTypeNode
-from exception import ExceptionType, ExceptionFrame, ExceptionCatcher, ExceptionMaker, TypeChecker
+from exception import ExceptionFrame, ExceptionCatcher, ExceptionMaker, TypeChecker
+from exception import NameErrorType, RuntimeErrorType
 from function import KeywordArg, FuncType, LambdaFuncType, ClassType
 from expression import AttrAssign, AttrRef, SubAssign, SubRef, IterRef, SliceAssign, SliceRef, \
      FunCall, BinaryOp, CompareOp, BooleanOp, AssignOp, UnaryOp, NotOp, IfExpOp
@@ -44,8 +45,8 @@ def build_assign(reporter, frame, space, n, v, evals):
 ##  Constructs a TypeNode from a given syntax tree.
 ##
 def build_expr(reporter, frame, space, tree, evals):
-  from builtin_types import BUILTIN_OBJECTS
-  from aggregate_types import ListObject, DictObject, TupleObject, GeneratorSlot
+  from builtin_types import BUILTIN_OBJECTS, GeneratorSlot
+  from aggregate_types import ListObject, DictObject, TupleObject
 
   if isinstance(tree, ast.Const):
     typename = type(tree.value).__name__
@@ -55,18 +56,18 @@ def build_expr(reporter, frame, space, tree, evals):
     try:
       expr = space[tree.name]
     except KeyError:
-      expt = ExceptionType('NameError', 'name %r is not defined.' % tree.name, tree)
-      frame.add_expt(expt)
+      frame.add_expt(NameErrorType.occur('name %r is not defined.' % tree.name, tree))
       expr = UndefinedTypeNode(tree.name)
 
   elif isinstance(tree, ast.CallFunc):
     func = build_expr(reporter, frame, space, tree.node, evals)
-    args = tuple( build_expr(reporter, frame, space, arg1, evals) for arg1 in tree.args )
-    expr = FunCall(frame, tree, func, args)
+    args = tuple( build_expr(reporter, frame, space, arg1, evals)
+                  for arg1 in tree.args if not isinstance(arg1, ast.Keyword) )
+    kwargs = dict( (arg1.name, build_expr(reporter, frame, space, arg1.expr, evals))
+                   for arg1 in tree.args if isinstance(arg1, ast.Keyword) )
+    # XXX handle: tree.star_args, tree.dstar_args
+    expr = FunCall(frame, tree, func, args, kwargs)
 
-  elif isinstance(tree, ast.Keyword):
-    expr = KeywordArg(tree.name, build_expr(reporter, frame, space, tree.expr, evals))
-    
   elif isinstance(tree, ast.Getattr):
     obj = build_expr(reporter, frame, space, tree.expr, evals)
     expr = AttrRef(frame, tree, obj, tree.attrname)
@@ -180,8 +181,7 @@ def build_expr(reporter, frame, space, tree, evals):
     expr = IfExpOp(frame, tree, test, then, else_)
 
   elif isinstance(tree, ast.Backquote):
-    expt = ExceptionType('RuntimeError', 'backquote is not supported.', tree)
-    frame.add_expt(expt)
+    frame.add_expt(RuntimeErrorType.occur('backquote is not supported.', tree))
     expr = UndefinedTypeNode('backquote')
 
   else:
@@ -232,7 +232,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     if tree.decorators:
       for node in tree.decorators:
         decor = build_expr(reporter, frame, space, node, evals)
-        func = FunCall(frame, tree, decor, [func])
+        func = FunCall(frame, tree, decor, (func,))
     space[name].bind(func)
 
   # class
@@ -252,8 +252,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, ast.AugAssign):
     left = build_expr(reporter, frame, space, tree.node, evals)
     if isinstance(left, UndefinedTypeNode):
-      expt = ExceptionType('NameError', 'cannot assign to an undefined variable.', tree)
-      frame.add_expt(expt)
+      frame.add_expt(NameErrorType.occur('cannot assign to an undefined variable.', tree))
     else:
       right = build_expr(reporter, frame, space, tree.expr, evals)
       value = AssignOp(frame, tree, tree.op, left, right)
@@ -330,12 +329,10 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     if tree.expr2:
       expttype = build_expr(reporter, frame, space, tree.expr1, evals)
       exptarg = build_expr(reporter, frame, space, tree.expr2, evals)
-      expt = ExceptionMaker(frame, tree, expttype, (exptarg,))
-      frame.add_expt(expt)
+      frame.add_expt(ExceptionMaker(frame, tree, expttype, (exptarg,)))
     elif tree.expr1:
       expttype = build_expr(reporter, frame, space, tree.expr1, evals)
-      expt = ExceptionMaker(frame, tree, expttype, ())
-      frame.add_expt(expt)
+      frame.add_expt(ExceptionMaker(frame, tree, expttype, ()))
 
   # printnl
   elif isinstance(tree, (ast.Print, ast.Printnl)):
@@ -372,11 +369,11 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
 
   elif isinstance(tree, ast.Assert):
     build_typecheck(reporter, frame, space, tree.test, evals)
+    build_expr(reporter, frame, space, tree.test, evals)
 
   # unsupported
   elif isinstance(tree, ast.Exec):
-    expt = ExceptionType('RuntimeError', 'exec is not supported.', tree)
-    frame.add_expt(expt)
+    frame.add_expt(RuntimeErrorType.occur('exec is not supported.', tree))
   
   else:
     raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._modname, tree.lineno))

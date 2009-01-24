@@ -17,13 +17,16 @@ path = ['']
 platform = ''
 prefix = ''
 pydebug = False
-stderr = file('')
-stdin = file('')
-stdout = file('')
+try:
+  stderr = file('')
+  stdin = file('')
+  stdout = file('')
+except:
+  pass
 subversion = ('', '', '')
 version = ''
 version_info = (0, 0, 0, '', 0)
-warnoptions = []
+warnoptions = ['']
 
 class frame(object): pass
 

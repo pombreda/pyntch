@@ -40,14 +40,17 @@ class TypeNode(object):
   debug = 0
 
   def __init__(self, types):
-    self.types = set(types)
+    self.types = types
     self.sendto = []
     return
+
+  def __iter__(self):
+    return iter(self.types)
 
   def connect(self, node, receiver=None):
     #assert isinstance(node, CompoundTypeNode), node
     if self.debug:
-      print >>stderr, 'connect: %r :- %r' % (node, self)
+      print >>stderr, 'connect: %r -> %r' % (self, node)
     receiver = receiver or node.recv
     self.sendto.append(receiver)
     receiver(self)
@@ -56,15 +59,19 @@ class TypeNode(object):
   def recv(self, src):
     raise NodeTypeError('cannot receive a value.')
 
-  def get_attr(self, name):
+  def get_attr(self, name, write=False):
     raise NodeAttrError(name)
-  def get_element(self, caller, subs, write=False):
+  def get_element(self, frame, subs, write=False):
     raise NodeTypeError('not subscriptable')
-  def get_iter(self, caller):
+  def get_iter(self, frame):
     raise NodeTypeError('not iterator')
-  def call(self, caller, args):
+  def call(self, frame, args, kwargs):
     raise NodeTypeError('not callable')
+  def get_seq(self, frame):
+    return self.get_iter(frame).get_attr('next').call(frame, (), {})
   
+  def equal(self, obj, _):
+    raise NotImplementedError
   def describe(self):
     return self.desc1(set())
   def desc1(self, _):
@@ -98,6 +105,8 @@ class SimpleTypeNode(TypeNode):
   def desc1(self, _):
     return repr(self)
 
+  def equal(self, obj, _):
+    return self is obj
 
 ##  CompoundTypeNode
 ##
@@ -111,10 +120,17 @@ class CompoundTypeNode(TypeNode):
   def __repr__(self):
     return self.describe()
 
-  def __eq__(self, obj):
-    return isinstance(obj, CompoundTypeNode) and self.types == obj.types
-  def __hash__(self):
-    return self._hashval
+  def equal(self, obj, done):
+    if not isinstance(obj, CompoundTypeNode): return False
+    if len(self.types) != len(obj.types): return False
+    if (self in done) and (obj in done):
+      return True
+    if (self in done) or (obj in done):
+      return False
+    done = done.union([self,obj])
+    for (t1,t2) in zip(self.types, obj.types):
+      if not t1.equal(t2, done): return False
+    return True
 
   def desc1(self, done):
     if self in done:
@@ -129,12 +145,14 @@ class CompoundTypeNode(TypeNode):
     return
 
   def update_types(self, types):
-    diff = types.difference(self.types)
-    if not diff: return
-    self.types.update(diff)
-    self._hashval = 0
-    for obj in self.types:
-      self._hashval ^= hash(obj)
+    d = []
+    for obj1 in types:
+      for obj2 in self.types:
+        if obj1.equal(obj2, set()): break
+      else:
+        d.append(obj1)
+    if not d: return
+    self.types.extend(d)
     for receiver in self.sendto:
       receiver(self)
     return
@@ -154,13 +172,13 @@ class UndefinedTypeNode(TypeNode):
   def desc1(self, _):
     return '(undef)'
 
-  def get_attr(self, name):
+  def get_attr(self, name, write=False):
     return self
-  def get_element(self, caller, subs, write=False):
+  def get_element(self, frame, subs, write=False):
     return self
-  def get_iter(self, caller):
+  def get_iter(self, frame):
     return self
-  def call(self, caller, args):
+  def call(self, frame, args, kwargs):
     return self
 
 
@@ -168,7 +186,7 @@ class UndefinedTypeNode(TypeNode):
 ##
 class BuiltinType(SimpleTypeNode):
 
-  PYTHON_TYPE = 'undefined'
+  PYTHON_TYPE = None
   
   def __init__(self):
     SimpleTypeNode.__init__(self, self)
@@ -177,16 +195,23 @@ class BuiltinType(SimpleTypeNode):
   def __repr__(self):
     return '<type %s>' % self.get_name()
 
+  
+  @classmethod
+  def get_type(klass):
+    from builtin_types import TypeType
+    return TypeType.get_typeobj()
+
   # get_name()
   # returns the name of the Python type of this object.
   @classmethod
   def get_name(klass):
+    assert isinstance(klass.PYTHON_TYPE, type)
     return klass.PYTHON_TYPE.__name__
 
-  # get_type()
+  # get_typeobj()
   TYPE = None
   @classmethod
-  def get_type(klass):
+  def get_typeobj(klass):
     if not klass.TYPE:
       klass.TYPE = klass()
     return klass.TYPE
@@ -196,5 +221,5 @@ class BuiltinType(SimpleTypeNode):
   @classmethod
   def get_object(klass):
     if not klass.OBJECT:
-      klass.OBJECT = SimpleTypeNode(klass.get_type())
+      klass.OBJECT = SimpleTypeNode(klass.get_typeobj())
     return klass.OBJECT

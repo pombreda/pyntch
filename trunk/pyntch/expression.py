@@ -1,35 +1,34 @@
 #!/usr/bin/env python
 
 from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError
-from exception import ExceptionType, ExceptionFrame, ExceptionRaiser, MustBeDefinedNode
+from exception import ExceptionFrame, ExceptionRaiser, MustBeDefinedNode, \
+     TypeErrorType, AttributeErrorType
 
 
 ##  FunCall
 ##
 class FunCall(CompoundTypeNode, ExceptionRaiser):
   
-  def __init__(self, parent_frame, loc, func, args):
+  def __init__(self, parent_frame, loc, func, args, kwargs={}):
     self.func = func
     self.args = args
+    self.kwargs = kwargs
     CompoundTypeNode.__init__(self)
     ExceptionRaiser.__init__(self, parent_frame, loc)
     func.connect(self, self.recv_func)
     return
 
   def __repr__(self):
-    return '<call %r(%s)>' % (self.func, ','.join(map(repr, self.args)))
+    return ('<call %r(%s)>' %
+            (self.func, ', '.join(map(repr, self.args) +
+                                  [ '%s=%r' % (k,v) for (k,v) in self.kwargs.iteritems() ])))
 
   def recv_func(self, src):
-    for func in src.types:
+    for obj in src:
       try:
-        result = func.call(self, self.args)
-        result.connect(self)
-        if isinstance(result, ExceptionFrame):
-          result.connect_expt(self)
+        obj.call(self, self.args, self.kwargs).connect(self)
       except NodeTypeError:
-        self.raise_expt(ExceptionType(
-          'TypeError',
-          'cannot call: %r might be %r' % (self.func, func)))
+        self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.func, func)))
     return
 
 
@@ -40,29 +39,24 @@ class AttrRef(MustBeDefinedNode):
   def __init__(self, parent_frame, loc, target, attrname):
     self.target = target
     self.attrname = attrname
-    self.objs = set()
     MustBeDefinedNode.__init__(self, parent_frame, loc)
-    self.target.connect(self, self.recv_target)
+    target.connect(self, self.recv_target)
     return
 
   def __repr__(self):
     return '%r.%s' % (self.target, self.attrname)
 
   def recv_target(self, src):
-    self.objs.update(src.types)
-    for obj in self.objs:
+    for obj in src:
       try:
-        attr = obj.get_attr(self.attrname)
-        attr.connect(self)
+        obj.get_attr(self.attrname).connect(self)
       except NodeAttrError:
-        self.raise_expt(ExceptionType(
-          'AttributeError',
-          'cannot get attribute: %r might be %r, no attr %s' % (self.target, obj, self.attrname)))
+        self.raise_expt(AttributeErrorType.occur(
+          'cannot get attribute: %r might be %r, no attr %s.' % (self.target, obj, self.attrname)))
     return
 
   def undefined(self):
-    return ExceptionType('AttributeError',
-                         'attribute not defined: %r.%s' % (self.target, self.attrname))
+    return AttributeErrorType.occur('attribute not defined: %r.%s' % (self.target, self.attrname))
 
 
 ##  AttrAssign
@@ -72,30 +66,22 @@ class AttrAssign(CompoundTypeNode, ExceptionRaiser):
   def __init__(self, parent_frame, loc, target, attrname, value):
     self.target = target
     self.attrname = attrname
-    self.objs = set()
     self.value = value
     CompoundTypeNode.__init__(self)
     ExceptionRaiser.__init__(self, parent_frame, loc)
-    self.target.connect(self, self.recv_target)
+    target.connect(self, self.recv_target)
     return
 
   def __repr__(self):
     return 'assign(%r.%s, %r)' % (self.target, self.attrname, self.value)
 
   def recv_target(self, src):
-    self.objs.update(src.types)
-    for obj in self.objs:
+    for obj in src:
       try:
-        attr = obj.get_attr(self.attrname)
-        self.value.connect(attr)
-      except NodeAttrError:
-        self.raise_expt(ExceptionType(
-          'AttributeError',
+        self.value.connect(obj.get_attr(self.attrname, write=True))
+      except (NodeAttrError, NodeTypeError):
+        self.raise_expt(AttributeErrorType.occur(
           'cannot assign attribute: %r might be %r, no attr %s' % (self.target, obj, self.attrname)))
-      except NodeTypeError:
-        self.raise_expt(ExceptionType(
-          'AttributeError',
-          'cannot assign attribute: %r might be %r, readonly %s' % (self.target, obj, self.attrname)))        
     return
 
 
@@ -105,26 +91,17 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, op, left, right):
     self.op = op
-    self.left_types = set()
-    self.right_types = set()
-    self.combinations = set()
+    self.left = left
+    self.right = right
+    self.done = set()
     CompoundTypeNode.__init__(self)
     ExceptionRaiser.__init__(self, parent_frame, loc)
-    left.connect(self, self.recv_left)
-    right.connect(self, self.recv_right)
+    left.connect(self)
+    right.connect(self)
     return
   
   def __repr__(self):
-    return '%s(%r,%r)' % (self.op, self.left_types, self.right_types)
-
-  def recv_left(self, src):
-    self.left_types.update(src.types)
-    self.update()
-    return
-  def recv_right(self, src):
-    self.right_types.update(src.types)
-    self.update()
-    return
+    return '%s(%r,%r)' % (self.op, self.left, self.right)
 
   VALID_TYPES = {
     ('str', 'Mul', 'int'): 'str',
@@ -132,69 +109,68 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
     ('unicode', 'Mul', 'int'): 'unicode',
     ('int', 'Mul', 'unicode'): 'unicode',
     }
-  def update(self):
+  def recv(self, _):
     from builtin_types import BUILTIN_OBJECTS, NumberType, IntType, BaseStringType
     from aggregate_types import ListType, ListObject, TupleType, TupleObject
-    for lobj in list(self.left_types):
-      for robj in list(self.right_types):
-        if (lobj,robj) in self.combinations: continue
-        self.combinations.add((lobj,robj))
+    for lobj in self.left:
+      for robj in self.right:
+        if (lobj,robj) in self.done: continue
+        self.done.add((lobj,robj))
         # special handling for a formatting (%) operator
-        if (lobj.is_type(BaseStringType.get_type()) and
+        if (lobj.is_type(BaseStringType.get_typeobj()) and
             self.op == 'Mod'):
-          self.update_types(set([lobj]))
+          self.update_types([lobj])
           continue
         # for numeric operation, the one with a higher rank is chosen.
-        if (lobj.is_type(NumberType.get_type()) and robj.is_type(NumberType.get_type()) and
+        if (lobj.is_type(NumberType.get_typeobj()) and robj.is_type(NumberType.get_typeobj()) and
             self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power')):
           if lobj.get_type().get_rank() < robj.get_type().get_rank():
-            self.update_types(set([robj]))
+            self.update_types([robj])
           else:
-            self.update_types(set([lobj]))
+            self.update_types([lobj])
           continue
-        if (lobj.is_type(IntType.get_type()) and robj.is_type(IntType.get_type()) and
+        if (lobj.is_type(IntType.get_typeobj()) and robj.is_type(IntType.get_typeobj()) and
             self.op in ('Bitand','Bitor','Bitxor')):
-          self.update_types(set([robj]))
+          self.update_types([robj])
           continue
         # for string operation, only Add is supported.
-        if (lobj.is_type(BaseStringType.get_type()) and robj.is_type(BaseStringType.get_type()) and
+        if (lobj.is_type(BaseStringType.get_typeobj()) and robj.is_type(BaseStringType.get_typeobj()) and
             self.op == 'Add'):
-          self.update_types(set([lobj]))
+          self.update_types([lobj])
           continue
         # for list operation, only Add and Mul is supported.
-        if (lobj.is_type(ListType.get_type()) and robj.is_type(ListType.get_type()) and
+        if (lobj.is_type(ListType.get_typeobj()) and robj.is_type(ListType.get_typeobj()) and
             self.op == 'Add'):
-          self.update_types(set([ListObject.concat(lobj, robj)]))
+          self.update_types([ListObject.concat(lobj, robj)])
           continue
-        if (lobj.is_type(ListType.get_type()) and robj.is_type(IntType.get_type()) and
+        if (lobj.is_type(ListType.get_typeobj()) and robj.is_type(IntType.get_typeobj()) and
             self.op == 'Mul'):
-          self.update_types(set([ListObject.multiply(lobj)]))
+          self.update_types([ListObject.multiply(lobj)])
           continue
-        if (lobj.is_type(IntType.get_type()) and robj.is_type(ListType.get_type()) and
+        if (lobj.is_type(IntType.get_typeobj()) and robj.is_type(ListType.get_typeobj()) and
             self.op == 'Mul'):
-          self.update_types(set([ListObject.multiply(robj)]))
+          self.update_types([ListObject.multiply(robj)])
           continue
         # for tuple operation, only Add and Mul is supported.
-        if (lobj.is_type(TupleType.get_type()) and robj.is_type(TupleType.get_type()) and
+        if (lobj.is_type(TupleType.get_typeobj()) and robj.is_type(TupleType.get_typeobj()) and
             self.op == 'Add'):
-          self.update_types(set([TupleObject.concat(lobj, robj)]))
+          self.update_types([TupleObject.concat(lobj, robj)])
           continue
-        if (lobj.is_type(TupleType.get_type()) and robj.is_type(IntType.get_type()) and
+        if (lobj.is_type(TupleType.get_typeobj()) and robj.is_type(IntType.get_typeobj()) and
             self.op == 'Mul'):
-          self.update_types(set([TupleObject.multiply(lobj)]))
+          self.update_types([TupleObject.multiply(lobj)])
           continue
-        if (lobj.is_type(IntType.get_type()) and robj.is_type(TupleType.get_type()) and
+        if (lobj.is_type(IntType.get_typeobj()) and robj.is_type(TupleType.get_typeobj()) and
             self.op == 'Mul'):
-          self.update_types(set([TupleObject.multiply(robj)]))
+          self.update_types([TupleObject.multiply(robj)])
           continue
         # other operations.
         k = (lobj.get_typename(), self.op, robj.get_typename())
         if k in self.VALID_TYPES:
           v = BUILTIN_OBJECTS[self.VALID_TYPES[k]]
-          self.update_types(set([v]))
+          self.update_types([v])
           continue
-        self.raise_expt(ExceptionType(
-          'TypeError',
+        self.raise_expt(TypeErrorType.occur(
           'unsupported operand %s for %r and %r' % (self.op, lobj, robj)))
     return
 
@@ -234,7 +210,7 @@ class UnaryOp(CompoundTypeNode, ExceptionRaiser):
       self.op = '-'
     CompoundTypeNode.__init__(self)
     ExceptionRaiser.__init__(self, parent_frame, loc)
-    self.value.connect(self)
+    self.value.connect(self) # XXX
     return
   
   def __repr__(self):
@@ -258,7 +234,7 @@ class CompareOp(CompoundTypeNode, ExceptionRaiser):
   
   def __repr__(self):
     return 'cmp(%r %s)' % (self.expr0,
-                           ','.join( '%s %r' % (op,expr) for (op,expr) in self.comps ))
+                           ', '.join( '%s %r' % (op,expr) for (op,expr) in self.comps ))
   
   def recv(self, _):
     # ignore because CompareOp always returns bool.
@@ -327,7 +303,6 @@ class SubRef(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, target, subs):
     self.target = target
-    self.objs = set()
     self.subs = subs
     CompoundTypeNode.__init__(self)
     ExceptionRaiser.__init__(self, parent_frame, loc)
@@ -338,14 +313,11 @@ class SubRef(CompoundTypeNode, ExceptionRaiser):
     return '%r[%s]' % (self.target, ':'.join(map(repr, self.subs)))
 
   def recv_target(self, src):
-    self.objs.update(src.types)
-    for obj in self.objs:
+    for obj in src:
       try:
         obj.get_element(self, self.subs).connect(self)
       except NodeTypeError:
-        self.raise_expt(ExceptionType(
-          'TypeError',
-          'unsubscriptable object: %r' % obj))
+        self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
 
 
@@ -355,7 +327,6 @@ class SubAssign(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, target, subs, value):
     self.target = target
-    self.objs = set()
     self.subs = subs
     self.value = value
     CompoundTypeNode.__init__(self)
@@ -367,15 +338,11 @@ class SubAssign(CompoundTypeNode, ExceptionRaiser):
     return 'assign(%r%r, %r)' % (self.target, self.subs, self.value)
 
   def recv_target(self, src):
-    self.objs.update(src.types)
-    for obj in self.objs:
+    for obj in src:
       try:
-        elem = obj.get_element(self, self.subs, write=True)
-        self.value.connect(elem)
+        self.value.connect(obj.get_element(self, self.subs, write=True))
       except NodeTypeError:
-        self.raise_expt(ExceptionType(
-          'TypeError',
-          'unsubscriptable object: %r' % obj))
+        self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
 
 
@@ -394,13 +361,11 @@ class IterRef(CompoundTypeNode, ExceptionRaiser):
     return 'iter(%r)' % (self.target,)
 
   def recv_target(self, src):
-    for obj in src.types:
+    for obj in src:
       try:
-        obj.get_iter(self).connect(self)
+        obj.get_seq(self).connect(self)
       except NodeTypeError:
-        self.raise_expt(ExceptionType(
-          'TypeError',
-          '%r is not an iterator: %r' % (self.target, obj)))
+        self.raise_expt(TypeErrorType.occur('%r is not an iterator: %r' % (self.target, obj)))
     return
 
 
@@ -410,7 +375,6 @@ class SliceRef(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, target, lower, upper):
     self.target = target
-    self.objs = set()
     self.lower = lower
     self.upper = upper
     CompoundTypeNode.__init__(self)
@@ -429,14 +393,11 @@ class SliceRef(CompoundTypeNode, ExceptionRaiser):
       return '%r[:]' % self.target
 
   def recv_target(self, src):
-    self.objs.update(src.types)
-    for obj in self.objs:
+    for obj in src:
       try:
         obj.get_element(self, [self.lower, self.upper]).connect(self)
       except NodeTypeError:
-        self.raise_expt(ExceptionType(
-          'TypeError',
-          'unsubscriptable object: %r' % obj))
+        self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
 
 
@@ -446,7 +407,6 @@ class SliceAssign(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, target, lower, upper, value):
     self.target = target
-    self.objs = set()
     self.lower = lower
     self.upper = upper
     self.value = value
@@ -459,15 +419,9 @@ class SliceAssign(CompoundTypeNode, ExceptionRaiser):
     return 'assign(%r[%r:%r], %r)' % (self.target, self.lower, self.upper, self.value)
 
   def recv_target(self, src):
-    self.objs.update(src.types)
-    for obj in self.objs:
+    for obj in src:
       try:
-        elem = obj.get_element(self, [self.lower, self.upper], write=True)
-        self.value.connect(elem)
+        self.value.connect(obj.get_element(self, [self.lower, self.upper], write=True))
       except NodeTypeError:
-        self.raise_expt(ExceptionType(
-          'TypeError',
-          'unsubscriptable object: %r' % obj))
+        self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
-
-

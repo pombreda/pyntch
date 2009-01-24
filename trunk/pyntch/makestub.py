@@ -46,7 +46,7 @@ def main(argv):
       elif typename in IGNORE_TYPES:
         print '%s = %s() # XXX' % (name, typename)
       else:
-        raise TypeError('unknown type: %s (%s)' % (name, typename))
+        print '# XXX unknown type: %s (%s)' % (name, typename)
   return 0
 
 if __name__ == '__main__': sys.exit(main(sys.argv))

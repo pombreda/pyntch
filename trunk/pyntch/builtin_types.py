@@ -4,10 +4,21 @@
 ##  as it causes circular imports!
 
 from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, BuiltinType, NodeAttrError, UndefinedTypeNode
-from exception import ExceptionType, ExceptionRaiser, TypeChecker, ElementTypeChecker
+from exception import ExceptionRaiser, TypeChecker, ElementTypeChecker
+from exception import TypeErrorType, ValueErrorType, IndexErrorType, IOErrorType, EOFErrorType, \
+     UnicodeDecodeErrorType, UnicodeEncodeErrorType
 from function import KeywordArg, ClassType, InstanceType
 
 ANY_TYPE = False
+
+
+# ElementAll
+class ElementAll(CompoundTypeNode):
+  def __init__(self, elements):
+    CompoundTypeNode.__init__(self)
+    for obj in elements:
+      obj.connect(self)
+    return
 
 
 ##  BuiltinFunc
@@ -34,21 +45,19 @@ class BuiltinFunc(SimpleTypeNode):
   def connect_expt(self, frame):
     return
 
-  def process_args(self, caller, args):
+  def process_args(self, caller, args, kwargs):
     raise NotImplementedError
   
-  def call(self, caller, args):
+  def call(self, caller, args, kwargs):
     if len(args) < self.minargs:
-      caller.raise_expt(ExceptionType(
-        'TypeError',
-        'too few argument for %s: %d or more' % (self.name, self.minargs)))
+      caller.raise_expt(TypeErrorType.occur(
+        'too few argument for %s: %d or more.' % (self.name, self.minargs)))
       return UndefinedTypeNode()
     if len(self.args) < len(args):
-      caller.raise_expt(ExceptionType(
-        'TypeError',
-        'too many argument for %s: at most %d' % (self.name, len(self.args))))
+      caller.raise_expt(TypeErrorType.occur(
+        'too many argument for %s: at most %d.' % (self.name, len(self.args))))
       return UndefinedTypeNode()
-    return self.process_args(caller, args)
+    return self.process_args(caller, args, kwargs)
 
 
 ##  BuiltinConstFunc
@@ -66,20 +75,90 @@ class BuiltinConstFunc(BuiltinFunc):
     else:
       return None
 
-  def process_args(self, caller, args):
+  def process_args(self, caller, args, kwargs):
+    if kwargs:
+      caller.raise_expt(TypeErrorType.occur(
+        'cannot take keyword argument: %r' % arg1.name))
     for (i,arg1) in enumerate(args):
-      if isinstance(arg1, KeywordArg):
-        caller.raise_expt(ExceptionType(
-          'TypeError',
-          'cannot take keyword argument: %r' % arg1.name))
-      else:
-        assert isinstance(arg1, TypeNode)
-        rcpt = self.accept_arg(caller, i)
-        if rcpt:
-          arg1.connect(rcpt)
+      assert isinstance(arg1, TypeNode)
+      rcpt = self.accept_arg(caller, i)
+      if rcpt:
+        arg1.connect(rcpt)
     for expt in self.expts:
       caller.raise_expt(expt)
     return self.retype
+
+
+##  IterObject
+##
+class IterObject(SimpleTypeNode):
+
+  def __init__(self, elements=None, elemall=None):
+    if elements == None:
+      assert elemall != None
+      self.elemall = elemall
+    else:
+      assert elements != None
+      self.elemall = ElementAll(elements)
+    SimpleTypeNode.__init__(self, self)
+    return
+  
+  def __repr__(self):
+    return '(%s, ...)' % self.elemall
+
+  @classmethod
+  def get_typename(klass):
+    return 'iterator'
+
+  def desc1(self, done):
+    return '(%s, ...)' % self.elemall.desc1(done)
+
+  def get_iter(self, caller):
+    return self
+
+  def get_attr(self, name, write=False):
+    if name == 'next':
+      return BuiltinConstFunc('iter.next', self.elemall)
+    raise NodeAttrError(name)
+
+##  IterFunc
+##
+class IterFunc(BuiltinFunc):
+
+  class IterConversion(CompoundTypeNode, ExceptionRaiser):
+    
+    def __init__(self, parent_frame, loc, obj):
+      self.iterobj = IterObject([])
+      CompoundTypeNode.__init__(self, [self.iterobj])
+      ExceptionRaiser.__init__(self, parent_frame, loc)
+      obj.connect(self)
+      return
+    
+    def recv(self, src):
+      for obj in src:
+        try:
+          obj.get_iter(self).connect(self.iterobj.elemall)
+        except NodeTypeError:
+          self.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
+      return self.iterobj
+  
+  def process_args(self, caller, args):
+    return self.IterConversion(caller, caller.loc, args[0])
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'iter', [ANY_TYPE])
+    return
+  
+
+
+##  GeneratorSlot
+##
+class GeneratorSlot(CompoundTypeNode):
+
+  def __init__(self, value):
+    CompoundTypeNode.__init__(self, [self])
+    self.value = value
+    return
 
 
 ##  Simple Types
@@ -109,17 +188,13 @@ class IntType(NumberType, BuiltinConstFunc):
       return
     
     def recv(self, src):
-      for obj in src.types:
-        if obj.is_type(BaseStringType.get_type()):
-          self.parent_frame.raise_expt(ExceptionType(
-            'ValueError',
-            'might be conversion error'))
-        elif obj.is_type((NumberType.get_type(), BoolType.get_type())):
+      for obj in src:
+        if obj.is_type(BaseStringType.get_typeobj()):
+          self.parent_frame.raise_expt(ValueErrorType.maybe('might be conversion error.'))
+        elif obj.is_type((NumberType.get_typeobj(), BoolType.get_typeobj())):
           pass
         else:
-          self.parent_frame.raise_expt(ExceptionType(
-            'TypeError',
-            'cannot convert to integer: %s' % obj))
+          self.parent_frame.raise_expt(TypeErrorType.occur('cannot convert to integer: %s' % obj))
       return
 
   def accept_arg(self, caller, i):
@@ -154,7 +229,7 @@ class BaseStringType(BuiltinType, BuiltinConstFunc):
     def accept_arg(self, caller, i):
       return ElementTypeChecker(caller, self.args[i].get_type(), caller.loc, 'arg%d' % i)
 
-  def get_attr(self, name):
+  def get_attr(self, name, write=False):
     from aggregate_types import TupleObject, ListObject
     if name == 'capitalize':
       return BuiltinConstFunc('str.capitalize',
@@ -174,13 +249,13 @@ class BaseStringType(BuiltinType, BuiltinConstFunc):
                               UnicodeType.get_object(),
                               [],
                               [BaseStringType, BaseStringType],
-                              [ExceptionType('UnicodeDecodeError', 'might not able to decode')])
+                              [UnicodeDecodeErrorType.maybe('might not able to decode.')])
     elif name == 'encode':
       return BuiltinConstFunc('str.encode',
                               StrType.get_object(),
                               [],
                               [BaseStringType, BaseStringType],
-                              [ExceptionType('UnicodeEncodeError', 'might not able to encode')])
+                              [UnicodeDecodeErrorType.maybe('might not able to encode.')])
     elif name == 'endswith':
       return BuiltinConstFunc('str.endswith',
                               BoolType.get_object(),
@@ -201,7 +276,7 @@ class BaseStringType(BuiltinType, BuiltinConstFunc):
                               IntType.get_object(),
                               [BaseStringType],
                               [IntType, IntType],
-                              [ExceptionType('ValueError', 'might not able to find the substring')])
+                              [ValueErrorType.maybe('might not able to find the substring.')])
     elif name == 'isalnum':
       return BuiltinConstFunc('str.isalnum', BoolType.get_object())
     elif name == 'isalpha':
@@ -246,7 +321,7 @@ class BaseStringType(BuiltinType, BuiltinConstFunc):
                               IntType.get_object(),
                               [BaseStringType],
                               [IntType, IntType],
-                              [ExceptionType('ValueError', 'might not able to find the substring')])
+                              [ValueErrorType.maybe('might not able to find the substring.')])
     elif name == 'rjust':
       return BuiltinConstFunc('str.rjust',
                               self.get_object(),
@@ -300,6 +375,13 @@ class BaseStringType(BuiltinType, BuiltinConstFunc):
     raise NodeAttrError(name)
 
   def get_iter(self, caller):
+    return IterObject(elemall=self.get_object())
+
+  def get_element(self, caller, subs, write=False):
+    if write:
+      caller.raise_expt(TypeErrorType.occur('cannot change a string.'))
+    else:
+      caller.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
     return self.get_object()
 
   class StrConversion(CompoundTypeNode, ExceptionRaiser):
@@ -310,26 +392,24 @@ class BaseStringType(BuiltinType, BuiltinConstFunc):
       return
     
     def recv(self, src):
-      for obj in src.types:
+      for obj in src:
         if isinstance(obj, InstanceType):
-          value = ClassType.OptionalAttr(obj, '__str__').call(self, ())
-          value.connect(TypeChecker(self, BaseStringType.get_type(), self.loc,
+          value = ClassType.OptionalAttr(obj, '__str__').call(self, (), {})
+          value.connect(TypeChecker(self, BaseStringType.get_typeobj(), self.loc,
                                     'the return value of __str__ method'))
-          value = ClassType.OptionalAttr(obj, '__repr__').call(self, ())
-          value.connect(TypeChecker(self, BaseStringType.get_type(), self.loc,
+          value = ClassType.OptionalAttr(obj, '__repr__').call(self, (), {})
+          value.connect(TypeChecker(self, BaseStringType.get_typeobj(), self.loc,
                                     'the return value of __repr__ method'))
       return
 
   def accept_arg(self, caller, _):
     return self.StrConversion(caller, caller.loc)
 
-  def call(self, caller, args):
+  def call(self, caller, args, kwargs):
     if self.PYTHON_TYPE is basestring:
-      caller.raise_expt(ExceptionType(
-        'TypeError',
-        'cannot instantiate a basestring type'))
+      caller.raise_expt(TypeErrorType.occur('cannot instantiate a basestring type.'))
       return UndefinedTypeNode()
-    return BuiltinConstFunc.call(self, caller, args)
+    return BuiltinConstFunc.call(self, caller, args, kwargs)
   
   def __init__(self):
     BuiltinConstFunc.__init__(self, 'basestring', None)
@@ -338,13 +418,13 @@ class BaseStringType(BuiltinType, BuiltinConstFunc):
 class StrType(BaseStringType):
   PYTHON_TYPE = str
   
-  def get_attr(self, name):
+  def get_attr(self, name, write=False):
     if name == 'translate':
       return BuiltinConstFunc('str.translate', self.get_object(),
                               [BaseStringType],
                               [BaseStringType],
-                              [ExceptionType('ValueError', 'table must be 256 chars long')])
-    return BaseStringType.get_attr(self, name)
+                              [ValueErrorType.maybe('table might not be 256 chars long.')])
+    return BaseStringType.get_attr(self, name, write=write)
     
   def __init__(self):
     StrType.TYPE = self
@@ -356,7 +436,7 @@ class StrType(BaseStringType):
 class UnicodeType(BaseStringType):
   PYTHON_TYPE = unicode
 
-  def get_attr(self, name):
+  def get_attr(self, name, write=False):
     if name == 'isdecimal':
       return BuiltinConstFunc('unicode.isdecimal',
                               BoolType.get_object())
@@ -368,7 +448,7 @@ class UnicodeType(BaseStringType):
       return BuiltinConstFunc('unicode.translate',
                               self.get_object(),
                               [BaseStringType])
-    return BaseStringType.get_attr(self, name)
+    return BaseStringType.get_attr(self, name, write=write)
 
   def __init__(self):
     UnicodeType.TYPE = self
@@ -391,10 +471,10 @@ class FileType(BuiltinType, BuiltinConstFunc):
                               FileType.get_object(),
                               [StrType],
                               [StrType, IntType],
-                              [ExceptionType('IOError', 'might not able to open a file.')])
+                              [IOErrorType.maybe('might not able to open a file.')])
     return
   
-  def get_attr(self, name):
+  def get_attr(self, name, write=False):
     if name == 'close':
       return BuiltinConstFunc('file.close',
                               NoneType.get_object())
@@ -425,25 +505,25 @@ class FileType(BuiltinType, BuiltinConstFunc):
                               StrType.get_object(),
                               [],
                               [IntType],
-                              [ExceptionType('EOFError', 'might receive an EOF.')])
+                              [EOFErrorType.maybe('might receive an EOF.')])
     elif name == 'readline':
       return BuiltinConstFunc('file.readline',
                               StrType.get_object(),
                               [],
                               [IntType],
-                              [ExceptionType('EOFError', 'might receive an EOF.')])
+                              [EOFErrorType.maybe('might receive an EOF.')])
     elif name == 'readlines':
       return BuiltinConstFunc('file.readlines',
                               ListObject([StrType.get_object()]),
                               [],
                               [IntType],
-                              [ExceptionType('EOFError', 'might receive an EOF.')])
+                              [EOFErrorType.maybe('might receive an EOF.')])
     elif name == 'seek':
       return BuiltinConstFunc('file.seek',
                               NoneType.get_object(),
                               [IntType],
                               [IntType],
-                              [ExceptionType('IOError', 'might be an illegal seek.')])
+                              [EOFErrorType.maybe('might receive an EOF.')])
     elif name == 'softspace':
       return IntType.get_object()
     elif name == 'tell':
@@ -451,7 +531,7 @@ class FileType(BuiltinType, BuiltinConstFunc):
                               IntType.get_object(),
                               [],
                               [],
-                              [ExceptionType('IOError', 'might be an illegal seek.')])
+                              [IOErrorType.maybe('might be an illegal seek.')])
     elif name == 'truncate':
       return BuiltinConstFunc('file.truncate',
                               NoneType.get_object(),
@@ -467,8 +547,8 @@ class FileType(BuiltinType, BuiltinConstFunc):
       return self
     raise NodeAttrError(name)
 
-  def get_iter(self):
-    return XXX
+  def get_iter(self, caller):
+    return IterObject(elemall=StrType.get_object())
 
 
 ##  ObjectType
@@ -481,6 +561,11 @@ class ObjectType(BuiltinType, BuiltinConstFunc):
     ObjectType.TYPE = self
     BuiltinConstFunc.__init__(self, 'object', ObjectType.get_object())
     return
+
+##  TypeType
+##
+class TypeType(BuiltinType):
+  PYTHON_TYPE = type
 
 
 
