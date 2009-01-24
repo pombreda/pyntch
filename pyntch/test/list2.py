@@ -1,17 +1,14 @@
 #!/usr/bin/env python
 
-def range(x):
-  return [1]
-
-def foo(x):
-  x[2] = x
+def makeloop(x):
+  x[0] = x
   return
 
 a = [1,2,3]
-b = a
-foo(b)
-x = b[2]
-y = [ j+1 for j in range(10) ]
+makeloop(a)
+b = [4,5,6]
+makeloop(b)
 
-for i in a:
-  print i
+c = a
+c = b
+print a+b+c

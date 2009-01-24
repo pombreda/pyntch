@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import sys
+import sys, os.path
 from typenode import TypeNode
 from exception import ExceptionFrame, MustBeDefinedNode
 from namespace import Namespace
-from module import load_module
+from module import Loader
 
 # main
 def main(argv):
@@ -17,22 +17,22 @@ def main(argv):
   except getopt.GetoptError:
     return usage()
   debug = 0
-  modpath = sys.path[:]
+  modpath = ['stub']+sys.path[:]
   for (k, v) in opts:
     if k == '-d': debug += 1
     elif k == '-p': modpath.extend(v.split(':'))
   TypeNode.debug = debug
-  ExceptionFrame.debug = debug
-  Namespace.debug = debug
-  Namespace.modpath = modpath
+  #ExceptionFrame.debug = debug
+  #Namespace.debug = debug
+  #Loader.debug = debug
+  Loader.initialize(modpath)
   for fname in args:
-    if fname.endswith('.py'):
-      name = fname[:-3]
-    else:
-      name = fname
-    print '===', name, '==='
+    print '===', fname, '==='
     MustBeDefinedNode.reset()
-    module = load_module(name, debug=debug, modpath=modpath)
+    if fname.endswith('.py'):
+      module = Loader.load_file(fname, '__main__')
+    else:
+      module = Loader.load_module(fname)
     MustBeDefinedNode.check()
     module.showrec(sys.stdout)
   return 0
