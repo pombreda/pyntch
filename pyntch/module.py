@@ -6,25 +6,37 @@ from exception import ExceptionFrame
 from namespace import Namespace, BuiltinNamespace
 
 
-##  ModuleType
+class ModuleType(BuiltinType):
+  
+  def __init__(self, parent_space, name):
+    self.name = name
+    self.space = Namespace(parent_space, name)
+    return
+  
+  def __repr__(self):
+    return '<Module %s>' % (self.name,)
+
+  @classmethod
+  def get_name(klass):
+    return 'module'
+
+  def get_attr(self, name, write=False):
+    return self.space.register_var(name)
+  
+
+##  PythonModuleType
 ##
-class ModuleType(BuiltinType, TreeReporter, ExceptionFrame):
+class PythonModuleType(ModuleType, TreeReporter, ExceptionFrame):
 
   def __init__(self, parent_reporter, parent_space, name, path):
-    self.name = name
     self.path = path
-    self.space = Namespace(parent_space, name)
-    BuiltinType.__init__(self)
+    ModuleType.__init__(self, parent_space, name)
     TreeReporter.__init__(self, parent_reporter, name)
     ExceptionFrame.__init__(self)
     return
   
   def __repr__(self):
     return '<Module %s (%s)>' % (self.name, self.path)
-
-  @classmethod
-  def get_name(klass):
-    return 'module'
 
   def raise_expt(self, expt):
     self.add_expt(expt)
@@ -37,9 +49,6 @@ class ModuleType(BuiltinType, TreeReporter, ExceptionFrame):
     build_stmt(self, self, self.space, tree, evals, isfuncdef=True)
     return
 
-  def get_attr(self, name, write=False):
-    return self.space.register_var(name)
-  
   def show(self, p):
     p('[%s]' % self.name)
     blocks = set( name for (name,_) in self.children )
@@ -100,9 +109,12 @@ class Loader(object):
     dirname = os.path.dirname(path)
     if dirname not in klass.module_path:
       klass.module_path.insert(0, dirname)
-    module = ModuleType(None, klass.BUILTIN_NAMESPACE, modname, path)
+    module = PythonModuleType(None, klass.BUILTIN_NAMESPACE, modname, path)
     klass.MODULE_CACHE[modname] = module
-    tree = parseFile(path)
+    try:
+      tree = parseFile(path)
+    except IOError:
+      raise klass.ModuleNotFound(modname)
     rec(tree)
     module.load(tree)
     return module

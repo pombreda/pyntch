@@ -23,7 +23,7 @@ class ElementAll(CompoundTypeNode):
 
 ##  BuiltinFunc
 ##
-class BuiltinFunc(SimpleTypeNode):
+class BuiltinFunc(BuiltinType):
 
   def __init__(self, name, args=None, optargs=None, expts=None):
     args = (args or [])
@@ -32,14 +32,14 @@ class BuiltinFunc(SimpleTypeNode):
     self.minargs = len(args)
     self.args = args+optargs
     self.expts = (expts or [])
-    SimpleTypeNode.__init__(self, self)
+    BuiltinType.__init__(self)
     return
 
   def __repr__(self):
     return '<builtin %s>' % self.name
 
   @classmethod
-  def get_typename(klass):
+  def get_name(klass):
     return 'builtin'
   
   def connect_expt(self, frame):
@@ -88,9 +88,15 @@ class BuiltinConstFunc(BuiltinFunc):
       caller.raise_expt(expt)
     return self.retype
 
-
+  
 ##  IterObject
 ##
+class IterType(BuiltinType):
+
+  @classmethod
+  def get_name(klass):
+    return 'iterator'
+  
 class IterObject(SimpleTypeNode):
 
   def __init__(self, elements=None, elemall=None):
@@ -106,12 +112,12 @@ class IterObject(SimpleTypeNode):
   def __repr__(self):
     return '(%s, ...)' % self.elemall
 
-  @classmethod
-  def get_typename(klass):
-    return 'iterator'
-
   def desc1(self, done):
     return '(%s, ...)' % self.elemall.desc1(done)
+
+  @classmethod
+  def get_type(klass):
+    return IterType.get_type()
 
   def get_iter(self, caller):
     return self
@@ -222,7 +228,7 @@ class ComplexType(NumberType):
   PYTHON_TYPE = complex
   RANK = 4
 
-class BaseStringType(BuiltinType, BuiltinConstFunc):
+class BaseStringType(BuiltinConstFunc):
   PYTHON_TYPE = basestring
 
   class JoinFunc(BuiltinConstFunc):
@@ -461,7 +467,7 @@ class UnicodeType(BaseStringType):
 
 ##  FileType
 ##
-class FileType(BuiltinType, BuiltinConstFunc):
+class FileType(BuiltinConstFunc):
 
   PYTHON_TYPE = file
   
@@ -553,7 +559,7 @@ class FileType(BuiltinType, BuiltinConstFunc):
 
 ##  ObjectType
 ##
-class ObjectType(BuiltinType, BuiltinConstFunc):
+class ObjectType(BuiltinConstFunc):
 
   PYTHON_TYPE = object
   
