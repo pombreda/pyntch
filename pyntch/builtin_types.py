@@ -4,10 +4,10 @@
 ##  as it causes circular imports!
 
 from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, BuiltinType, NodeAttrError, UndefinedTypeNode
-from exception import ExceptionRaiser, TypeChecker, ElementTypeChecker
+from exception import TypeChecker, ElementTypeChecker
 from exception import TypeErrorType, ValueErrorType, IndexErrorType, IOErrorType, EOFErrorType, \
      UnicodeDecodeErrorType, UnicodeEncodeErrorType
-from function import KeywordArg, ClassType, InstanceType
+from function import ClassType, InstanceType
 
 ANY_TYPE = False
 
@@ -67,7 +67,7 @@ class InternalConstFunc(InternalFunc):
 
   def accept_arg(self, frame, i):
     if self.args[i]:
-      return TypeChecker(frame, self.args[i].get_type(), frame.loc, 'arg%d' % i)
+      return TypeChecker(frame, self.args[i].get_type(), 'arg%d' % i)
     else:
       return None
 
@@ -84,7 +84,6 @@ class InternalConstFunc(InternalFunc):
       frame.raise_expt(expt)
     return self.retype
 
-  
 
 class BuiltinFunc(InternalFunc, BuiltinType):
   def __init__(self, name, args=None, optargs=None, expts=None):
@@ -151,12 +150,12 @@ class IterObject(SimpleTypeNode):
 ##
 class IterFunc(BuiltinFunc):
 
-  class IterConversion(CompoundTypeNode, ExceptionRaiser):
+  class IterConversion(CompoundTypeNode):
     
-    def __init__(self, parent_frame, loc, obj):
+    def __init__(self, frame, obj):
+      self.frame = frame
       self.iterobj = IterObject([])
       CompoundTypeNode.__init__(self, [self.iterobj])
-      ExceptionRaiser.__init__(self, parent_frame, loc)
       obj.connect(self)
       return
     
@@ -165,11 +164,11 @@ class IterFunc(BuiltinFunc):
         try:
           obj.get_iter(self).connect(self.iterobj.elemall)
         except NodeTypeError:
-          self.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
+          self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
       return self.iterobj
   
   def process_args(self, frame, args):
-    return self.IterConversion(frame, frame.loc, args[0])
+    return self.IterConversion(frame, args[0])
 
   def __init__(self):
     BuiltinFunc.__init__(self, 'iter', [ANY_TYPE])
@@ -208,19 +207,19 @@ class IntType(NumberType, InternalConstFunc):
 
   class IntConversion(CompoundTypeNode):
     
-    def __init__(self, parent_frame):
+    def __init__(self, frame):
+      self.frame = frame
       CompoundTypeNode.__init__(self)
-      self.parent_frame = parent_frame
       return
     
     def recv(self, src):
       for obj in src:
         if obj.is_type(BaseStringType.get_typeobj()):
-          self.parent_frame.raise_expt(ValueErrorType.maybe('might be conversion error.'))
+          self.frame.raise_expt(ValueErrorType.maybe('might be conversion error.'))
         elif obj.is_type((NumberType.get_typeobj(), BoolType.get_typeobj())):
           pass
         else:
-          self.parent_frame.raise_expt(TypeErrorType.occur('cannot convert to integer: %s' % obj))
+          self.frame.raise_expt(TypeErrorType.occur('cannot convert to integer: %s' % obj))
       return
 
   def accept_arg(self, frame, i):
@@ -254,7 +253,7 @@ class BaseStringType(BuiltinType, InternalConstFunc):
 
   class JoinFunc(InternalConstFunc):
     def accept_arg(self, frame, i):
-      return ElementTypeChecker(frame, self.args[i].get_type(), frame.loc, 'arg%d' % i)
+      return ElementTypeChecker(frame, self.args[i].get_type(), 'arg%d' % i)
 
   def get_attr(self, name, write=False):
     from aggregate_types import TupleObject, ListObject
@@ -411,26 +410,26 @@ class BaseStringType(BuiltinType, InternalConstFunc):
       frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
     return self.get_object()
 
-  class StrConversion(CompoundTypeNode, ExceptionRaiser):
+  class StrConversion(CompoundTypeNode):
     
-    def __init__(self, parent_frame, loc):
+    def __init__(self, frame):
+      self.frame = frame
       CompoundTypeNode.__init__(self)
-      ExceptionRaiser.__init__(self, parent_frame, loc)
       return
     
     def recv(self, src):
       for obj in src:
         if isinstance(obj, InstanceType):
-          value = ClassType.OptionalAttr(obj, '__str__').call(self, (), {})
-          value.connect(TypeChecker(self, BaseStringType.get_typeobj(), self.loc,
+          value = ClassType.OptionalAttr(obj, '__str__').call(self.frame, (), {})
+          value.connect(TypeChecker(self.frame, BaseStringType.get_typeobj(), 
                                     'the return value of __str__ method'))
-          value = ClassType.OptionalAttr(obj, '__repr__').call(self, (), {})
-          value.connect(TypeChecker(self, BaseStringType.get_typeobj(), self.loc,
+          value = ClassType.OptionalAttr(obj, '__repr__').call(self.frame, (), {})
+          value.connect(TypeChecker(self.frame, BaseStringType.get_typeobj(), 
                                     'the return value of __repr__ method'))
       return
 
   def accept_arg(self, frame, _):
-    return self.StrConversion(frame, frame.loc)
+    return self.StrConversion(frame)
 
   def call(self, frame, args, kwargs):
     if self.PYTHON_TYPE is basestring:

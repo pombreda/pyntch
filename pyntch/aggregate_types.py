@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from typenode import SimpleTypeNode, CompoundTypeNode, BuiltinType, NodeTypeError, NodeAttrError
-from exception import ExceptionRaiser, TypeChecker, \
+from exception import TypeChecker, \
      TypeErrorType, IndexErrorType, ValueErrorType, KeyErrorType
 from builtin_types import BuiltinFunc, BuiltinConstFunc, \
      ElementAll, IterObject, BoolType, IntType, NoneType, ANY_TYPE
@@ -42,12 +42,12 @@ class ListType(BuiltinFunc):
   
   PYTHON_TYPE = list
   
-  class ListConversion(CompoundTypeNode, ExceptionRaiser):
+  class ListConversion(CompoundTypeNode):
     
-    def __init__(self, parent_frame, loc, obj):
+    def __init__(self, frame, obj):
+      self.frame = frame
       self.listobj = ListObject([])
       CompoundTypeNode.__init__(self, [self.listobj])
-      ExceptionRaiser.__init__(self, parent_frame, loc)
       obj.connect(self)
       return
     
@@ -56,7 +56,7 @@ class ListType(BuiltinFunc):
         try:
           obj.get_seq(self).connect(self.listobj.elemall)
         except NodeTypeError:
-          self.raise_expt(TypeErrorType.occur('cannot convert to list: %s' % obj))
+          self.frame.raise_expt(TypeErrorType.occur('cannot convert to list: %s' % obj))
       return
   
   def process_args(self, frame, args, kwargs):
@@ -64,7 +64,7 @@ class ListType(BuiltinFunc):
       frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
       return UndefinedTypeNode()
     if args:
-      return self.ListConversion(frame, frame.loc, args[0])
+      return self.ListConversion(frame, args[0])
     else:
       return ListObject.get_null()
 
@@ -161,18 +161,18 @@ class ListObject(BuiltinAggregateObject):
 
   class ExtendMethod(BuiltinConstFunc):
     
-    class ElementExtender(CompoundTypeNode, ExceptionRaiser):
-      def __init__(self, parent_frame, loc, elemall):
+    class ElementExtender(CompoundTypeNode):
+      def __init__(self, frame, elemall):
+        self.frame = frame
         self.elemall = elemall
         CompoundTypeNode.__init__(self)
-        ExceptionRaiser.__init__(self, parent_frame, loc)
         return
       def recv(self, src):
         for obj in src:
           try:
             obj.get_seq(self).connect(self.elemall)
           except NodeTypeError:
-            self.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
+            self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
         return
 
     def __init__(self, listobj):
@@ -182,7 +182,7 @@ class ListObject(BuiltinAggregateObject):
     def __repr__(self):
       return '%r.extend' % self.listobj
     def accept_arg(self, frame, i):
-      return self.ElementExtender(frame, frame.loc, self.listobj.elemall)
+      return self.ElementExtender(frame, self.listobj.elemall)
     
   class InsertMethod(BuiltinConstFunc):
     
@@ -218,12 +218,12 @@ class TupleType(BuiltinFunc):
   
   PYTHON_TYPE = tuple
 
-  class TupleConversion(CompoundTypeNode, ExceptionRaiser):
+  class TupleConversion(CompoundTypeNode):
     
-    def __init__(self, parent_frame, loc, obj):
+    def __init__(self, frame, obj):
+      self.frame = frame
       self.tupleobj = TupleObject([])
       CompoundTypeNode.__init__(self, [])
-      ExceptionRaiser.__init__(self, parent_frame, loc)
       obj.connect(self)
       return
     
@@ -232,7 +232,7 @@ class TupleType(BuiltinFunc):
         try:
           obj.get_seq(self).connect(self.tupleobj.elemall)
         except NodeTypeError:
-          self.raise_expt(TypeErrorType.occur('cannot convert to tuple: %s' % obj))
+          self.frame.raise_expt(TypeErrorType.occur('cannot convert to tuple: %s' % obj))
       return
   
   def process_args(self, frame, args, kwargs):
@@ -240,7 +240,7 @@ class TupleType(BuiltinFunc):
       frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
       return UndefinedTypeNode()
     if args:
-      return self.TupleConversion(frame, frame.loc, args[0])
+      return self.TupleConversion(frame, args[0])
     else:
       return TupleObject.get_null()
 
@@ -252,9 +252,8 @@ class TupleObject(BuiltinAggregateObject):
 
   TYPEOBJ = TupleType.get_typeobj()
   
-  def __init__(self, elements=None, loc=None, elemall=None):
+  def __init__(self, elements=None, elemall=None):
     self.elements = elements
-    self.loc = loc
     if elements == None:
       assert elemall != None
       self.elemall = elemall
@@ -281,7 +280,7 @@ class TupleObject(BuiltinAggregateObject):
   @classmethod
   def multiply(klass, obj):
     assert isinstance(obj, klass)
-    return klass(loc=obj.loc, elemall=obj.elemall)
+    return klass(elemall=obj.elemall)
   
   def desc1(self, done):
     if self.elements == None:
@@ -300,69 +299,18 @@ class TupleObject(BuiltinAggregateObject):
     return IterObject(elemall=self.elemall)
   
 
-##  TupleUnpack
-##
-class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
-
-  ##  Element
-  ##
-  class Element(CompoundTypeNode):
-    
-    def __init__(self, tup, i):
-      CompoundTypeNode.__init__(self)
-      self.tup = tup
-      self.i = i
-      return
-
-    def __repr__(self):
-      return '<TupleElement: %r[%d]>' % (self.tup, self.i)
-  
-  #
-  def __init__(self, parent_frame, loc, tupobj, nelements):
-    CompoundTypeNode.__init__(self)
-    self.tupobj = tupobj
-    self.elements = [ self.Element(self, i) for i in xrange(nelements) ]
-    ExceptionRaiser.__init__(self, parent_frame, loc)
-    self.tupobj.connect(self, self.recv_tupobj)
-    return
-
-  def __repr__(self):
-    return '<TupleUnpack: %r>' % (self.tupobj,)
-
-  def get_nth(self, i):
-    return self.elements[i]
-
-  def recv_tupobj(self, src):
-    assert src is self.tupobj
-    for obj in src:
-      if obj.is_type(TupleType.get_typeobj()) and obj.elements != None:
-        if len(obj.elements) != len(self.elements):
-          self.raise_expt(ValueErrorType.occur('tuple unpackable: len(%r) != %r' % (obj, len(self.elements))))
-        else:
-          for (src,dest) in zip(obj.elements, self.elements):
-            src.connect(dest)
-      else:
-        try:
-          src = obj.get_seq(self)
-          for dest in self.elements:
-            src.connect(dest)
-        except NodeTypeError:
-          self.raise_expt(TypeErrorType.occur('not iterable: %r' % src))
-    return
-
-
 ##  SetObject
 ##
 class SetType(BuiltinFunc):
 
   PYTHON_TYPE = set
 
-  class SetConversion(CompoundTypeNode, ExceptionRaiser):
+  class SetConversion(CompoundTypeNode):
     
-    def __init__(self, parent_frame, loc, obj):
+    def __init__(self, frame, obj):
+      self.frame = frame
       self.setobj = SetObject([])
       CompoundTypeNode.__init__(self)
-      ExceptionRaiser.__init__(self, parent_frame, loc)
       obj.connect(self)
       return
     
@@ -371,7 +319,7 @@ class SetType(BuiltinFunc):
         try:
           obj.get_seq(self).connect(self.setobj.elemall)
         except NodeTypeError:
-          self.raise_expt(TypeErrorType.occur('cannot convert to set: %s' % obj))
+          self.frame.raise_expt(TypeErrorType.occur('cannot convert to set: %s' % obj))
       return
   
   def process_args(self, frame, args, kwargs):
@@ -379,7 +327,7 @@ class SetType(BuiltinFunc):
       frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
       return UndefinedTypeNode()
     if args:
-      return self.SetConversion(frame, frame.loc, args[0])
+      return self.SetConversion(frame, args[0])
     else:
       return SetObject.get_null()
 
@@ -449,12 +397,12 @@ class DictType(BuiltinFunc):
   
   PYTHON_TYPE = dict
   
-  class DictConversion(CompoundTypeNode, ExceptionRaiser):
+  class DictConversion(CompoundTypeNode):
     
-    def __init__(self, parent_frame, loc, obj):
+    def __init__(self, frame, obj):
+      self.frame = frame
       self.dictobj = DictObject([])
       CompoundTypeNode.__init__(self, [self.dictobj])
-      ExceptionRaiser.__init__(self, parent_frame, loc)
       obj.connect(self)
       return
     
@@ -463,7 +411,7 @@ class DictType(BuiltinFunc):
         try:
           obj.get_seq(self).connect(self, self.recv_pair)
         except NodeTypeError:
-          self.raise_expt(TypeErrorType.occur('cannot convert to dict: %s' % obj))
+          self.frame.raise_expt(TypeErrorType.occur('cannot convert to dict: %s' % obj))
       return
   
     def recv_pair(self, src):
@@ -475,21 +423,21 @@ class DictType(BuiltinFunc):
               k.connect(self.dictobj.key)
               v.connect(self.dictobj.value)
             else:
-              self.raise_expt(TypeErrorType.occur('cannot convert to dict: tuple length is not 2: %s' % obj))
+              self.frame.raise_expt(TypeErrorType.occur('cannot convert to dict: tuple length is not 2: %s' % obj))
             continue
           elem = obj.get_seq(self)
           elem.connect(self, self.dictobj.key)
           elem.connect(self, self.dictobj.value)
-          self.raise_expt(TypeErrorType.maybe('might not be able to convert to dict: %s' % obj))
+          self.frame.raise_expt(TypeErrorType.maybe('might not be able to convert to dict: %s' % obj))
         except NodeTypeError:
-          self.raise_expt(TypeErrorType.occur('cannot convert to dict: %s' % obj))
+          self.frame.raise_expt(TypeErrorType.occur('cannot convert to dict: %s' % obj))
       return
     
   def process_args(self, frame, args, kwargs):
     if kwargs:
       return DictObject([ (StrType.get_object(), v) for (_,v) in kwargs.iteritems() ])
     if args:
-      return self.ListConversion(frame, frame.loc, args[0])
+      return self.DictConversion(frame, args[0])
     else:
       return DictObject.get_null()
 

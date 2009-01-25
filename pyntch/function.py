@@ -5,19 +5,6 @@ from namespace import Namespace, Variable
 from exception import TypeErrorType, ExceptionFrame
 
 
-##  KeywordArg
-##
-class KeywordArg(object):
-
-  def __init__(self, name, value):
-    self.name = name
-    self.value = value
-    return
-
-  def __repr__(self):
-    return '%s=%r' % (self.name, self.value)
-
-
 ##  FuncType
 ##
 class FuncType(BuiltinType, TreeReporter):
@@ -35,10 +22,6 @@ class FuncType(BuiltinType, TreeReporter):
     def __repr__(self):
       return '<FuncBody %s>' % self.name
 
-    def raise_expt(self, expt):
-      self.add_expt(expt)
-      return
-
     def set_retval(self, evals):
       from builtin_types import IterObject
       returns = [ obj for (t,obj) in evals if t == 'r' ]
@@ -54,7 +37,7 @@ class FuncType(BuiltinType, TreeReporter):
 
   def __init__(self, parent_reporter, parent_frame, parent_space,
                name, argnames, defaults, varargs, kwargs, code):
-    from aggregate_types import TupleUnpack
+    from expression import TupleUnpack
     def maprec(func, x):
       if isinstance(x, tuple):
         return tuple( maprec(func, y) for y in x )
@@ -121,7 +104,8 @@ class FuncType(BuiltinType, TreeReporter):
 
   def call(self, frame, args, kwargs):
     from builtin_types import StrType
-    from aggregate_types import DictObject, TupleObject, TupleUnpack
+    from aggregate_types import DictObject, TupleObject
+    from expression import TupleUnpack
     self.callers.append(frame)
     # Copy the list of argument variables.
     argvars = list(self.argvars)
@@ -173,8 +157,10 @@ class FuncType(BuiltinType, TreeReporter):
     return self.body
 
   def show(self, p):
+    for frame in self.callers:
+      if frame.loc:
+        p('# called at %s(%d)' % (frame.loc._modname, frame.loc.lineno))
     names = set()
-    print self.callers
     def recjoin(sep, seq):
       for x in seq:
         if isinstance(x, tuple):
@@ -314,7 +300,7 @@ class ClassType(BuiltinType, TreeReporter):
       # Propagate the exceptions.
       self.connect_expt(frame)
       return self
-
+    
     def recv_attr(self, src):
       for func in src:
         try:
@@ -363,6 +349,7 @@ class ClassType(BuiltinType, TreeReporter):
     self.baseklass = CompoundTypeNode()
     for base in bases:
       base.connect(self.baseklass)
+    self.callers = []
     return
 
   def __repr__(self):
@@ -401,9 +388,13 @@ class ClassType(BuiltinType, TreeReporter):
     return method
 
   def call(self, frame, args, kwargs):
+    self.callers.append(frame)
     return self.InitMethodBody(self.instance).call(frame, args, kwargs)
   
   def show(self, p):
+    for frame in self.callers:
+      if frame.loc:
+        p('# called at %s(%d)' % (frame.loc._modname, frame.loc.lineno))
     if self.bases:
       p('class %s(%s):' % (self.name, ', '.join( repr(base) for base in self.bases )))
     else:
