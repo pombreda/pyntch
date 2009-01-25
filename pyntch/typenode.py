@@ -183,7 +183,7 @@ class UndefinedTypeNode(TypeNode):
 ##
 class BuiltinType(SimpleTypeNode):
 
-  PYTHON_TYPE = None
+  PYTHON_TYPE = None # must be defined by subclass
   
   def __init__(self):
     SimpleTypeNode.__init__(self, self)

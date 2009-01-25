@@ -4,7 +4,7 @@ import sys, os.path
 from typenode import TypeNode
 from exception import ExceptionFrame, MustBeDefinedNode
 from namespace import Namespace
-from module import Loader
+from module import Interpreter
 
 # main
 def main(argv):
@@ -24,15 +24,15 @@ def main(argv):
   TypeNode.debug = debug
   #ExceptionFrame.debug = debug
   #Namespace.debug = debug
-  #Loader.debug = debug
-  Loader.initialize(modpath)
+  #Interpreter.debug = debug
+  Interpreter.initialize(modpath)
   for fname in args:
     print '===', fname, '==='
     MustBeDefinedNode.reset()
     if fname.endswith('.py'):
-      module = Loader.load_file(fname, '__main__')
+      module = Interpreter.load_file(fname, '__main__')
     else:
-      module = Loader.load_module(fname)
+      module = Interpreter.load_module(fname)
     MustBeDefinedNode.check()
     module.showrec(sys.stdout)
   return 0

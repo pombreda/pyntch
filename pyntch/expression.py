@@ -117,6 +117,8 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
         if (lobj,robj) in self.done: continue
         self.done.add((lobj,robj))
         # special handling for a formatting (%) operator
+        ltype = lobj.get_type()
+        rtype = robj.get_type()
         if (lobj.is_type(BaseStringType.get_typeobj()) and
             self.op == 'Mod'):
           self.update_types([lobj])
@@ -124,7 +126,7 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
         # for numeric operation, the one with a higher rank is chosen.
         if (lobj.is_type(NumberType.get_typeobj()) and robj.is_type(NumberType.get_typeobj()) and
             self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power')):
-          if lobj.get_type().get_rank() < robj.get_type().get_rank():
+          if ltype.get_rank() < rtype.get_rank():
             self.update_types([robj])
           else:
             self.update_types([lobj])
@@ -165,7 +167,7 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
           self.update_types([TupleObject.multiply(robj)])
           continue
         # other operations.
-        k = (lobj.get_type().get_name(), self.op, robj.get_type().get_name())
+        k = (ltype.get_name(), self.op, rtype.get_name())
         if k in self.VALID_TYPES:
           v = BUILTIN_OBJECTS[self.VALID_TYPES[k]]
           self.update_types([v])
