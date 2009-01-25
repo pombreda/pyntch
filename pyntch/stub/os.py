@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # module: 'os'
 
-import posixpath as path
-import errno
 from posix import *
+import errno
+import posixpath as path
 
 SEEK_CUR = 0
 SEEK_END = 0
@@ -27,11 +27,14 @@ OSError = error
 WindowsError = error
 VMSError = error
 
-execl = function() # XXX
-execle = function() # XXX
-execlp = function() # XXX
-execlpe = function() # XXX
-
+def execl(file, *args):
+  execv(file, args)
+  return
+def execle(file, *args):
+  execve(file, args[:-1], args[-1])
+  return
+execlp = execl
+execlpe = execlp
 execvp = _execvp
 execvpe = _execvpe
 
@@ -39,26 +42,50 @@ def getenv(k):
   assert isinstance(k, str)
   return environ[k]
 
-popen2 = function() # XXX
-popen3 = function() # XXX
-popen4 = function() # XXX
+def popen2(cmd, mode='', bufsize=0):
+  assert isinstance(cmd, str)
+  assert isinstance(mode, str)
+  assert isinstance(bufsize, int)
+  return (file(''), file(''))
+def popen3(cmd, mode='', bufsize=0):
+  assert isinstance(cmd, str)
+  assert isinstance(mode, str)
+  assert isinstance(bufsize, int)
+  return (file(''), file(''), file(''))
+def popen4(cmd, mode='', bufsize=0):
+  assert isinstance(cmd, str)
+  assert isinstance(mode, str)
+  assert isinstance(bufsize, int)
+  return (file(''), file(''))
 
-makedirs = function() # XXX
-removedirs = function() # XXX
-renames = function() # XXX
+def makedirs(path, mode=0):
+  assert isinstance(path, str)
+  assert isinstance(mode, int)
+  return
+def removedirs(path):
+  assert isinstance(path, str)
+  return
+def renames(old, new):
+  assert isinstance(old, str)
+  assert isinstance(new, str)
+  return
 
 P_NOWAIT = 0
 P_NOWAITO = 0
 P_WAIT = 0
 
-spawnl = function() # XXX
-spawnle = function() # XXX
-spawnlp = function() # XXX
-spawnlpe = function() # XXX
-spawnv = function() # XXX
-spawnve = function() # XXX
-spawnvp = function() # XXX
-spawnvpe = function() # XXX
+def spawnv(mode, file, args):
+  return
+def spawnve(mode, file, args, env):
+  return
+def spawnl(mode, file, *args):
+  return spawnv(mode, file, args)
+def spawnle(mode, file, *args):
+  return spawnve(mode, file, args[:-1], args[-1])
+spawnvp = spawnv
+spawnvpe = spawnve
+spawnlp = spawnl
+spawnlpe = spawnle
 
 def urandom(n):
   assert isinstance(n, int)

@@ -127,13 +127,13 @@ def dup2(fd1,fd2):
   assert isinstance(fd2, int)
   return
 
-def execv(path, args):
+def _execv(path, args):
   assert isinstance(path, str)
   for arg in args:
     assert isinstance(arg, str)
   return
 
-def execve(path, args, env):
+def _execve(path, args, env):
   assert isinstance(path, str)
   for arg in args:
     assert isinstance(arg, str)

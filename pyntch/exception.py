@@ -317,7 +317,7 @@ class TypeChecker(CompoundTypeNode):
           self.update_types(obj)
           break
       else:
-        s = '|'.join( typeobj.get_type().get_name() for typeobj in self.validtypes )
+        s = '|'.join( typeobj.get_name() for typeobj in self.validtypes )
         self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be %s' % (self.blame, obj, s),
                                                          self.loc))
     return

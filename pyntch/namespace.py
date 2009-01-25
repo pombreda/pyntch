@@ -194,8 +194,10 @@ class Namespace(object):
           self.import_all(module.space)
         else:
           asname = name1 or name0
-          self.register_var(asname)
-          self[asname].bind(module)
+          try:
+            self.register_var(asname).bind(module.space[name0])
+          except KeyError:
+            raise Interpreter.ModuleNotFound(name0)
 
     # print, printnl
     elif isinstance(tree, (ast.Print, ast.Printnl)):
@@ -400,8 +402,7 @@ class BuiltinNamespace(Namespace):
     import builtin_funcs
     Namespace.__init__(self, parent, '__builtin__')
     # abs,all,any,apply,divmod,enumerate,
-    # filter,isinstance,issubclass,
-    # map,max,min,pow,
+    # filter,map,max,min,pow,
     # reduce,sorted,sum,zip
     self.register_var('callable').bind(builtin_funcs.CallableFunc())
     self.register_var('chr').bind(builtin_funcs.ChrFunc())
@@ -410,6 +411,8 @@ class BuiltinNamespace(Namespace):
     self.register_var('hash').bind(builtin_funcs.HashFunc())
     self.register_var('hex').bind(builtin_funcs.HexFunc())
     self.register_var('id').bind(builtin_funcs.IdFunc())
+    self.register_var('isinstance').bind(builtin_funcs.IsInstanceFunc())
+    self.register_var('issubclass').bind(builtin_funcs.IsSubclassFunc())
     self.register_var('iter').bind(builtin_funcs.IterFunc())
     self.register_var('len').bind(builtin_funcs.LenFunc())
     self.register_var('oct').bind(builtin_funcs.OctFunc())
