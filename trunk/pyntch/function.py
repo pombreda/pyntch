@@ -275,9 +275,10 @@ class ClassType(BuiltinType, TreeReporter):
       self.attr = instance.get_attr(name)
       self.args = []
       self.kwargs = {}
+      self.retval = CompoundTypeNode()
       CompoundTypeNode.__init__(self)
       ExceptionFrame.__init__(self)
-      self.attr.connect(self, self.recv_attr)
+      self.attr.connect(self)
       return
 
     def __repr__(self):
@@ -299,15 +300,15 @@ class ClassType(BuiltinType, TreeReporter):
         arg1.connect(var1)
       # Propagate the exceptions.
       self.connect_expt(frame)
-      return self
+      return self.retval
     
-    def recv_attr(self, src):
-      for func in src:
+    def recv(self, src):
+      for obj in src:
         try:
           # XXX self.kwargs might not be fixated.
-          func.call(self, self.args, self.kwargs).connect(self)
+          obj.call(self, self.args, self.kwargs).connect(self.retval)
         except NodeTypeError:
-          self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (src, func)))
+          self.update_type([obj])
       return
 
   ##  InitMethodBody
