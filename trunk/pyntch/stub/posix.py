@@ -43,6 +43,8 @@ WNOHANG = 0
 WUNTRACED = 0
 W_OK = 0
 X_OK = 0
+_STAT = (0,0,0,0,0,0,0,0,0,0) # UNIX
+_STATVFS = (0,0,0,0,0,0,0,0,0,0) # UNIX
 
 class error(object): pass
 class stat_result(object): pass
@@ -80,6 +82,7 @@ def WTERMSIG(x):
 
 def _exit(x):
   assert isinstance(x, int)
+  return
 
 def abort(): return
 
@@ -87,203 +90,396 @@ def access(path, mode):
   assert isinstance(path, str)
   assert isinstance(mode, int)
   return
+
 def chdir(path):
   assert isinstance(path, str)
   return
+
 def chmod(path, mode):
   assert isinstance(path, str)
   assert isinstance(mode, int)
   return
+
 def chown(path, uid, gid):
   assert isinstance(path, str)
   assert isinstance(uid, int)
   assert isinstance(gid, int)
   return
+
 def chroot(path):
   assert isinstance(path, str)
   return
+
 def close(fd):
   assert isinstance(fd, int)
   return
+
 def confstr(x): return ''
+
 def ctermid(): return ''
+
 def dup(fd):
   assert isinstance(fd, int)
   return 0
+
 def dup2(fd1,fd2):
   assert isinstance(fd1, int)
   assert isinstance(fd2, int)
   return
 
-def execv(*x): return
+def execv(path, args):
+  assert isinstance(path, str)
+  for arg in args:
+    assert isinstance(arg, str)
+  return
 
-def execve(*x): return
-
-def fchdir(*x): return
-
-def fdatasync(*x): return
-
-def fdopen(*x): return
-
-def fork(*x): return
-
-def forkpty(*x): return
-
-def fpathconf(*x): return
-
-def fstat(*x): return
-
-def fstatvfs(*x): return
-
-def fsync(*x): return
-
-def ftruncate(*x): return
-
-def getcwd(*x): return
-
-def getcwdu(*x): return
-
-def getegid(*x): return
-
-def geteuid(*x): return
-
-def getgid(*x): return
-
-def getgroups(*x): return
-
-def getloadavg(*x): return
-
-def getlogin(*x): return
-
-def getpgid(*x): return
-
-def getpgrp(*x): return
-
-def getpid(*x): return
-
-def getppid(*x): return
-
-def getsid(*x): return
-
-def getuid(*x): return
-
-def isatty(*x): return
-
-def kill(*x): return
-
-def killpg(*x): return
-
-def lchown(*x): return
-
-def link(*x): return
-
-def listdir(*x): return
-
-def lseek(*x): return
-
-def lstat(*x): return
-
-def major(*x): return
-
-def makedev(*x): return
-
-def minor(*x): return
-
-def mkdir(*x): return
-
-def mkfifo(*x): return
-
-def mknod(*x): return
-
-def nice(*x): return
-
-def open(*x): return
-
-def openpty(*x): return
-
-def pathconf(*x): return
-
-def pipe(*x): return
-
-def popen(*x): return
-
-def putenv(*x): return
-
-def read(*x): return
-
-def readlink(*x): return
-
-def remove(*x): return
-
-def rename(*x): return
-
-def rmdir(*x): return
-
-def setegid(*x): return
-
-def seteuid(*x): return
-
-def setgid(*x): return
-
-def setgroups(*x): return
-
-def setpgid(*x): return
-
-def setpgrp(*x): return
-
-def setregid(*x): return
-
-def setreuid(*x): return
-
-def setsid(*x): return
-
-def setuid(*x): return
-
-def stat(*x): return
-
-def stat_float_times(*x): return
-
-def statvfs(*x): return
-
-def strerror(*x): return
-
-def symlink(*x): return
-
-def sysconf(*x): return
-
-def system(*x): return
-
-def tcgetpgrp(*x): return
-
-def tcsetpgrp(*x): return
-
-def tempnam(*x): return
-
-def times(*x): return
-
-def tmpfile(*x): return
-
-def tmpnam(*x): return
-
-def ttyname(*x): return
-
-def umask(*x): return
-
-def uname(*x): return
-
-def unlink(*x): return
-
-def unsetenv(*x): return
-
-def utime(*x): return
-
-def wait(*x): return
-
-def wait3(*x): return
-
-def wait4(*x): return
-
-def waitpid(*x): return
-
-def write(*x): return
+def execve(path, args, env):
+  assert isinstance(path, str)
+  for arg in args:
+    assert isinstance(arg, str)
+  for (k,v) in env.iteritems():
+    assert isinstance(k, str)
+    assert isinstance(v, str)
+  return
+
+def fchdir(fd):
+  assert isinstance(fd, int)
+  return
+
+def fdatasync(fd):
+  assert isinstance(fd, int)
+  return
+
+def fdopen(fd, mode='', bufsize=0):
+  assert isinstance(fd, int)
+  assert isinstance(mode, str)
+  assert isinstance(bufsize, int)
+  return file('')
+
+def fork(pid):
+  assert isinstance(pid, int)
+  return 0
+
+def forkpty(pid, fd):
+  assert isinstance(pid, int)
+  assert isinstance(fd, int)
+  return 0
+
+def fpathconf(fd, name):
+  assert isinstance(fd, int)
+  assert isinstance(name, str)
+  return 0
+
+def fstat(fd):
+  assert isinstance(fd, int)
+  return _STAT
+
+def fstatvfs(fd):
+  assert isinstance(fd, int)
+  return _STATVFS
+
+def fsync(fd):
+  assert isinstance(fd, int)
+  return
+
+def ftruncate(fd, length):
+  assert isinstance(fd, int)
+  assert isinstance(length, int)
+  return
+
+def getcwd():
+  return ''
+
+def getcwdu():
+  return u''
+
+def getegid():
+  return 0
+
+def geteuid():
+  return 0
+
+def getgid():
+  return 0
+
+def getgroups():
+  return [0]
+
+def getloadavg():
+  return (0.0, 0.0, 0.0)
+
+def getlogin():
+  return ''
+
+def getpgid():
+  return 0
+
+def getpgrp():
+  return 0
+
+def getpid():
+  return 0
+
+def getppid():
+  return 0
+
+def getsid():
+  return 0
+
+def getuid():
+  return 0
+
+def isatty():
+  return False
+
+def kill(pid, sig):
+  assert isinstance(pid, int)
+  assert isinstance(sig, int)
+  return
+
+def killpg(pid, sig):
+  assert isinstance(pid, int)
+  assert isinstance(sig, int)
+  return
+
+def lchown(path, uid, gid):
+  assert isinstance(path, str)
+  assert isinstance(uid, int)
+  assert isinstance(gid, int)
+  return
+
+def link(src, dst):
+  assert isinstance(src, str)
+  assert isinstance(dst, str)
+  return
+
+def listdir(path):
+  assert isinstance(path, str)
+  return ['']
+
+def lseek(fd, pos, how):
+  assert isinstance(fd, int)
+  assert isinstance(pos, int)
+  assert isinstance(how, int)
+  return
+
+def lstat(path):
+  assert isinstance(path, str)
+  return _STAT
+
+def major(dev):
+  assert isinstance(dev, int)
+  return 0
+
+def makedev(major, minor):
+  assert isinstance(major, int)
+  assert isinstance(minor, int)
+  return 0
+
+def minor(dev):
+  assert isinstance(dev, int)
+  return 0
+
+def mkdir(path, mode=0):
+  assert isinstance(path, str)
+  assert isinstance(mode, int)
+  return
+
+def mkfifo(path, mode=0):
+  assert isinstance(path, str)
+  assert isinstance(mode, int)
+  return
+
+def mknod(path, mode=0, dev=0):
+  assert isinstance(path, str)
+  assert isinstance(mode, int)
+  assert isinstance(dev, int)
+  return
+
+def nice(prio):
+  assert isinstance(prio, int)
+  return 0
+
+def open(path, flag, mode=0):
+  assert isinstance(path, str)
+  assert isinstance(flag, int)
+  assert isinstance(mode, int)
+  return 0
+
+def openpty():
+  return (0, 0)
+
+def pathconf(path, name):
+  assert isinstance(path, str)
+  assert isinstance(name, str)
+  return 0
+
+def pipe():
+  return (0, 0)
+
+def popen(cmd, mode='', bufsize=0):
+  assert isinstance(cmd, str)
+  assert isinstance(mode, str)
+  assert isinstance(bufsize, int)
+  return 0
+
+def putenv(k, v):
+  assert isinstance(k, str)
+  assert isinstance(v, str)
+  return
+
+def read(fd, bufsize):
+  assert isinstance(fd, int)
+  assert isinstance(bufsize, int)
+  return ''
+
+def readlink(path):
+  assert isinstance(path, str)
+  return ''
+
+def remove(path):
+  assert isinstance(path, str)
+  return
+
+def rename(old, new):
+  assert isinstance(old, str)
+  assert isinstance(new, str)
+  return
+
+def rmdir(path):
+  assert isinstance(path, str)
+  return
+
+def setegid(gid):
+  assert isinstance(gid, int)
+  return
+
+def seteuid(uid):
+  assert isinstance(uid, int)
+  return
+
+def setgid(gid):
+  assert isinstance(gid, int)
+  return
+
+def setgroups(groups):
+  for gid in groups:
+    assert isinstance(gid, int)
+  return
+
+def setpgid(pid, pgrp):
+  assert isinstance(pid, int)
+  assert isinstance(pgrp, int)
+  return
+
+def setpgrp(): return
+
+def setregid(rgid, egid):
+  assert isinstance(rgid, int)
+  assert isinstance(egid, int)
+  return
+
+def setreuid(ruid, euid):
+  assert isinstance(ruid, int)
+  assert isinstance(euid, int)
+  return
+
+def setsid(): return
+
+def setuid(uid):
+  assert isinstance(uid, int)
+  return
+
+def stat(path):
+  assert isinstance(path, str)
+  return _STAT
+
+def stat_float_times(newval=False):
+  return True
+
+def statvfs(path):
+  return _STATVFS
+
+def strerror(code):
+  assert isinstance(code, int)
+  return ''
+
+def symlink(src, dst):
+  assert isinstance(src, str)
+  assert isinstance(dst, str)
+  return
+
+def sysconf(name):
+  assert isinstance(name, str)
+  return 0
+
+def system(cmd):
+  assert isinstance(cmd, str)
+  return 0
+
+def tcgetpgrp(fd):
+  assert isinstance(fd, int)
+  return 0
+
+def tcsetpgrp(fd, pgid):
+  assert isinstance(fd, int)
+  assert isinstance(pgid, int)
+  return
+
+def tempnam(dir='', prefix=''):
+  assert isinstance(dir, str)
+  assert isinstance(prefix, str)
+  return ''
+
+def times():
+  return (0.0, 0.0, 0.0, 0.0, 0.0)
+
+def tmpfile():
+  return file('')
+
+def tmpnam():
+  return ''
+
+def ttyname(fd):
+  assert isinstance(fd, int)
+  return
+
+def umask(mask):
+  assert isinstance(mask, int)
+  return
+
+def uname():
+  return ('', '', '', '', '')
+
+unlink = remove
+
+def unsetenv(k):
+  assert isinstance(k, str)
+  return
+
+def utime(path, x):
+  assert isinstance(path, str)
+  return
+
+def wait():
+  return (0, 0)
+
+def wait3(opts):
+  assert isinstance(opts, int)
+  return (0, 0, 0)
+
+def wait4(pid, opts):
+  assert isinstance(pid, int)
+  assert isinstance(opts, int)
+  return (0, 0, 0)
+
+def waitpid(pid, opts):
+  assert isinstance(pid, int)
+  assert isinstance(opts, int)
+  return (0, 0)
+
+def write(fd, data):
+  assert isinstance(fd, int)
+  assert isinstance(data, str)
+  return
 

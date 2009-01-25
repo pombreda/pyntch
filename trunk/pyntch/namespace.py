@@ -27,7 +27,7 @@ class Variable(CompoundTypeNode):
   
 ##  Namespace
 ##
-class Namespace:
+class Namespace(object):
 
   debug = 0
 
@@ -35,8 +35,10 @@ class Namespace:
     self.parent_space = parent_space
     self.name = name
     self.vars = {}
-    self.msgs = []
-    self.global_space = parent_space.global_space
+    if parent_space:
+      self.global_space = parent_space.global_space
+    else:
+      self.global_space = self
     return
   
   def __repr__(self):
@@ -307,27 +309,15 @@ class Namespace:
 
 ##  BuiltinNamespace
 ##
-class BuiltinNamespace(Namespace):
-
-  def __init__(self):
+class BuiltinTypesNamespace(Namespace):
+  
+  def __init__(self, parent):
     import builtin_types
     import aggregate_types
-    import builtin_funcs
-    import exception
-    
-    self.parent_space = None
-    self.name = '__builtin__'
-    self.vars = {}
-    self.msgs = []
-    self.global_space = self
-    #
-    self.register_var('True').bind(builtin_types.BoolType.get_object())
-    self.register_var('False').bind(builtin_types.BoolType.get_object())
-    self.register_var('None').bind(builtin_types.NoneType.get_object())
-    self.register_var('__name__').bind(builtin_types.StrType.get_object())
-    self.register_var('__file__').bind(builtin_types.StrType.get_object())
-
+    Namespace.__init__(self, parent, 'types')
+    # types
     self.register_var('type').bind(builtin_types.TypeType.get_typeobj())
+    self.register_var('NoneType').bind(builtin_types.NoneType.get_typeobj())
     self.register_var('int').bind(builtin_types.IntType.get_typeobj())
     self.register_var('long').bind(builtin_types.LongType.get_typeobj())
     self.register_var('float').bind(builtin_types.FloatType.get_typeobj())
@@ -343,38 +333,35 @@ class BuiltinNamespace(Namespace):
     self.register_var('tuple').bind(aggregate_types.TupleType.get_typeobj())
     self.register_var('set').bind(aggregate_types.SetType.get_typeobj())
     self.register_var('dict').bind(aggregate_types.DictType.get_typeobj())
+    #self.register_var('xrange').bind(builtin_types.XRangeType.get_typeobj())
+    #self.register_var('staticmethod').bind(builtin_types.StaticMethodType.get_typeobj())
+    #self.register_var('classmethod').bind(builtin_types.ClassMethodType.get_typeobj())
+    #self.register_var('reversed').bind(builtin_types.ReversedType.get_typeobj())
+    #self.register_var('frozenset').bind(builtin_types.FrozenSetType.get_typeobj())
     
-    #self.register_var('property').bind(builtin_types.XRangeFunc())
-    #self.register_var('xrange').bind(builtin_types.XRangeFunc())
-    #self.register_var('type').bind(builtin_types.TypeFunc())
-    #self.register_var('staticmethod').bind(builtin_types.StaticMethodFunc())
-    #self.register_var('classmethod').bind(builtin_types.ClassMethodFunc())
-    #self.register_var('reversed').bind(builtin_types.ReversedFunc())
-    #self.register_var('frozenset').bind(builtin_types.FrozenSetType())
-
-    # abs,all,any,apply,
-    # divmod,enumerate,
-    # filter,
-    # isinstance,issubclass,
-    # map,max,min,pow,
-    # reduce,sorted,sum,zip
-    self.register_var('callable').bind(builtin_funcs.CallableFunc())
-    self.register_var('chr').bind(builtin_funcs.ChrFunc())
-    self.register_var('cmp').bind(builtin_funcs.CmpFunc())
-    self.register_var('dir').bind(builtin_funcs.DirFunc())
-    self.register_var('hash').bind(builtin_funcs.HashFunc())
-    self.register_var('hex').bind(builtin_funcs.HexFunc())
-    self.register_var('id').bind(builtin_funcs.IdFunc())
-    self.register_var('iter').bind(builtin_types.IterFunc())
-    self.register_var('len').bind(builtin_funcs.LenFunc())
-    self.register_var('oct').bind(builtin_funcs.OctFunc())
-    self.register_var('ord').bind(builtin_funcs.OrdFunc())
-    self.register_var('range').bind(builtin_funcs.RangeFunc())
-    self.register_var('raw_input').bind(builtin_funcs.RawInputFunc())
-    self.register_var('repr').bind(builtin_funcs.ReprFunc())
-    self.register_var('round').bind(builtin_funcs.RoundFunc())
-    self.register_var('unichr').bind(builtin_funcs.UnichrFunc())
-
+    #self.register_var('BuiltinFunctionType').bind(builtin_types.BuiltinFunc.get_typeobj())
+    #self.register_var('BuiltinMethodType').bind(builtin_types.BuiltinFunc.get_typeobj())
+    #self.register_var('ClassType').bind(function.ClassType.get_typeobj())
+    #self.register_var('FunctionType').bind(function.FuncType.get_typeobj())
+    #self.register_var('LambdaType').bind(function.LambdaFuncType.get_typeobj())
+    #self.register_var('GeneratorType').bind(function.IterType.get_typeobj())
+    #self.register_var('InstanceType').bind(function.InstanceType.get_typeobj())
+    #self.register_var('MethodType').bind(function.MethodType.get_typeobj())
+    
+    #self.register_var('ModuleType').bind(module.ModuleType.get_typeobj())
+    
+    #self.register_var('buffer').bind(builtin_types.BufferType.get_typeobj())
+    #self.register_var('property').bind(builtin_types.PropertyType.get_typeobj())
+    return
+    
+  def fullname(self):
+    return '.types'
+  
+class BuiltinExceptionsNamespace(Namespace):
+  
+  def __init__(self, parent):
+    import exception
+    Namespace.__init__(self, parent, 'exceptions')
     # exceptions
     self.register_var('Exception').bind(exception.ExceptionType())
     self.register_var('StandardError').bind(exception.StandardErrorType())
@@ -386,9 +373,6 @@ class BuiltinNamespace(Namespace):
     self.register_var('AttributeError').bind(exception.AttributeErrorType())
     self.register_var('EnvironmentError').bind(exception.EnvironmentErrorType())
     self.register_var('IOError').bind(exception.IOErrorType())
-    self.register_var('OSError').bind(exception.OSErrorType())
-    self.register_var('WindowsError.').bind(exception.WindowsErrorType())
-    self.register_var('VMSError').bind(exception.VMSErrorType())
     self.register_var('EOFError').bind(exception.EOFErrorType())
     self.register_var('ImportError').bind(exception.ImportErrorType())
     self.register_var('LookupError').bind(exception.LookupErrorType())
@@ -410,12 +394,51 @@ class BuiltinNamespace(Namespace):
     self.register_var('UnicodeDecodeError').bind(exception.UnicodeDecodeErrorType())
     self.register_var('UnicodeEncodeError').bind(exception.UnicodeEncodeErrorType())
     self.register_var('UnicodeTranslateError').bind(exception.UnicodeTranslateErrorType())
+    return
+    
+  def fullname(self):
+    return '.exceptions'
+  
+class BuiltinNamespace(Namespace):
 
-    # buffer, coerce, intern
+  def __init__(self):
+    import builtin_types
+    import builtin_funcs
+    Namespace.__init__(self, None, '__builtin__')
+    self.import_all(BuiltinTypesNamespace(self))
+    self.import_all(BuiltinExceptionsNamespace(self))
+
+    # abs,all,any,apply,divmod,enumerate,
+    # filter,isinstance,issubclass,
+    # map,max,min,pow,
+    # reduce,sorted,sum,zip
+    self.register_var('callable').bind(builtin_funcs.CallableFunc())
+    self.register_var('chr').bind(builtin_funcs.ChrFunc())
+    self.register_var('cmp').bind(builtin_funcs.CmpFunc())
+    self.register_var('dir').bind(builtin_funcs.DirFunc())
+    self.register_var('hash').bind(builtin_funcs.HashFunc())
+    self.register_var('hex').bind(builtin_funcs.HexFunc())
+    self.register_var('id').bind(builtin_funcs.IdFunc())
+    self.register_var('iter').bind(builtin_funcs.IterFunc())
+    self.register_var('len').bind(builtin_funcs.LenFunc())
+    self.register_var('oct').bind(builtin_funcs.OctFunc())
+    self.register_var('ord').bind(builtin_funcs.OrdFunc())
+    self.register_var('range').bind(builtin_funcs.RangeFunc())
+    self.register_var('raw_input').bind(builtin_funcs.RawInputFunc())
+    self.register_var('repr').bind(builtin_funcs.ReprFunc())
+    self.register_var('round').bind(builtin_funcs.RoundFunc())
+    self.register_var('unichr').bind(builtin_funcs.UnichrFunc())
+
+    # coerce, intern
     # vars,eval,locals,globals,compile,getattr,hasattr,setattr,delattr,reload,__import__,execfile,input
+
+    # Builtin constants.
+    self.register_var('True').bind(builtin_types.BoolType.get_object())
+    self.register_var('False').bind(builtin_types.BoolType.get_object())
+    self.register_var('None').bind(builtin_types.NoneType.get_object())
+    self.register_var('__name__').bind(builtin_types.StrType.get_object())
+    self.register_var('__file__').bind(builtin_types.StrType.get_object())
     return
 
   def fullname(self):
     return ''
-  
-

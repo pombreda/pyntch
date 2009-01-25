@@ -10,7 +10,7 @@ from namespace import Namespace
 from function import ClassType, InstanceType
 from builtin_types import IterObject, NumberType, BoolType, IntType, LongType, FloatType, \
      BaseStringType, StrType, UnicodeType, ANY_TYPE, \
-     BuiltinFunc, BuiltinConstFunc
+     BuiltinFunc, BuiltinConstFunc, IterFunc
 from aggregate_types import ListObject, TupleObject
 
 

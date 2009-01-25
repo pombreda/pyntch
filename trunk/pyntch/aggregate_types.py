@@ -11,17 +11,18 @@ from builtin_types import BuiltinFunc, BuiltinConstFunc, \
 ##
 class BuiltinAggregateObject(SimpleTypeNode):
 
-  TYPEOBJ = 'undefined'
+  TYPEOBJ = None
 
   def __init__(self):
     SimpleTypeNode.__init__(self, self.TYPEOBJ)
     return
 
-  # get_typename()
+  # get_type()
   # returns the name of the Python type of this object.
   @classmethod
-  def get_typename(klass):
-    return klass.TYPEOBJ.get_typename()
+  def get_type(klass):
+    assert isinstance(klass.TYPEOBJ, BuiltinType)
+    return klass.TYPEOBJ
 
   # get_null()
   NULL = None
@@ -37,7 +38,7 @@ class BuiltinAggregateObject(SimpleTypeNode):
   
 ##  List
 ##
-class ListType(BuiltinType, BuiltinFunc):
+class ListType(BuiltinFunc):
   
   PYTHON_TYPE = list
   
@@ -213,7 +214,7 @@ class ListObject(BuiltinAggregateObject):
 
 ##  TupleObject
 ##
-class TupleType(BuiltinType, BuiltinFunc):
+class TupleType(BuiltinFunc):
   
   PYTHON_TYPE = tuple
 
@@ -352,7 +353,7 @@ class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
 
 ##  SetObject
 ##
-class SetType(BuiltinType, BuiltinFunc):
+class SetType(BuiltinFunc):
 
   PYTHON_TYPE = set
 
@@ -444,7 +445,7 @@ class SetObject(BuiltinAggregateObject):
 
 ##  DictObject
 ##
-class DictType(BuiltinType, BuiltinFunc):
+class DictType(BuiltinFunc):
   
   PYTHON_TYPE = dict
   

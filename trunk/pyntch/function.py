@@ -116,6 +116,9 @@ class FuncType(BuiltinType, TreeReporter):
   def get_name(klass):
     return 'function'
   
+  def get_type(self):
+    return self
+
   def call(self, frame, args, kwargs):
     from builtin_types import StrType
     from aggregate_types import DictObject, TupleObject, TupleUnpack
@@ -217,14 +220,18 @@ class LambdaFuncType(FuncType):
     evals.append(('r', build_expr(self, body, self.space, tree, evals)))
     body.set_retval(evals)
     return body
+
+  @classmethod
+  def get_name(klass):
+    return 'lambda'
   
   def __repr__(self):
     return ('<LambdaFunc %s>' % (self.name))
 
 
-##  BoundMethod
+##  MethodType
 ##
-class BoundMethod(BuiltinType):
+class MethodType(BuiltinType):
 
   def __init__(self, arg0, func):
     self.arg0 = arg0
@@ -233,12 +240,15 @@ class BoundMethod(BuiltinType):
     return
 
   def __repr__(self):
-    return '<Bound %r(%s=%r)>' % (self.func, self.func.argnames[0], self.arg0)
+    return '<method %r(%s=%r)>' % (self.func, self.func.argnames[0], self.arg0)
 
   @classmethod
   def get_name(klass):
-    return 'boundmethod'
+    return 'method'
   
+  def get_type(self):
+    return self
+
   def call(self, frame, args, kwargs):
     return self.func.call(frame, (self.arg0,)+tuple(args), kwargs)
 
@@ -384,7 +394,7 @@ class ClassType(BuiltinType, TreeReporter):
 
   def bind_func(self, func):
     if func not in self.boundmethods:
-      method = BoundMethod(self, func)
+      method = MethodType(self, func)
       self.boundmethods[func] = method
     else:
       method = self.boundmethods[func]
@@ -464,6 +474,10 @@ class InstanceType(SimpleTypeNode):
   def __repr__(self):
     return ('<Instance %s>' % (self.klass.name,))
 
+  @classmethod
+  def get_name(klass):
+    return 'instance'
+  
   def get_type(self):
     return self.klass
 
@@ -491,7 +505,7 @@ class InstanceType(SimpleTypeNode):
 
   def bind_func(self, func):
     if func not in self.boundmethods:
-      method = BoundMethod(self, func)
+      method = MethodType(self, func)
       self.boundmethods[func] = method
     else:
       method = self.boundmethods[func]

@@ -35,9 +35,9 @@ class ExceptionObject(SimpleTypeNode):
 
   def __repr__(self):
     if self.loc:
-      return '<%s: %s> at %s(%d)' % (self.get_typename(), self.message, self.loc._modname, self.loc.lineno)
+      return '<%s: %s> at %s(%d)' % (self.get_type().get_name(), self.message, self.loc._modname, self.loc.lineno)
     else:
-      return '<%s: %s>' % (self.get_typename(), self.message)
+      return '<%s: %s>' % (self.get_type().get_name(), self.message)
 
   def get_attr(self, name, write=False):
     if name == 'args':
@@ -64,12 +64,12 @@ class EnvironmentErrorType(StandardErrorType):
   PYTHON_TYPE = EnvironmentError
 class IOErrorType(EnvironmentErrorType):
   PYTHON_TYPE = IOError
-class OSErrorType(EnvironmentErrorType):
-  PYTHON_TYPE = OSError
-class WindowsErrorType(OSErrorType):
-  PYTHON_TYPE = OSError # I mean WindowsError.
-class VMSErrorType(OSErrorType):
-  PYTHON_TYPE = OSError # I mean VMSError.
+#class OSErrorType(EnvironmentErrorType):
+#  PYTHON_TYPE = OSError
+#class WindowsErrorType(OSErrorType):
+#  PYTHON_TYPE = OSError # I mean WindowsError.
+#class VMSErrorType(OSErrorType):
+#  PYTHON_TYPE = OSError # I mean VMSError.
 class EOFErrorType(StandardErrorType):
   PYTHON_TYPE = EOFError
 class ImportErrorType(StandardErrorType):
@@ -317,7 +317,7 @@ class TypeChecker(CompoundTypeNode):
           self.update_types(obj)
           break
       else:
-        s = '|'.join( typeobj.get_typename() for typeobj in self.validtypes )
+        s = '|'.join( typeobj.get_type().get_name() for typeobj in self.validtypes )
         self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be %s' % (self.blame, obj, s),
                                                          self.loc))
     return

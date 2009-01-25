@@ -89,13 +89,10 @@ class SimpleTypeNode(TypeNode):
     return
 
   def __repr__(self):
-    return '<%s>' % self.get_typename()
+    return '<%s>' % self.get_type().get_name()
 
   def get_type(self):
     return self.typeobj
-
-  def get_typename(self):
-    return self.typeobj.get_name()
 
   def is_type(self, *typeobjs):
     for typeobj in typeobjs:
@@ -195,7 +192,6 @@ class BuiltinType(SimpleTypeNode):
   def __repr__(self):
     return '<type %s>' % self.get_name()
 
-  
   @classmethod
   def get_type(klass):
     from builtin_types import TypeType

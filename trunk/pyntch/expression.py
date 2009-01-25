@@ -165,7 +165,7 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
           self.update_types([TupleObject.multiply(robj)])
           continue
         # other operations.
-        k = (lobj.get_typename(), self.op, robj.get_typename())
+        k = (lobj.get_type().get_name(), self.op, robj.get_type().get_name())
         if k in self.VALID_TYPES:
           v = BUILTIN_OBJECTS[self.VALID_TYPES[k]]
           self.update_types([v])
