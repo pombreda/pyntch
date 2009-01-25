@@ -3,14 +3,17 @@ import sys, os.path
 stderr = sys.stderr
 from typenode import TreeReporter, BuiltinType
 from exception import ExceptionFrame
-from namespace import Namespace, BuiltinNamespace
+from namespace import Namespace
 
 
+##  ModuleType
+##
 class ModuleType(BuiltinType):
   
-  def __init__(self, parent_space, name):
+  def __init__(self, name, space):
     self.name = name
-    self.space = Namespace(parent_space, name)
+    self.space = space
+    BuiltinType.__init__(self)
     return
   
   def __repr__(self):
@@ -22,16 +25,16 @@ class ModuleType(BuiltinType):
 
   def get_attr(self, name, write=False):
     return self.space.register_var(name)
-  
+
 
 ##  PythonModuleType
 ##
 class PythonModuleType(ModuleType, TreeReporter, ExceptionFrame):
 
-  def __init__(self, parent_reporter, parent_space, name, path):
+  def __init__(self, name, parent_space, path=None):
     self.path = path
-    ModuleType.__init__(self, parent_space, name)
-    TreeReporter.__init__(self, parent_reporter, name)
+    ModuleType.__init__(self, name, Namespace(parent_space, name))
+    TreeReporter.__init__(self, None, name)
     ExceptionFrame.__init__(self)
     return
   
@@ -60,21 +63,36 @@ class PythonModuleType(ModuleType, TreeReporter, ExceptionFrame):
     return
   
 
-class Loader(object):
+##  Interpreter
+##
+class Interpreter(object):
 
   class ModuleNotFound(Exception): pass
   
   debug = 0
   
-  module_path = []
-  MODULE_CACHE = {}
-  BUILTIN_NAMESPACE = None
+  module_path = None
+  MODULE_CACHE = None
+  DEFAULT_NAMESPACE = None
 
   @classmethod
   def initialize(klass, module_path):
     # global parameters.
+    from namespace import BuiltinTypesNamespace, BuiltinExceptionsNamespace, BuiltinNamespace, DefaultNamespace
     klass.module_path = module_path
-    klass.BUILTIN_NAMESPACE = BuiltinNamespace()
+    default = DefaultNamespace()
+    builtin = BuiltinNamespace(default)
+    types = BuiltinTypesNamespace(builtin)
+    exceptions = BuiltinExceptionsNamespace(builtin)
+    builtin.import_all(types)
+    builtin.import_all(exceptions)
+    default.import_all(builtin)
+    klass.DEFAULT_NAMESPACE = default
+    klass.MODULE_CACHE = {
+      '__builtin__': ModuleType('__builtin__', builtin),
+      'types': ModuleType('types', types),
+      'exceptions': ModuleType('exceptions', exceptions),
+      }
     return
 
   # find_module(name)
@@ -109,7 +127,7 @@ class Loader(object):
     dirname = os.path.dirname(path)
     if dirname not in klass.module_path:
       klass.module_path.insert(0, dirname)
-    module = PythonModuleType(None, klass.BUILTIN_NAMESPACE, modname, path)
+    module = PythonModuleType(modname, klass.DEFAULT_NAMESPACE, path)
     klass.MODULE_CACHE[modname] = module
     try:
       tree = parseFile(path)

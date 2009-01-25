@@ -11,7 +11,7 @@ from builtin_types import BuiltinFunc, BuiltinConstFunc, \
 ##
 class BuiltinAggregateObject(SimpleTypeNode):
 
-  TYPEOBJ = None
+  TYPEOBJ = None # must be defined by subclass
 
   def __init__(self):
     SimpleTypeNode.__init__(self, self.TYPEOBJ)
@@ -604,5 +604,3 @@ class DictObject(BuiltinAggregateObject):
 
   def get_iter(self, frame):
     return IterObject(elemall=self.key)
-  
-

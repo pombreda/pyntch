@@ -76,7 +76,7 @@ class Namespace(object):
   
   # register_names
   def register_names(self, tree):
-    from module import Loader
+    from module import Interpreter
     
     if isinstance(tree, ast.Module):
       self.register_names(tree.node)
@@ -182,13 +182,13 @@ class Namespace(object):
     elif isinstance(tree, ast.Import):
       for (modname,name) in tree.names:
         asname = name or modname
-        module = Loader.load_module(modname)
+        module = Interpreter.load_module(modname)
         self.register_var(asname)
         self[asname].bind(module)
 
     # from
     elif isinstance(tree, ast.From):
-      module = Loader.load_module(tree.modname)
+      module = Interpreter.load_module(tree.modname)
       for (name0,name1) in tree.names:
         if name0 == '*':
           self.import_all(module.space)
@@ -353,9 +353,6 @@ class BuiltinTypesNamespace(Namespace):
     #self.register_var('buffer').bind(builtin_types.BufferType.get_typeobj())
     #self.register_var('property').bind(builtin_types.PropertyType.get_typeobj())
     return
-    
-  def fullname(self):
-    return '.types'
   
 class BuiltinExceptionsNamespace(Namespace):
   
@@ -395,19 +392,13 @@ class BuiltinExceptionsNamespace(Namespace):
     self.register_var('UnicodeEncodeError').bind(exception.UnicodeEncodeErrorType())
     self.register_var('UnicodeTranslateError').bind(exception.UnicodeTranslateErrorType())
     return
-    
-  def fullname(self):
-    return '.exceptions'
   
 class BuiltinNamespace(Namespace):
 
-  def __init__(self):
+  def __init__(self, parent):
     import builtin_types
     import builtin_funcs
-    Namespace.__init__(self, None, '__builtin__')
-    self.import_all(BuiltinTypesNamespace(self))
-    self.import_all(BuiltinExceptionsNamespace(self))
-
+    Namespace.__init__(self, parent, '__builtin__')
     # abs,all,any,apply,divmod,enumerate,
     # filter,isinstance,issubclass,
     # map,max,min,pow,
@@ -436,9 +427,16 @@ class BuiltinNamespace(Namespace):
     self.register_var('True').bind(builtin_types.BoolType.get_object())
     self.register_var('False').bind(builtin_types.BoolType.get_object())
     self.register_var('None').bind(builtin_types.NoneType.get_object())
-    self.register_var('__name__').bind(builtin_types.StrType.get_object())
-    self.register_var('__file__').bind(builtin_types.StrType.get_object())
     return
 
+class DefaultNamespace(Namespace):
+  
+  def __init__(self):
+    import builtin_types
+    Namespace.__init__(self, None, '(default)')
+    self.register_var('__file__').bind(builtin_types.StrType.get_object())
+    self.register_var('__name__').bind(builtin_types.StrType.get_object())
+    return
+  
   def fullname(self):
     return ''
