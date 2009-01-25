@@ -129,6 +129,24 @@ class IdFunc(BuiltinConstFunc):
     return
 
 
+##  IsInstanceFunc
+##
+class IsInstanceFunc(BuiltinConstFunc):
+
+  def __init__(self):
+    BuiltinConstFunc.__init__(self, 'isinstance', BoolType.get_object(), [ANY_TYPE, ANY_TYPE])
+    return
+
+
+##  IsSubclassFunc
+##
+class IsSubclassFunc(BuiltinConstFunc):
+
+  def __init__(self):
+    BuiltinConstFunc.__init__(self, 'issubclass', BoolType.get_object(), [ANY_TYPE, ANY_TYPE])
+    return
+
+
 ##  OctFunc
 ##
 class OctFunc(BuiltinConstFunc):
