@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError
-from exception import ExceptionFrame, ExceptionRaiser, MustBeDefinedNode, \
+from exception import ExceptionRaiser, MustBeDefinedNode, \
      TypeErrorType, AttributeErrorType
 
 
@@ -87,7 +87,7 @@ class AttrAssign(CompoundTypeNode, ExceptionRaiser):
 
 ##  BinaryOp
 ##
-class BinaryOp(CompoundTypeNode, ExceptionRaiser):
+class BinaryOp(MustBeDefinedNode):
   
   def __init__(self, parent_frame, loc, op, left, right):
     self.op = op
@@ -175,6 +175,9 @@ class BinaryOp(CompoundTypeNode, ExceptionRaiser):
         self.raise_expt(TypeErrorType.occur(
           'unsupported operand %s for %r and %r' % (self.op, lobj, robj)))
     return
+  
+  def undefined(self):
+    return TypeErrorType.occur('unsupported operand %s for %r and %r' % (self.op, self.left, self.right))
 
 
 ##  AssignOp
@@ -426,4 +429,56 @@ class SliceAssign(CompoundTypeNode, ExceptionRaiser):
         self.value.connect(obj.get_element(self, [self.lower, self.upper], write=True))
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
+    return
+
+
+##  TupleUnpack
+##
+class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
+
+  ##  Element
+  ##
+  class Element(CompoundTypeNode):
+    
+    def __init__(self, tup, i):
+      CompoundTypeNode.__init__(self)
+      self.tup = tup
+      self.i = i
+      return
+
+    def __repr__(self):
+      return '<TupleElement: %r[%d]>' % (self.tup, self.i)
+  
+  #
+  def __init__(self, parent_frame, loc, tupobj, nelements):
+    self.tupobj = tupobj
+    self.elements = [ self.Element(self, i) for i in xrange(nelements) ]
+    CompoundTypeNode.__init__(self)
+    ExceptionRaiser.__init__(self, parent_frame, loc)
+    self.tupobj.connect(self, self.recv_tupobj)
+    return
+
+  def __repr__(self):
+    return '<TupleUnpack: %r>' % (self.tupobj,)
+
+  def get_nth(self, i):
+    return self.elements[i]
+
+  def recv_tupobj(self, src):
+    from aggregate_types import TupleType
+    assert src is self.tupobj
+    for obj in src:
+      if obj.is_type(TupleType.get_typeobj()) and obj.elements != None:
+        if len(obj.elements) != len(self.elements):
+          self.raise_expt(ValueErrorType.occur('tuple unpackable: len(%r) != %r' % (obj, len(self.elements))))
+        else:
+          for (src,dest) in zip(obj.elements, self.elements):
+            src.connect(dest)
+      else:
+        try:
+          src = obj.get_seq(self)
+          for dest in self.elements:
+            src.connect(dest)
+        except NodeTypeError:
+          self.raise_expt(TypeErrorType.occur('not iterable: %r' % src))
     return

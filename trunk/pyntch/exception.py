@@ -18,26 +18,21 @@ class ExceptionType(BuiltinType):
   PYTHON_TYPE = Exception
 
   @classmethod
-  def occur(klass, message, loc=None):
-    return ExceptionObject(klass.get_typeobj(), message, loc=loc)
+  def occur(klass, message):
+    return ExceptionObject(klass.get_typeobj(), message)
   maybe = occur
 
 class ExceptionObject(SimpleTypeNode):
 
-  def __init__(self, typeobj, message, args=None, loc=None):
-    assert not loc or isinstance(loc, ast.Node), loc
+  def __init__(self, typeobj, message, args=None):
     self.typeobj = typeobj
     self.message = message
     self.args = args
-    self.loc = loc
     SimpleTypeNode.__init__(self, typeobj)
     return
 
   def __repr__(self):
-    if self.loc:
-      return '<%s: %s> at %s(%d)' % (self.get_type().get_name(), self.message, self.loc._modname, self.loc.lineno)
-    else:
-      return '<%s: %s>' % (self.get_type().get_name(), self.message)
+    return '<%s: %s>' % (self.get_type().get_name(), self.message)
 
   def get_attr(self, name, write=False):
     if name == 'args':
@@ -46,6 +41,18 @@ class ExceptionObject(SimpleTypeNode):
       return XXX
     raise NodeAttrError(name)
 
+class TracebackObject(object):
+  def __init__(self, obj, loc):
+    self.obj = obj
+    self.loc = loc
+    return
+  def __repr__(self):
+    return '%s at %s(%d)' % (self.obj, self.loc._modname, self.loc.lineno)
+  def equal(self, obj, done):
+    return self is obj
+  def desc1(self, _):
+    return repr(self)
+  
 class StandardErrorType(ExceptionType):
   PYTHON_TYPE = StandardError
 class ArithmeticErrorType(StandardErrorType):
@@ -125,25 +132,39 @@ class ExceptionFrame(object):
 
   debug = 0
 
-  def __init__(self):
-    self.expt = CompoundTypeNode()
+  class ExceptionAnnotator(CompoundTypeNode):
+    
+    def __init__(self, loc):
+      self.loc = loc
+      CompoundTypeNode.__init__(self)
+      return
+    
+    def recv(self, src):
+      for obj in src:
+        if self.loc and not isinstance(obj, TracebackObject):
+          obj = TracebackObject(obj, self.loc)
+        self.update_types([obj])
+      return
+
+  def __init__(self, parent=None, loc=None):
+    self.loc = loc
+    self.expt = self.ExceptionAnnotator(loc)
+    if parent:
+      self.connect_expt(parent)
     return
 
   def connect_expt(self, frame):
     assert isinstance(frame, ExceptionFrame)
     if self.debug:
       print >>stderr, 'connect_expt: %r <- %r' % (frame, self)
-    frame.add_expt(self.expt)
+    self.expt.connect(frame.expt)
     return
   
-  def add_expt(self, expt):
+  def raise_expt(self, expt):
     if self.debug:
-      print >>stderr, 'add_expt: %r <- %r' % (self, expt)
-    assert isinstance(expt, TypeNode)
+      print >>stderr, 'raise_expt: %r <- %r' % (self, expt)
     expt.connect(self.expt)
     return
-
-  raise_expt = add_expt
 
   def show(self, p):
     for expt in self.expt:
@@ -214,20 +235,8 @@ class ExceptionCatcher(ExceptionFrame):
 
 ##  ExceptionRaiser
 ##
-class ExceptionRaiser(ExceptionFrame):
+class ExceptionRaiser(ExceptionFrame): pass
 
-  def __init__(self, parent, loc):
-    assert not loc or isinstance(loc, ast.Node), loc
-    self.loc = loc
-    ExceptionFrame.__init__(self)
-    self.connect_expt(parent)
-    return
-  
-  def raise_expt(self, expt):
-    expt.loc = self.loc
-    ExceptionFrame.raise_expt(self, expt)
-    return
-  
 
 ##  MustBeDefinedNode
 ##
@@ -282,8 +291,6 @@ class ExceptionMaker(CompoundTypeNode, ExceptionRaiser):
         except NodeTypeError:
           self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.exctype, obj)))
           continue
-        for parent in self.callers:
-          result.connect_expt(parent)
         result.connect(self)
       else:
         obj.connect(self)
@@ -294,11 +301,10 @@ class ExceptionMaker(CompoundTypeNode, ExceptionRaiser):
 ##
 class TypeChecker(CompoundTypeNode):
   
-  def __init__(self, parent_frame, types, loc=None, blame=None):
+  def __init__(self, parent_frame, types, blame=None):
     CompoundTypeNode.__init__(self)
     self.parent_frame = parent_frame
     self.validtypes = CompoundTypeNode()
-    self.loc = loc
     self.blame = blame
     if not isinstance(types, (tuple,list)):
       types = (types,)
@@ -318,8 +324,7 @@ class TypeChecker(CompoundTypeNode):
           break
       else:
         s = '|'.join( typeobj.get_name() for typeobj in self.validtypes )
-        self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be %s' % (self.blame, obj, s),
-                                                         self.loc))
+        self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be %s' % (self.blame, obj, s)))
     return
 
 
@@ -333,8 +338,7 @@ class ElementTypeChecker(TypeChecker):
         obj.get_seq(self.parent_frame).connect(self, self.recv_elemobj)
       except NodeTypeError:
         if self.blame:
-          self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be iterable' % (self.blame, obj),
-                                                           self.loc))
+          self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be iterable' % (self.blame, obj)))
     return
   
   def recv_elemobj(self, src):
@@ -345,6 +349,5 @@ class ElementTypeChecker(TypeChecker):
           break
       elif self.blame:
         self.parent_frame.raise_expt(TypeErrorType.occur(
-          '%s (%s) must be [%s]' % (self.blame, obj, '|'.join(map(repr, self.validtypes))),
-          self.loc))
+          '%s (%s) must be [%s]' % (self.blame, obj, '|'.join(map(repr, self.validtypes)))))
     return

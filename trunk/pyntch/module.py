@@ -41,10 +41,6 @@ class PythonModuleType(ModuleType, TreeReporter, ExceptionFrame):
   def __repr__(self):
     return '<Module %s (%s)>' % (self.name, self.path)
 
-  def raise_expt(self, expt):
-    self.add_expt(expt)
-    return
-  
   def load(self, tree):
     from syntax import build_stmt
     evals = []

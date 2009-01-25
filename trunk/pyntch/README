@@ -3,6 +3,9 @@ README
 
 
 # TODO:
+#  remove equal()
+#  raise_expt at syntax.py
+#  functype -> funcobject
 #  hier class types.
 #  iterator support: it.next(), gen.send(), etc.
 #  optional method: __add__, __eq__, __iter__ etc.
