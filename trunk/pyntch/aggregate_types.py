@@ -3,8 +3,19 @@
 from typenode import SimpleTypeNode, CompoundTypeNode, BuiltinType, NodeTypeError, NodeAttrError
 from exception import TypeChecker, \
      TypeErrorType, IndexErrorType, ValueErrorType, KeyErrorType
-from builtin_types import BuiltinFunc, BuiltinConstFunc, \
-     ElementAll, IterObject, BoolType, IntType, NoneType, ANY_TYPE
+from builtin_types import InternalFunc, InternalConstFunc, BoolType, IntType, NoneType, ANY_TYPE
+
+
+
+##  ElementAll
+##
+class ElementAll(CompoundTypeNode):
+  
+  def __init__(self, elements):
+    CompoundTypeNode.__init__(self)
+    for obj in elements:
+      obj.connect(self)
+    return
 
 
 ##  BuiltinAggregateObject
@@ -32,13 +43,30 @@ class BuiltinAggregateObject(SimpleTypeNode):
       klass.NULL = klass([])
     return klass.NULL
 
+class BuiltinSequenceObject(BuiltinAggregateObject):
+  
+  def __init__(self, elements=None, elemall=None):
+    self.elements = elements
+    if elements == None:
+      assert elemall != None
+      self.elemall = elemall
+    else:
+      assert elements != None
+      self.elemall = ElementAll(elements)
+    BuiltinAggregateObject.__init__(self)
+    return
+
+  def equal(self, obj, done=None):
+    if obj.__class__ is not self.__class__: return False
+    return self.elemall.equal(obj.elemall, done)
+
 
 ##  Aggregate Types
 ##
   
 ##  List
 ##
-class ListType(BuiltinFunc):
+class ListType(BuiltinType, InternalFunc):
   
   PYTHON_TYPE = list
   
@@ -69,29 +97,15 @@ class ListType(BuiltinFunc):
       return ListObject.get_null()
 
   def __init__(self):
-    BuiltinFunc.__init__(self, 'list', [], [ANY_TYPE])
+    InternalFunc.__init__(self, 'list', [], [ANY_TYPE])
     return
   
-class ListObject(BuiltinAggregateObject):
+class ListObject(BuiltinSequenceObject):
 
   TYPEOBJ = ListType.get_typeobj()
   
-  def __init__(self, elements=None, elemall=None):
-    if elements == None:
-      assert elemall != None
-      self.elemall = elemall
-    else:
-      assert elements != None
-      self.elemall = ElementAll(elements)
-    BuiltinAggregateObject.__init__(self)
-    return
-  
   def __repr__(self):
     return '[%s]' % self.elemall.describe()
-
-  def equal(self, obj, done):
-    if not isinstance(obj, ListObject): return False
-    return self.elemall.equal(obj.elemall, done)
 
   @classmethod
   def concat(klass, obj1, obj2):
@@ -114,28 +128,28 @@ class ListObject(BuiltinAggregateObject):
     if name == 'append':
       return self.AppendMethod(self)
     elif name == 'count':
-      return BuiltinConstFunc('list.count', IntType.get_object(),
+      return InternalConstFunc('list.count', IntType.get_object(),
                               [ANY_TYPE])
     elif name == 'extend':
       return self.ExtendMethod(self)
     elif name == 'index':
-      return BuiltinConstFunc('list.index', IntType.get_object(),
+      return InternalConstFunc('list.index', IntType.get_object(),
                          [ANY_TYPE],
                          [IntType, IntType],
                          [ValueErrorType.maybe('might not able to find the element.')])
     elif name == 'insert':
       return self.InsertMethod(self)
     elif name == 'pop':
-      return BuiltinConstFunc('list.pop', NoneType.get_object(),
+      return InternalConstFunc('list.pop', NoneType.get_object(),
                               [],
                               [IntType],
                               [ValueErrorType.maybe('might be empty list or out of range.')])
     elif name == 'remove':
-      return BuiltinConstFunc('list.remove', NoneType.get_object(),
+      return InternalConstFunc('list.remove', NoneType.get_object(),
                               [ANY_TYPE],
                               [ValueErrorType.maybe('might not able to remove the element.')])
     elif name == 'reverse':
-      return BuiltinConstFunc('list.remove', NoneType.get_object())
+      return InternalConstFunc('list.remove', NoneType.get_object())
     elif name == 'sort':
       return self.SortMethod(NoneType.get_object())
     raise NodeAttrError(name)
@@ -149,17 +163,17 @@ class ListObject(BuiltinAggregateObject):
 
   ##  Methods
   ##
-  class AppendMethod(BuiltinConstFunc):
+  class AppendMethod(InternalConstFunc):
     def __init__(self, listobj):
       self.listobj = listobj
-      BuiltinConstFunc.__init__(self, 'list.append', NoneType.get_object(), [ANY_TYPE])
+      InternalConstFunc.__init__(self, 'list.append', NoneType.get_object(), [ANY_TYPE])
       return
     def __repr__(self):
       return '%r.append' % self.listobj
     def accept_arg(self, frame, _):
       return self.listobj.elemall
 
-  class ExtendMethod(BuiltinConstFunc):
+  class ExtendMethod(InternalConstFunc):
     
     class ElementExtender(CompoundTypeNode):
       def __init__(self, frame, elemall):
@@ -176,7 +190,7 @@ class ListObject(BuiltinAggregateObject):
         return
 
     def __init__(self, listobj):
-      BuiltinConstFunc.__init__(self, 'list.extend', NoneType.get_object(), [ANY_TYPE])
+      InternalConstFunc.__init__(self, 'list.extend', NoneType.get_object(), [ANY_TYPE])
       self.listobj = listobj
       return
     def __repr__(self):
@@ -184,10 +198,10 @@ class ListObject(BuiltinAggregateObject):
     def accept_arg(self, frame, i):
       return self.ElementExtender(frame, self.listobj.elemall)
     
-  class InsertMethod(BuiltinConstFunc):
+  class InsertMethod(InternalConstFunc):
     
     def __init__(self, listobj):
-      BuiltinConstFunc.__init__(self, 'list.insert', NoneType.get_object(), [IntType, ANY_TYPE], [],
+      InternalConstFunc.__init__(self, 'list.insert', NoneType.get_object(), [IntType, ANY_TYPE], [],
                                 [IndexErrorType.maybe('might be out of range.')])
       self.listobj = listobj
       return
@@ -199,12 +213,12 @@ class ListObject(BuiltinAggregateObject):
       if i == 0:
         return self.listobj.elemall
       else:
-        return BuiltinConstFunc.accept_arg(self, frame, i)
+        return InternalConstFunc.accept_arg(self, frame, i)
       
-  class SortMethod(BuiltinConstFunc):
+  class SortMethod(InternalConstFunc):
     
     def __init__(self, listobj):
-      BuiltinConstFunc.__init__(self, 'list.sort', NoneType.get_object())
+      InternalConstFunc.__init__(self, 'list.sort', NoneType.get_object())
       self.listobj = listobj
       return
     
@@ -214,7 +228,7 @@ class ListObject(BuiltinAggregateObject):
 
 ##  TupleObject
 ##
-class TupleType(BuiltinFunc):
+class TupleType(BuiltinType, InternalFunc):
   
   PYTHON_TYPE = tuple
 
@@ -245,23 +259,12 @@ class TupleType(BuiltinFunc):
       return TupleObject.get_null()
 
   def __init__(self):
-    BuiltinFunc.__init__(self, 'tuple', [], [ANY_TYPE])
+    InternalFunc.__init__(self, 'tuple', [], [ANY_TYPE])
     return
 
-class TupleObject(BuiltinAggregateObject):
+class TupleObject(BuiltinSequenceObject):
 
   TYPEOBJ = TupleType.get_typeobj()
-  
-  def __init__(self, elements=None, elemall=None):
-    self.elements = elements
-    if elements == None:
-      assert elemall != None
-      self.elemall = elemall
-    else:
-      assert elemall == None
-      self.elemall = ElementAll(elements)
-    BuiltinAggregateObject.__init__(self)
-    return
   
   def __repr__(self):
     if self.elements == None:
@@ -301,7 +304,7 @@ class TupleObject(BuiltinAggregateObject):
 
 ##  SetObject
 ##
-class SetType(BuiltinFunc):
+class SetType(BuiltinType, InternalFunc):
 
   PYTHON_TYPE = set
 
@@ -332,22 +335,12 @@ class SetType(BuiltinFunc):
       return SetObject.get_null()
 
   def __init__(self):
-    BuiltinFunc.__init__(self, 'set', [], [ANY_TYPE])
+    InternalFunc.__init__(self, 'set', [], [ANY_TYPE])
     return
 
-class SetObject(BuiltinAggregateObject):
+class SetObject(BuiltinSequenceObject):
 
   TYPEOBJ = SetType.get_typeobj()
-  
-  def __init__(self, elements=None, elemall=None):
-    if elements == None:
-      assert elemall != None
-      self.elemall = elemall
-    else:
-      assert elements != None
-      self.elemall = ElementAll(elements)
-    BuiltinAggregateObject.__init__(self)
-    return
   
   def __repr__(self):
     return '([%s])' % (self.elemall)
@@ -391,9 +384,48 @@ class SetObject(BuiltinAggregateObject):
     raise NodeAttrError(name)
   
 
+##  IterObject
+##
+class IterType(BuiltinType):
+
+  @classmethod
+  def get_name(klass):
+    return 'iterator'
+  
+class IterObject(SimpleTypeNode):
+
+  def __init__(self, elements=None, elemall=None):
+    if elements == None:
+      assert elemall != None
+      self.elemall = elemall
+    else:
+      assert elements != None
+      self.elemall = ElementAll(elements)
+    SimpleTypeNode.__init__(self, self)
+    return
+  
+  def __repr__(self):
+    return '(%s, ...)' % self.elemall
+
+  def desc1(self, done):
+    return '(%s, ...)' % self.elemall.desc1(done)
+
+  @classmethod
+  def get_type(klass):
+    return IterType.get_type()
+
+  def get_iter(self, frame):
+    return self
+
+  def get_attr(self, name, write=False):
+    if name == 'next':
+      return InternalConstFunc('iter.next', self.elemall)
+    raise NodeAttrError(name)
+  
+
 ##  DictObject
 ##
-class DictType(BuiltinFunc):
+class DictType(BuiltinType, InternalFunc):
   
   PYTHON_TYPE = dict
   
@@ -442,7 +474,7 @@ class DictType(BuiltinFunc):
       return DictObject.get_null()
 
   def __init__(self):
-    BuiltinFunc.__init__(self, 'dict', [], [ANY_TYPE]) # XXX take keyword argument!
+    InternalFunc.__init__(self, 'dict', [], [ANY_TYPE]) # XXX take keyword argument!
     return
 
 class DictObject(BuiltinAggregateObject):
@@ -450,12 +482,12 @@ class DictObject(BuiltinAggregateObject):
   TYPEOBJ = DictType.get_typeobj()
   
   # dict.get
-  class Get(BuiltinConstFunc):
+  class Get(InternalConstFunc):
     def __init__(self, dictobj):
       self.dictobj = dictobj
       self.found = CompoundTypeNode()
       dictobj.value.connect(self.found)
-      BuiltinConstFunc.__init__(self, 'dict.get', self.found, [ANY_TYPE], [ANY_TYPE])
+      InternalConstFunc.__init__(self, 'dict.get', self.found, [ANY_TYPE], [ANY_TYPE])
       return
     def __repr__(self):
       return '%r.get' % self.dictobj
@@ -465,10 +497,10 @@ class DictObject(BuiltinAggregateObject):
       return self.found
 
   # dict.setdefault
-  class SetDefault(BuiltinConstFunc):
+  class SetDefault(InternalConstFunc):
     def __init__(self, dictobj):
       self.dictobj = dictobj
-      BuiltinConstFunc.__init__(self, 'dict.setdefault', dictobj.default, [ANY_TYPE], [ANY_TYPE])
+      InternalConstFunc.__init__(self, 'dict.setdefault', dictobj.default, [ANY_TYPE], [ANY_TYPE])
       return
     def __repr__(self):
       return '%r.setdefault' % self.dictobj
@@ -497,6 +529,10 @@ class DictObject(BuiltinAggregateObject):
   def __repr__(self):
     return '{%s: %s}' % (self.key, self.value)
 
+  def equal(self, obj, done=None):
+    if not isinstance(obj, DictObject): return False
+    return self.key.equal(obj.key, done) and self.value.equal(obj.value, done)
+  
   def copy(self):
     return DictObject(key=self.key, value=self.value)
 
@@ -510,35 +546,35 @@ class DictObject(BuiltinAggregateObject):
 
   def get_attr(self, name, write=False):
     if name == 'clear':
-      return BuiltinConstFunc('dict.clear', NoneType.get_object())
+      return InternalConstFunc('dict.clear', NoneType.get_object())
     elif name == 'copy':
-      return BuiltinConstFunc('dict.copy', self.copy())
+      return InternalConstFunc('dict.copy', self.copy())
     elif name == 'fromkeys':
       return self.FromKeys()
     elif name == 'get':
       return self.Get(self)
     elif name == 'has_key':
-      return BuiltinConstFunc('dict.has_key', BoolType.get_object(), [ANY_TYPE])
+      return InternalConstFunc('dict.has_key', BoolType.get_object(), [ANY_TYPE])
     elif name == 'items':
-      return BuiltinConstFunc('dict.items', ListObject([ TupleObject([self.key, self.value]) ]))
+      return InternalConstFunc('dict.items', ListObject([ TupleObject([self.key, self.value]) ]))
     elif name == 'iteritems':
-      return BuiltinConstFunc('dict.iteritems', IterObject([ TupleObject([self.key, self.value]) ]))
+      return InternalConstFunc('dict.iteritems', IterObject([ TupleObject([self.key, self.value]) ]))
     elif name == 'iterkeys':
-      return BuiltinConstFunc('dict.iterkeys', IterObject([ TupleObject([self.key]) ]))
+      return InternalConstFunc('dict.iterkeys', IterObject([ TupleObject([self.key]) ]))
     elif name == 'itervalues':
-      return BuiltinConstFunc('dict.itervalues', IterObject([ TupleObject([self.value]) ]))
+      return InternalConstFunc('dict.itervalues', IterObject([ TupleObject([self.value]) ]))
     elif name == 'keys':
-      return BuiltinConstFunc('dict.keys', ListObject([ TupleObject([self.key]) ]))
+      return InternalConstFunc('dict.keys', ListObject([ TupleObject([self.key]) ]))
     elif name == 'pop':
       return self.Get(self)
     elif name == 'popitem':
-      return BuiltinConstFunc('dict.popitem', TupleObject([self.key, self.value]))
+      return InternalConstFunc('dict.popitem', TupleObject([self.key, self.value]))
     elif name == 'setdefault':
       return self.SetDefault(self)
     elif name == 'update':
       return self.Update(self)
     elif name == 'values':
-      return BuiltinConstFunc('dict.keys', ListObject([ TupleObject([self.key]) ]))
+      return InternalConstFunc('dict.keys', ListObject([ TupleObject([self.key]) ]))
     raise NodeAttrError(name)
 
   def get_element(self, frame, subs, write=False):

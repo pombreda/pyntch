@@ -70,7 +70,7 @@ class TypeNode(object):
   def get_seq(self, frame):
     return self.get_iter(frame).get_attr('next').call(frame, (), {})
   
-  def equal(self, obj, _):
+  def equal(self, obj, _=None):
     raise NotImplementedError
   def describe(self):
     return self.desc1(set())
@@ -102,29 +102,28 @@ class SimpleTypeNode(TypeNode):
   def desc1(self, _):
     return repr(self)
 
-  def equal(self, obj, _):
+  def equal(self, obj, _=None):
     return self is obj
+
 
 ##  CompoundTypeNode
 ##
 class CompoundTypeNode(TypeNode):
 
   def __init__(self, types=None):
-    self._hashval = 0
     TypeNode.__init__(self, types or [])
     return
 
   def __repr__(self):
     return self.describe()
 
-  def equal(self, obj, done):
+  def equal(self, obj, done=None):
+    if done == None: done = set()
     if not isinstance(obj, CompoundTypeNode): return False
     if len(self.types) != len(obj.types): return False
-    if (self in done) and (obj in done):
-      return True
-    if (self in done) or (obj in done):
-      return False
-    done = done.union([self,obj])
+    if self in done or obj in done: return False
+    done.add(self)
+    done.add(obj)
     for (t1,t2) in zip(self.types, obj.types):
       if not t1.equal(t2, done): return False
     return True
@@ -145,7 +144,7 @@ class CompoundTypeNode(TypeNode):
     d = []
     for obj1 in types:
       for obj2 in self.types:
-        if obj1.equal(obj2, set()): break
+        if obj1.equal(obj2): break
       else:
         d.append(obj1)
     if not d: return

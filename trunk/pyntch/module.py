@@ -107,7 +107,7 @@ class Interpreter(object):
         path = os.path.join(path, '__init__.py')
         if os.path.isfile(path):
           return path
-    raise klass.ModuleNotFound(name)
+    raise klass.ModuleNotFound(name, modpath)
 
   # load_file
   @classmethod

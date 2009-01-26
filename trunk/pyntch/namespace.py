@@ -341,8 +341,8 @@ class BuiltinTypesNamespace(Namespace):
     #self.register_var('reversed').bind(builtin_types.ReversedType.get_typeobj())
     #self.register_var('frozenset').bind(builtin_types.FrozenSetType.get_typeobj())
     
-    #self.register_var('BuiltinFunctionType').bind(builtin_types.BuiltinFunc.get_typeobj())
-    #self.register_var('BuiltinMethodType').bind(builtin_types.BuiltinFunc.get_typeobj())
+    #self.register_var('BuiltinFunctionType').bind(builtin_funcs.BuiltinFunc.get_typeobj())
+    #self.register_var('BuiltinMethodType').bind(builtin_funcs.BuiltinFunc.get_typeobj())
     #self.register_var('ClassType').bind(function.ClassType.get_typeobj())
     #self.register_var('FunctionType').bind(function.FuncType.get_typeobj())
     #self.register_var('LambdaType').bind(function.LambdaFuncType.get_typeobj())

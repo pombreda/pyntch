@@ -3,15 +3,40 @@
 ##  This module should not be imported as toplevel,
 ##  as it causes circular imports!
 
-from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError
+from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, BuiltinType
 from exception import ExceptionRaiser, TypeChecker
 from exception import TypeErrorType
 from namespace import Namespace
 from function import ClassType, InstanceType
-from builtin_types import IterObject, NumberType, BoolType, IntType, LongType, FloatType, \
+from builtin_types import TypeType, NumberType, BoolType, IntType, LongType, FloatType, \
      BaseStringType, StrType, UnicodeType, ANY_TYPE, \
-     BuiltinFunc, BuiltinConstFunc, IterFunc
-from aggregate_types import ListObject, TupleObject
+     InternalFunc, InternalConstFunc
+from aggregate_types import ListObject, TupleObject, IterObject
+
+
+##  BuiltinFunc
+class BuiltinFunc(InternalFunc, BuiltinType):
+  def __init__(self, name, args=None, optargs=None, expts=None):
+    InternalFunc.__init__(self, name, args=args, optargs=optargs, expts=expts)
+    BuiltinType.__init__(self)
+    return
+  def __repr__(self):
+    return '<builtin %s>' % self.name
+  @classmethod
+  def get_name(self):
+    return 'builtin'
+
+##  BuiltinConstFunc
+class BuiltinConstFunc(InternalConstFunc, BuiltinType):
+  def __init__(self, name, retype, args=None, optargs=None, expts=None):
+    InternalConstFunc.__init__(self, name, retype, args=args, optargs=optargs, expts=expts)
+    BuiltinType.__init__(self)
+    return
+  def __repr__(self):
+    return '<builtin %s>' % self.name
+  @classmethod
+  def get_name(self):
+    return 'builtin'
 
 
 ##  ReprFunc
@@ -134,7 +159,7 @@ class IdFunc(BuiltinConstFunc):
 class IsInstanceFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'isinstance', BoolType.get_object(), [ANY_TYPE, ANY_TYPE])
+    BuiltinConstFunc.__init__(self, 'isinstance', BoolType.get_object(), [ANY_TYPE, TypeType])
     return
 
 
@@ -143,7 +168,7 @@ class IsInstanceFunc(BuiltinConstFunc):
 class IsSubclassFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'issubclass', BoolType.get_object(), [ANY_TYPE, ANY_TYPE])
+    BuiltinConstFunc.__init__(self, 'issubclass', BoolType.get_object(), [TypeType, TypeType])
     return
 
 
@@ -176,3 +201,30 @@ class RoundFunc(BuiltinConstFunc):
     return
 
 
+##  IterFunc
+##
+class IterFunc(BuiltinFunc):
+
+  class IterConversion(CompoundTypeNode):
+    
+    def __init__(self, frame, obj):
+      self.frame = frame
+      self.iterobj = IterObject([])
+      CompoundTypeNode.__init__(self, [self.iterobj])
+      obj.connect(self)
+      return
+    
+    def recv(self, src):
+      for obj in src:
+        try:
+          obj.get_iter(self).connect(self.iterobj.elemall)
+        except NodeTypeError:
+          self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
+      return self.iterobj
+  
+  def process_args(self, frame, args, kwargs):
+    return self.IterConversion(frame, args[0])
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'iter', [ANY_TYPE])
+    return

@@ -35,24 +35,13 @@ class ExceptionObject(SimpleTypeNode):
     return '<%s: %s>' % (self.get_type().get_name(), self.message)
 
   def get_attr(self, name, write=False):
+    from builtin_types import StrType
     if name == 'args':
-      return XXX
+      return self.args # XXX None is returned.
     if name == 'message':
-      return XXX
+      return StrType.get_object()
     raise NodeAttrError(name)
 
-class TracebackObject(object):
-  def __init__(self, obj, loc):
-    self.obj = obj
-    self.loc = loc
-    return
-  def __repr__(self):
-    return '%s at %s(%d)' % (self.obj, self.loc._modname, self.loc.lineno)
-  def equal(self, obj, done):
-    return self is obj
-  def desc1(self, _):
-    return repr(self)
-  
 class StandardErrorType(ExceptionType):
   PYTHON_TYPE = StandardError
 class ArithmeticErrorType(StandardErrorType):
@@ -132,6 +121,23 @@ class ExceptionFrame(object):
 
   debug = 0
 
+  class TracebackObject(TypeNode):
+    
+    def __init__(self, obj, loc):
+      self.obj = obj
+      self.loc = loc
+      TypeNode.__init__(self, [self])
+      return
+    
+    def __repr__(self):
+      return '%s at %s(%d)' % (self.obj, self.loc._modname, self.loc.lineno)
+    
+    def equal(self, obj, _=None):
+      return self is obj
+    
+    def desc1(self, _):
+      return repr(self)
+
   class ExceptionAnnotator(CompoundTypeNode):
     
     def __init__(self, loc):
@@ -141,9 +147,9 @@ class ExceptionFrame(object):
     
     def recv(self, src):
       for obj in src:
-        if self.loc and not isinstance(obj, TracebackObject):
-          obj = TracebackObject(obj, self.loc)
-        self.update_types([obj])
+        if self.loc and not isinstance(obj, ExceptionFrame.TracebackObject):
+          obj = ExceptionFrame.TracebackObject(obj, self.loc)
+          self.update_types([obj])
       return
 
   def __init__(self, parent=None, loc=None):
@@ -186,6 +192,8 @@ class ExceptionCatcher(ExceptionFrame):
     def recv(self, src):
       if self.catcher.catchall: return
       for expt1 in src:
+        if isinstance(expt1, ExceptionFrame.TracebackObject):
+          expt1 = expt1.obj
         for (expt0,var) in self.catcher.handlers.itervalues():
           for typeobj in expt0:
             if expt1.is_type(typeobj):
@@ -320,7 +328,7 @@ class TypeChecker(CompoundTypeNode):
     for obj in src:
       for typeobj in self.validtypes:
         if obj.is_type(typeobj):
-          self.update_types(obj)
+          self.update_types([obj])
           break
       else:
         s = '|'.join( typeobj.get_name() for typeobj in self.validtypes )
@@ -345,9 +353,55 @@ class ElementTypeChecker(TypeChecker):
     for obj in src:
       if typeobj in self.validtypes:
         if obj.is_type(typeobj):
-          self.update_types(obj)
+          self.update_types([obj])
           break
       elif self.blame:
         self.parent_frame.raise_expt(TypeErrorType.occur(
           '%s (%s) must be [%s]' % (self.blame, obj, '|'.join(map(repr, self.validtypes)))))
     return
+
+
+##  KeyValueTypeChecker
+##
+class KeyValueTypeChecker(TypeChecker):
+  
+  def __init__(self, parent_frame, keys, values, blame=None):
+    self.validkeys = CompoundTypeNode()
+    for obj in keys:
+      obj.connect(self.validkeys)
+    TypeChecker.__init__(self, parent_frame, values, blame=blame)
+    return
+    
+  def recv(self, src):
+    from aggregate_types import DictObject
+    for obj in src:
+      if isinstance(obj, DictObject):
+        obj.key.connect(self, self.recv_key)
+        obj.value.connect(self, self.recv_value)
+      else:
+        if self.blame:
+          self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be dictionary' % (self.blame, obj)))
+    return
+  
+  def recv_key(self, src):
+    for obj in src:
+      if typeobj in self.validkeys:
+        if obj.is_type(typeobj):
+          self.update_types([obj])
+          break
+      elif self.blame:
+        self.parent_frame.raise_expt(TypeErrorType.occur(
+          'key %s (%s) must be [%s]' % (self.blame, obj, '|'.join(map(repr, self.validkeys)))))
+    return
+
+  def recv_value(self, src):
+    for obj in src:
+      if typeobj in self.validtypes:
+        if obj.is_type(typeobj):
+          self.update_types([obj])
+          break
+      elif self.blame:
+        self.parent_frame.raise_expt(TypeErrorType.occur(
+          'value %s (%s) must be [%s]' % (self.blame, obj, '|'.join(map(repr, self.validtypes)))))
+    return
+
