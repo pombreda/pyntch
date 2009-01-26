@@ -118,9 +118,10 @@ class CompoundTypeNode(TypeNode):
     return self.describe()
 
   def equal(self, obj, done=None):
-    if done == None: done = set()
+    if self is obj: return True
     if not isinstance(obj, CompoundTypeNode): return False
     if len(self.types) != len(obj.types): return False
+    if done == None: done = set()
     if self in done or obj in done: return False
     done.add(self)
     done.add(obj)
