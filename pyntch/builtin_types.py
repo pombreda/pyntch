@@ -12,15 +12,6 @@ from function import ClassType, InstanceType
 ANY_TYPE = False
 
 
-# ElementAll
-class ElementAll(CompoundTypeNode):
-  def __init__(self, elements):
-    CompoundTypeNode.__init__(self)
-    for obj in elements:
-      obj.connect(self)
-    return
-
-
 ##  InternalFunc
 ##
 class InternalFunc(SimpleTypeNode):
@@ -83,97 +74,6 @@ class InternalConstFunc(InternalFunc):
     for expt in self.expts:
       frame.raise_expt(expt)
     return self.retype
-
-
-class BuiltinFunc(InternalFunc, BuiltinType):
-  def __init__(self, name, args=None, optargs=None, expts=None):
-    InternalFunc.__init__(self, name, args=args, optargs=optargs, expts=expts)
-    BuiltinType.__init__(self)
-    return
-  def __repr__(self):
-    return '<builtin %s>' % self.name
-  @classmethod
-  def get_name(self):
-    return 'builtin'
-
-class BuiltinConstFunc(InternalConstFunc, BuiltinType):
-  def __init__(self, name, retype, args=None, optargs=None, expts=None):
-    InternalConstFunc.__init__(self, name, retype, args=args, optargs=optargs, expts=expts)
-    BuiltinType.__init__(self)
-    return
-  def __repr__(self):
-    return '<builtin %s>' % self.name
-  @classmethod
-  def get_name(self):
-    return 'builtin'
-
-
-##  IterObject
-##
-class IterType(BuiltinType):
-
-  @classmethod
-  def get_name(klass):
-    return 'iterator'
-  
-class IterObject(SimpleTypeNode):
-
-  def __init__(self, elements=None, elemall=None):
-    if elements == None:
-      assert elemall != None
-      self.elemall = elemall
-    else:
-      assert elements != None
-      self.elemall = ElementAll(elements)
-    SimpleTypeNode.__init__(self, self)
-    return
-  
-  def __repr__(self):
-    return '(%s, ...)' % self.elemall
-
-  def desc1(self, done):
-    return '(%s, ...)' % self.elemall.desc1(done)
-
-  @classmethod
-  def get_type(klass):
-    return IterType.get_type()
-
-  def get_iter(self, frame):
-    return self
-
-  def get_attr(self, name, write=False):
-    if name == 'next':
-      return InternalConstFunc('iter.next', self.elemall)
-    raise NodeAttrError(name)
-
-##  IterFunc
-##
-class IterFunc(BuiltinFunc):
-
-  class IterConversion(CompoundTypeNode):
-    
-    def __init__(self, frame, obj):
-      self.frame = frame
-      self.iterobj = IterObject([])
-      CompoundTypeNode.__init__(self, [self.iterobj])
-      obj.connect(self)
-      return
-    
-    def recv(self, src):
-      for obj in src:
-        try:
-          obj.get_iter(self).connect(self.iterobj.elemall)
-        except NodeTypeError:
-          self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
-      return self.iterobj
-  
-  def process_args(self, frame, args):
-    return self.IterConversion(frame, args[0])
-
-  def __init__(self):
-    BuiltinFunc.__init__(self, 'iter', [ANY_TYPE])
-    return
-  
 
 
 ##  GeneratorSlot
@@ -401,6 +301,7 @@ class BaseStringType(BuiltinType, InternalConstFunc):
     raise NodeAttrError(name)
 
   def get_iter(self, frame):
+    from aggregate_types import IterObject
     return IterObject(elemall=self.get_object())
 
   def get_element(self, frame, subs, write=False):
@@ -464,6 +365,13 @@ class StrType(BaseStringType):
 class UnicodeType(BaseStringType):
   PYTHON_TYPE = unicode
 
+  class TranslateFunc(InternalConstFunc):
+    def accept_arg(self, frame, i):
+      return KeyValueTypeChecker(frame,
+                                 [IntType.get_type()],
+                                 [IntType.get_type(), UnicodeType.get_type(), NoneType.get_type()],
+                                 'arg%d' % i)
+
   def get_attr(self, name, write=False):
     if name == 'isdecimal':
       return InternalConstFunc('unicode.isdecimal',
@@ -472,10 +380,9 @@ class UnicodeType(BaseStringType):
       return InternalConstFunc('unicode.isnumeric',
                               BoolType.get_object())
     elif name == 'translate':
-      return XXX
-      return InternalConstFunc('unicode.translate',
-                              self.get_object(),
-                              [BaseStringType])
+      return self.TranslateFunc('unicode.translate',
+                                self.get_object(),
+                                [ANY_TYPE])
     return BaseStringType.get_attr(self, name, write=write)
 
   def __init__(self):
@@ -504,6 +411,10 @@ class FileType(BuiltinType, InternalConstFunc):
                               [IOErrorType.maybe('might not able to open a file.')])
     return
   
+  class WriteStringsFunc(InternalConstFunc):
+    def accept_arg(self, frame, i):
+      return ElementTypeChecker(frame, self.args[i].get_type(), 'arg%d' % i)
+
   def get_attr(self, name, write=False):
     if name == 'close':
       return InternalConstFunc('file.close',
@@ -570,14 +481,17 @@ class FileType(BuiltinType, InternalConstFunc):
     elif name == 'write':
       return InternalConstFunc('file.write',
                               NoneType.get_object(),
-                              [StrType])
+                              [BaseStringType])
     elif name == 'writelines':
-      return XXX
+      return self.WriteStringsFunc('file.writestrings', 
+                                   NoneType.get_object(),
+                                   [BaseStringType])
     elif name == 'xreadlines':
       return self
     raise NodeAttrError(name)
 
   def get_iter(self, frame):
+    from aggregate_types import IterObject
     return IterObject(elemall=StrType.get_object())
 
 

@@ -23,7 +23,7 @@ class FuncType(BuiltinType, TreeReporter):
       return '<FuncBody %s>' % self.name
 
     def set_retval(self, evals):
-      from builtin_types import IterObject
+      from aggregate_types import IterObject
       returns = [ obj for (t,obj) in evals if t == 'r' ]
       yields = [ obj for (t,obj) in evals if t == 'y' ]
       assert returns

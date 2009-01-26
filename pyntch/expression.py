@@ -28,7 +28,7 @@ class FunCall(CompoundTypeNode, ExceptionRaiser):
       try:
         obj.call(self, self.args, self.kwargs).connect(self)
       except NodeTypeError:
-        self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.func, func)))
+        self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.func, obj)))
     return
 
 
@@ -215,7 +215,7 @@ class UnaryOp(CompoundTypeNode, ExceptionRaiser):
       self.op = '-'
     CompoundTypeNode.__init__(self)
     ExceptionRaiser.__init__(self, parent_frame, loc)
-    self.value.connect(self) # XXX
+    self.value.connect(self) # XXX handle optional methods
     return
   
   def __repr__(self):
