@@ -42,6 +42,26 @@ class ExceptionObject(SimpleTypeNode):
       return StrType.get_object()
     raise NodeAttrError(name)
 
+class TracebackObject(TypeNode):
+
+  def __init__(self, expt, loc=None):
+    self.expt = expt
+    self.loc = loc
+    TypeNode.__init__(self, [self])
+    return
+
+  def __repr__(self):
+    if self.loc:
+      return '%s at %s(%d)' % (self.expt, self.loc._modname, self.loc.lineno)
+    else:
+      return '%s at ???' % (self.expt)
+
+  def equal(self, obj, done=None):
+    return isinstance(obj, TracebackObject) and self.loc == obj.loc and self.expt.equal(obj.expt, done) 
+
+  def desc1(self, _):
+    return repr(self)
+
 class StandardErrorType(ExceptionType):
   PYTHON_TYPE = StandardError
 class ArithmeticErrorType(StandardErrorType):
@@ -121,23 +141,6 @@ class ExceptionFrame(object):
 
   debug = 0
 
-  class TracebackObject(TypeNode):
-    
-    def __init__(self, obj, loc):
-      self.obj = obj
-      self.loc = loc
-      TypeNode.__init__(self, [self])
-      return
-    
-    def __repr__(self):
-      return '%s at %s(%d)' % (self.obj, self.loc._modname, self.loc.lineno)
-    
-    def equal(self, obj, _=None):
-      return self is obj
-    
-    def desc1(self, _):
-      return repr(self)
-
   class ExceptionAnnotator(CompoundTypeNode):
     
     def __init__(self, loc):
@@ -147,14 +150,14 @@ class ExceptionFrame(object):
     
     def recv(self, src):
       for obj in src:
-        if self.loc and not isinstance(obj, ExceptionFrame.TracebackObject):
-          obj = ExceptionFrame.TracebackObject(obj, self.loc)
-          self.update_types([obj])
+        assert isinstance(obj, TracebackObject), obj
+        if not obj.loc: obj.loc = self.loc
+        self.update_types([obj])
       return
 
   def __init__(self, parent=None, loc=None):
     self.loc = loc
-    self.expt = self.ExceptionAnnotator(loc)
+    self.annotator = self.ExceptionAnnotator(loc)
     if parent:
       self.connect_expt(parent)
     return
@@ -163,17 +166,17 @@ class ExceptionFrame(object):
     assert isinstance(frame, ExceptionFrame)
     if self.debug:
       print >>stderr, 'connect_expt: %r <- %r' % (frame, self)
-    self.expt.connect(frame.expt)
+    self.annotator.connect(frame.annotator)
     return
   
   def raise_expt(self, expt):
     if self.debug:
       print >>stderr, 'raise_expt: %r <- %r' % (self, expt)
-    expt.connect(self.expt)
+    TracebackObject(expt).connect(self.annotator)
     return
 
   def show(self, p):
-    for expt in self.expt:
+    for expt in self.annotator:
       p('  raises %r' % expt)
     return
 
@@ -191,23 +194,21 @@ class ExceptionCatcher(ExceptionFrame):
     
     def recv(self, src):
       if self.catcher.catchall: return
-      for expt1 in src:
-        if isinstance(expt1, ExceptionFrame.TracebackObject):
-          expt1 = expt1.obj
-        for (expt0,var) in self.catcher.handlers.itervalues():
-          for typeobj in expt0:
-            if expt1.is_type(typeobj):
-              expt1.connect(var)
-              break
-          else:
-            continue
-          break
-        else:
-          self.update_types([expt1])
+      for obj in src:
+        assert isinstance(obj, TracebackObject), obj
+        caught = False
+        for expt1 in obj.expt:
+          for (expt0,var) in self.catcher.handlers.itervalues():
+            for typeobj in expt0:
+              if expt1.is_type(typeobj):
+                expt1.connect(var)
+                caught = True
+        if not caught:
+          self.update_types([obj])
       return
 
   def __init__(self, parent):
-    self.expt = self.ExceptionFilter(self)
+    self.annotator = self.ExceptionFilter(self)
     self.handlers = {}
     self.catchall = False
     self.connect_expt(parent)

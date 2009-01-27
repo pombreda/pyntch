@@ -54,7 +54,7 @@ def build_expr(reporter, frame, space, tree, evals):
     try:
       expr = space[tree.name]
     except KeyError:
-      frame.raise_expt(NameErrorType.occur('name %r is not defined.' % tree.name))
+      ExceptionFrame(frame, tree).raise_expt(NameErrorType.occur('name %r is not defined.' % tree.name))
       expr = UndefinedTypeNode(tree.name)
 
   elif isinstance(tree, ast.CallFunc):
@@ -179,7 +179,7 @@ def build_expr(reporter, frame, space, tree, evals):
     expr = IfExpOp(frame, tree, test, then, else_)
 
   elif isinstance(tree, ast.Backquote):
-    frame.raise_expt(RuntimeErrorType.occur('backquote is not supported.'))
+    ExceptionFrame(frame, tree).raise_expt(RuntimeErrorType.occur('backquote is not supported.'))
     expr = UndefinedTypeNode('backquote')
 
   else:
@@ -256,7 +256,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, ast.AugAssign):
     left = build_expr(reporter, frame, space, tree.node, evals)
     if isinstance(left, UndefinedTypeNode):
-      frame.raise_expt(NameErrorType.occur('cannot assign to an undefined variable.'))
+      ExceptionFrame(frame, tree).raise_expt(NameErrorType.occur('cannot assign to an undefined variable.'))
     else:
       right = build_expr(reporter, frame, space, tree.expr, evals)
       value = AssignOp(frame, tree, tree.op, left, right)
@@ -333,10 +333,10 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     if tree.expr2:
       expttype = build_expr(reporter, frame, space, tree.expr1, evals)
       exptarg = build_expr(reporter, frame, space, tree.expr2, evals)
-      frame.raise_expt(ExceptionMaker(frame, tree, expttype, (exptarg,)))
+      ExceptionFrame(frame, tree).raise_expt(ExceptionMaker(frame, tree, expttype, (exptarg,)))
     elif tree.expr1:
       expttype = build_expr(reporter, frame, space, tree.expr1, evals)
-      frame.raise_expt(ExceptionMaker(frame, tree, expttype, ()))
+      ExceptionFrame(frame, tree).raise_expt(ExceptionMaker(frame, tree, expttype, ()))
 
   # printnl
   elif isinstance(tree, (ast.Print, ast.Printnl)):
@@ -379,7 +379,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
 
   # unsupported
   elif isinstance(tree, ast.Exec):
-    frame.raise_expt(RuntimeErrorType.occur('exec is not supported.'))
+    ExceptionFrame(frame, tree).raise_expt(RuntimeErrorType.occur('exec is not supported.'))
   
   else:
     raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._modname, tree.lineno))
