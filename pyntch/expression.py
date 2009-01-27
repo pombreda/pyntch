@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError
+from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError
 from exception import ExceptionRaiser, MustBeDefinedNode, \
      TypeErrorType, AttributeErrorType
 
@@ -254,8 +254,10 @@ class BooleanOp(CompoundTypeNode, ExceptionRaiser):
     from builtin_types import BoolType
     self.op = op
     self.nodes = nodes
-    CompoundTypeNode.__init__(self, [BoolType.get_object()])
+    CompoundTypeNode.__init__(self)
     ExceptionRaiser.__init__(self, parent_frame, loc)
+    if op != 'Or' or not [ 1 for node in nodes if isinstance(node, SimpleTypeNode) ]:
+      BoolType.get_object().connect(self)
     for node in self.nodes:
       node.connect(self)
     return

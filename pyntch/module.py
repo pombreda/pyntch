@@ -54,7 +54,7 @@ class PythonModuleType(ModuleType, TreeReporter, ExceptionFrame):
     for (name,v) in sorted(self.space):
       if name in blocks: continue
       p('  %s = %s' % (name, v.describe()))
-    for expt in self.expt:
+    for expt in self.annotator:
       p('  raises %r' % expt)
     return
   

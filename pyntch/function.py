@@ -368,8 +368,9 @@ class ClassType(BuiltinType, TreeReporter):
       return True
     else:
       for klass in self.baseklass:
-        if klass.is_subclass(klassobj):
-          return True
+        if isinstance(klass, ClassType):
+          if klass.is_subclass(klassobj):
+            return True
       return False
 
   def get_attr(self, name, write=False):
