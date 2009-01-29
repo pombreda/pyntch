@@ -27,6 +27,7 @@ subversion = ('', '', '')
 version = ''
 version_info = (0, 0, 0, '', 0)
 warnoptions = ['']
+modules = {'':None}
 
 class frame(object): pass
 

@@ -11,7 +11,7 @@ from function import ClassType, InstanceType
 from builtin_types import TypeType, NumberType, BoolType, IntType, LongType, FloatType, \
      BaseStringType, StrType, UnicodeType, ANY_TYPE, \
      InternalFunc, InternalConstFunc
-from aggregate_types import ListObject, TupleObject, IterObject
+from aggregate_types import ListType, TupleType, IterType
 
 
 ##  BuiltinFunc
@@ -94,7 +94,7 @@ class OrdFunc(BuiltinConstFunc):
 class RangeFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'range', ListObject([IntType.get_object()]), 
+    BuiltinConstFunc.__init__(self, 'range', ListType.get_object([IntType.get_object()]), 
                               [IntType],
                               [IntType, IntType])
     return
@@ -123,7 +123,7 @@ class CmpFunc(BuiltinConstFunc):
 class DirFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'dir', ListObject([StrType.get_object()]), [], [ANY_TYPE])
+    BuiltinConstFunc.__init__(self, 'dir', ListType.get_object([StrType.get_object()]), [], [ANY_TYPE])
     return
 
 
@@ -209,7 +209,7 @@ class IterFunc(BuiltinFunc):
     
     def __init__(self, frame, obj):
       self.frame = frame
-      self.iterobj = IterObject([])
+      self.iterobj = IterType.get_object()
       CompoundTypeNode.__init__(self, [self.iterobj])
       obj.connect(self)
       return
@@ -217,7 +217,7 @@ class IterFunc(BuiltinFunc):
     def recv(self, src):
       for obj in src:
         try:
-          obj.get_iter(self).connect(self.iterobj.elemall)
+          obj.get_iter(self.frame).connect(self.iterobj.elemall)
         except NodeTypeError:
           self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
       return self.iterobj

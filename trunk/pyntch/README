@@ -3,13 +3,13 @@ README
 
 
 # TODO:
-#  remove equal()
-#  raise_expt at syntax.py
+#  internalfunc -> callable
 #  functype -> funcobject
 #  hier class types.
+#  remove equal()
 #  iterator support: it.next(), gen.send(), etc.
 #  optional method: __add__, __eq__, __iter__ etc.
-#  automatic coercion.
+#  automatic coercion. (when?)
 #  re-raise in except:
 
 Pyntch is a PYthoN Type CHecker.  It examines a Python source code
