@@ -1,59 +1,34 @@
 #!/usr/bin/env python
 
-from typenode import SimpleTypeNode, CompoundTypeNode, BuiltinType, NodeTypeError, NodeAttrError
+from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, \
+     BuiltinType, BuiltinObject
 from exception import TypeChecker, \
      TypeErrorType, IndexErrorType, ValueErrorType, KeyErrorType
 from builtin_types import InternalFunc, InternalConstFunc, BoolType, IntType, NoneType, ANY_TYPE
 
 
 
-##  ElementAll
+##  Aggregate Types
 ##
-class ElementAll(CompoundTypeNode):
+class BuiltinAggregateType(BuiltinType):
   
-  def __init__(self, elements):
-    CompoundTypeNode.__init__(self)
-    for obj in elements:
-      obj.connect(self)
-    return
+  # get_object() now creates an actual instance.
+  @classmethod
+  def get_object(klass, *args, **kwargs):
+    return klass.PYTHON_IMPL(klass.get_typeobj(), *args, **kwargs)
 
 
-##  BuiltinAggregateObject
+##  BuiltinSequenceObject
 ##
-class BuiltinAggregateObject(SimpleTypeNode):
-
-  TYPEOBJ = None # must be defined by subclass
-
-  def __init__(self):
-    SimpleTypeNode.__init__(self, self.TYPEOBJ)
-    return
-
-  # get_type()
-  # returns the name of the Python type of this object.
-  @classmethod
-  def get_type(klass):
-    assert isinstance(klass.TYPEOBJ, BuiltinType)
-    return klass.TYPEOBJ
-
-  # get_null()
-  NULL = None
-  @classmethod
-  def get_null(klass):
-    if not klass.NULL:
-      klass.NULL = klass([])
-    return klass.NULL
-
-class BuiltinSequenceObject(BuiltinAggregateObject):
+class BuiltinSequenceObject(BuiltinObject):
   
-  def __init__(self, elements=None, elemall=None):
+  def __init__(self, typeobj, elements=None, elemall=None):
     self.elements = elements
-    if elements == None:
-      assert elemall != None
+    if elemall != None:
       self.elemall = elemall
     else:
-      assert elements != None
-      self.elemall = ElementAll(elements)
-    BuiltinAggregateObject.__init__(self)
+      self.elemall = CompoundTypeNode(elements or [])
+    BuiltinObject.__init__(self, typeobj)
     return
 
   def equal(self, obj, done=None):
@@ -61,61 +36,12 @@ class BuiltinSequenceObject(BuiltinAggregateObject):
     return self.elemall.equal(obj.elemall, done)
 
 
-##  Aggregate Types
-##
-  
 ##  List
 ##
-class ListType(BuiltinType, InternalFunc):
-  
-  PYTHON_TYPE = list
-  
-  class ListConversion(CompoundTypeNode):
-    
-    def __init__(self, frame, obj):
-      self.frame = frame
-      self.listobj = ListObject([])
-      CompoundTypeNode.__init__(self, [self.listobj])
-      obj.connect(self)
-      return
-    
-    def recv(self, src):
-      for obj in src:
-        try:
-          obj.get_seq(self).connect(self.listobj.elemall)
-        except NodeTypeError:
-          self.frame.raise_expt(TypeErrorType.occur('cannot convert to list: %s' % obj))
-      return
-  
-  def process_args(self, frame, args, kwargs):
-    if kwargs:
-      frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
-      return UndefinedTypeNode()
-    if args:
-      return self.ListConversion(frame, args[0])
-    else:
-      return ListObject.get_null()
-
-  def __init__(self):
-    InternalFunc.__init__(self, 'list', [], [ANY_TYPE])
-    return
-  
 class ListObject(BuiltinSequenceObject):
-
-  TYPEOBJ = ListType.get_typeobj()
   
   def __repr__(self):
     return '[%s]' % self.elemall.describe()
-
-  @classmethod
-  def concat(klass, obj1, obj2):
-    assert isinstance(obj1, klass) and isinstance(obj2, klass)
-    return klass([obj1.elemall, obj2.elemall])
-
-  @classmethod
-  def multiply(klass, obj):
-    assert isinstance(obj, klass)
-    return obj
 
   def desc1(self, done):
     return '[%s]' % self.elemall.desc1(done)
@@ -128,25 +54,19 @@ class ListObject(BuiltinSequenceObject):
     if name == 'append':
       return self.AppendMethod(self)
     elif name == 'count':
-      return InternalConstFunc('list.count', IntType.get_object(),
-                              [ANY_TYPE])
+      return InternalConstFunc('list.count', IntType.get_object(), [ANY_TYPE])
     elif name == 'extend':
       return self.ExtendMethod(self)
     elif name == 'index':
-      return InternalConstFunc('list.index', IntType.get_object(),
-                         [ANY_TYPE],
-                         [IntType, IntType],
-                         [ValueErrorType.maybe('might not able to find the element.')])
+      return InternalConstFunc('list.index', IntType.get_object(), [ANY_TYPE], [IntType, IntType],
+                               [ValueErrorType.maybe('might not able to find the element.')])
     elif name == 'insert':
       return self.InsertMethod(self)
     elif name == 'pop':
-      return InternalConstFunc('list.pop', NoneType.get_object(),
-                              [],
-                              [IntType],
+      return InternalConstFunc('list.pop', NoneType.get_object(), [], [IntType],
                               [ValueErrorType.maybe('might be empty list or out of range.')])
     elif name == 'remove':
-      return InternalConstFunc('list.remove', NoneType.get_object(),
-                              [ANY_TYPE],
+      return InternalConstFunc('list.remove', NoneType.get_object(), [ANY_TYPE],
                               [ValueErrorType.maybe('might not able to remove the element.')])
     elif name == 'reverse':
       return InternalConstFunc('list.remove', NoneType.get_object())
@@ -159,7 +79,7 @@ class ListObject(BuiltinSequenceObject):
     return self.elemall
 
   def get_iter(self, frame):
-    return IterObject(elemall=self.elemall)
+    return IterType.get_object(elemall=self.elemall)
 
   ##  Methods
   ##
@@ -202,7 +122,7 @@ class ListObject(BuiltinSequenceObject):
     
     def __init__(self, listobj):
       InternalConstFunc.__init__(self, 'list.insert', NoneType.get_object(), [IntType, ANY_TYPE], [],
-                                [IndexErrorType.maybe('might be out of range.')])
+                                 [IndexErrorType.maybe('might be out of range.')])
       self.listobj = listobj
       return
     
@@ -226,27 +146,36 @@ class ListObject(BuiltinSequenceObject):
       return '%r.sort' % self.listobj
 
 
-##  TupleObject
+##  ListType
 ##
-class TupleType(BuiltinType, InternalFunc):
+class ListType(BuiltinAggregateType, InternalFunc):
   
-  PYTHON_TYPE = tuple
+  PYTHON_TYPE = list
+  PYTHON_IMPL = ListObject
+  
+  @classmethod
+  def concat(klass, obj1, obj2):
+    return klass.get_object([obj1.elemall, obj2.elemall])
 
-  class TupleConversion(CompoundTypeNode):
+  @classmethod
+  def multiply(klass, obj):
+    return obj
+
+  class ListConversion(CompoundTypeNode):
     
     def __init__(self, frame, obj):
       self.frame = frame
-      self.tupleobj = TupleObject([])
-      CompoundTypeNode.__init__(self, [])
+      self.listobj = ListType.get_object()
+      CompoundTypeNode.__init__(self, [self.listobj])
       obj.connect(self)
       return
     
     def recv(self, src):
       for obj in src:
         try:
-          obj.get_seq(self).connect(self.tupleobj.elemall)
+          obj.get_seq(self).connect(self.listobj.elemall)
         except NodeTypeError:
-          self.frame.raise_expt(TypeErrorType.occur('cannot convert to tuple: %s' % obj))
+          self.frame.raise_expt(TypeErrorType.occur('cannot convert to list: %s' % obj))
       return
   
   def process_args(self, frame, args, kwargs):
@@ -254,17 +183,18 @@ class TupleType(BuiltinType, InternalFunc):
       frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
       return UndefinedTypeNode()
     if args:
-      return self.TupleConversion(frame, args[0])
+      return self.ListConversion(frame, args[0])
     else:
-      return TupleObject.get_null()
+      return ListType.get_object()
 
   def __init__(self):
-    InternalFunc.__init__(self, 'tuple', [], [ANY_TYPE])
+    InternalFunc.__init__(self, 'list', [], [ANY_TYPE])
     return
 
+  
+##  TupleObject
+##
 class TupleObject(BuiltinSequenceObject):
-
-  TYPEOBJ = TupleType.get_typeobj()
   
   def __repr__(self):
     if self.elements == None:
@@ -276,7 +206,7 @@ class TupleObject(BuiltinSequenceObject):
   def concat(klass, obj1, obj2):
     assert isinstance(obj1, klass) and isinstance(obj2, klass)
     if obj1.elements == None or obj2.elements == None:
-      return klass(elemall=ElementAll([obj1.elemall, obj2.elemall]))
+      return klass(elemall=CompoundTypeNode([obj1.elemall, obj2.elemall]))
     else:
       return klass(elements=obj1.elements+obj2.elements)
 
@@ -299,20 +229,21 @@ class TupleObject(BuiltinSequenceObject):
     return self.elemall
 
   def get_iter(self, frame):
-    return IterObject(elemall=self.elemall)
+    return IterType.get_object(elemall=self.elemall)
   
 
-##  SetObject
+##  TupleType
 ##
-class SetType(BuiltinType, InternalFunc):
+class TupleType(BuiltinAggregateType, InternalFunc):
+  
+  PYTHON_TYPE = tuple
+  PYTHON_IMPL = TupleObject
 
-  PYTHON_TYPE = set
-
-  class SetConversion(CompoundTypeNode):
+  class TupleConversion(CompoundTypeNode):
     
     def __init__(self, frame, obj):
       self.frame = frame
-      self.setobj = SetObject([])
+      self.tupleobj = TupleType.get_object()
       CompoundTypeNode.__init__(self)
       obj.connect(self)
       return
@@ -320,9 +251,9 @@ class SetType(BuiltinType, InternalFunc):
     def recv(self, src):
       for obj in src:
         try:
-          obj.get_seq(self).connect(self.setobj.elemall)
+          obj.get_seq(self).connect(self.tupleobj.elemall)
         except NodeTypeError:
-          self.frame.raise_expt(TypeErrorType.occur('cannot convert to set: %s' % obj))
+          self.frame.raise_expt(TypeErrorType.occur('cannot convert to tuple: %s' % obj))
       return
   
   def process_args(self, frame, args, kwargs):
@@ -330,23 +261,24 @@ class SetType(BuiltinType, InternalFunc):
       frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
       return UndefinedTypeNode()
     if args:
-      return self.SetConversion(frame, args[0])
+      return self.TupleConversion(frame, args[0])
     else:
-      return SetObject.get_null()
+      return TupleType.get_object()
 
   def __init__(self):
-    InternalFunc.__init__(self, 'set', [], [ANY_TYPE])
+    InternalFunc.__init__(self, 'tuple', [], [ANY_TYPE])
     return
 
-class SetObject(BuiltinSequenceObject):
 
-  TYPEOBJ = SetType.get_typeobj()
+##  SetObject
+##
+class SetObject(BuiltinSequenceObject):
   
   def __repr__(self):
     return '([%s])' % (self.elemall)
 
   def copy(self):
-    return SetObject(elemall=self.elemall)
+    return SetType.get_object(elemall=self.elemall)
 
   def get_attr(self, name, write=False):
     if name == 'add':
@@ -384,35 +316,53 @@ class SetObject(BuiltinSequenceObject):
     raise NodeAttrError(name)
   
 
+##  SetType
+##
+class SetType(BuiltinAggregateType, InternalFunc):
+
+  PYTHON_TYPE = set
+  PYTHON_IMPL = SetObject
+
+  class SetConversion(CompoundTypeNode):
+    
+    def __init__(self, frame, obj):
+      self.frame = frame
+      self.setobj = SetType.get_object()
+      CompoundTypeNode.__init__(self)
+      obj.connect(self)
+      return
+    
+    def recv(self, src):
+      for obj in src:
+        try:
+          obj.get_seq(self).connect(self.setobj.elemall)
+        except NodeTypeError:
+          self.frame.raise_expt(TypeErrorType.occur('cannot convert to set: %s' % obj))
+      return
+  
+  def process_args(self, frame, args, kwargs):
+    if kwargs:
+      frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
+      return UndefinedTypeNode()
+    if args:
+      return self.SetConversion(frame, args[0])
+    else:
+      return SetType.get_object()
+
+  def __init__(self):
+    InternalFunc.__init__(self, 'set', [], [ANY_TYPE])
+    return
+
+
 ##  IterObject
 ##
-class IterType(BuiltinType):
-
-  @classmethod
-  def get_name(klass):
-    return 'iterator'
-  
-class IterObject(SimpleTypeNode):
-
-  def __init__(self, elements=None, elemall=None):
-    if elements == None:
-      assert elemall != None
-      self.elemall = elemall
-    else:
-      assert elements != None
-      self.elemall = ElementAll(elements)
-    SimpleTypeNode.__init__(self, self)
-    return
+class IterObject(BuiltinSequenceObject):
   
   def __repr__(self):
     return '(%s, ...)' % self.elemall
 
   def desc1(self, done):
     return '(%s, ...)' % self.elemall.desc1(done)
-
-  @classmethod
-  def get_type(klass):
-    return IterType.get_type()
 
   def get_iter(self, frame):
     return self
@@ -423,17 +373,141 @@ class IterObject(SimpleTypeNode):
     raise NodeAttrError(name)
   
 
+##  IterType
+##
+class IterType(BuiltinAggregateType):
+
+  PYTHON_IMPL = IterObject
+
+  @classmethod
+  def get_name(klass):
+    return 'iterator'
+
+
 ##  DictObject
 ##
-class DictType(BuiltinType, InternalFunc):
+class DictObject(BuiltinObject):
+  
+  # dict.get
+  class Get(InternalConstFunc):
+    def __init__(self, dictobj):
+      self.dictobj = dictobj
+      self.found = CompoundTypeNode()
+      dictobj.value.connect(self.found)
+      InternalConstFunc.__init__(self, 'dict.get', self.found, [ANY_TYPE], [ANY_TYPE])
+      return
+    def __repr__(self):
+      return '%r.get' % self.dictobj
+    def accept_arg(self, frame, i):
+      if i == 0:
+        return None
+      return self.found
+
+  # dict.setdefault
+  class SetDefault(InternalConstFunc):
+    def __init__(self, dictobj):
+      self.dictobj = dictobj
+      InternalConstFunc.__init__(self, 'dict.setdefault', dictobj.default, [ANY_TYPE], [ANY_TYPE])
+      return
+    def __repr__(self):
+      return '%r.setdefault' % self.dictobj
+    def accept_arg(self, frame, i):
+      if i == 1:
+        self.args[i].connect(self.dictobj.value)
+      return None
+
+  def __init__(self, typeobj, items=None, key=None, value=None):
+    if items != None:
+      assert key == None and value == None
+      self.key = CompoundTypeNode( k for (k,v) in items )
+      self.value = CompoundTypeNode( v for (k,v) in items )
+    elif key != None and value != None:
+      self.key = CompoundTypeNode([key])
+      self.value = CompoundTypeNode([value])
+    else:
+      self.key = CompoundTypeNode()
+      self.value = CompoundTypeNode()
+    self.default = CompoundTypeNode([NoneType.get_object()])
+    self.value.connect(self.default)
+    BuiltinObject.__init__(self, typeobj)
+    return
+  
+  def __repr__(self):
+    return '{%s: %s}' % (self.key, self.value)
+
+  def equal(self, obj, done=None):
+    if not isinstance(obj, DictObject): return False
+    return self.key.equal(obj.key, done) and self.value.equal(obj.value, done)
+  
+  def copy(self):
+    return DictType.get_object(key=self.key, value=self.value)
+
+  def desc1(self, done):
+    return '{%s: %s}' % (self.key.desc1(done), self.value.desc1(done))
+
+  def bind(self, key, value):
+    key.connect(self.key)
+    value.connect(self.value)
+    return
+
+  def get_attr(self, name, write=False):
+    if name == 'clear':
+      return InternalConstFunc('dict.clear', NoneType.get_object())
+    elif name == 'copy':
+      return InternalConstFunc('dict.copy', self.copy())
+    elif name == 'fromkeys':
+      return self.FromKeys()
+    elif name == 'get':
+      return self.Get(self)
+    elif name == 'has_key':
+      return InternalConstFunc('dict.has_key', BoolType.get_object(), [ANY_TYPE])
+    elif name == 'items':
+      return InternalConstFunc('dict.items', ListType.get_object([ TupleType.get_object([self.key, self.value]) ]))
+    elif name == 'iteritems':
+      return InternalConstFunc('dict.iteritems', IterType.get_object([ TupleType.get_object([self.key, self.value]) ]))
+    elif name == 'iterkeys':
+      return InternalConstFunc('dict.iterkeys', IterType.get_object([ TupleType.get_object([self.key]) ]))
+    elif name == 'itervalues':
+      return InternalConstFunc('dict.itervalues', IterType.get_object([ TupleType.get_object([self.value]) ]))
+    elif name == 'keys':
+      return InternalConstFunc('dict.keys', ListType.get_object([ TupleType.get_object([self.key]) ]))
+    elif name == 'pop':
+      return self.Get(self)
+    elif name == 'popitem':
+      return InternalConstFunc('dict.popitem', TupleType.get_object([self.key, self.value]))
+    elif name == 'setdefault':
+      return self.SetDefault(self)
+    elif name == 'update':
+      return self.Update(self)
+    elif name == 'values':
+      return InternalConstFunc('dict.keys', ListType.get_object([ TupleType.get_object([self.key]) ]))
+    raise NodeAttrError(name)
+
+  def get_element(self, frame, subs, write=False):
+    assert len(subs) == 1
+    key = subs[0]
+    if write:
+      key.connect(self.key)
+    else:
+      frame.raise_expt(KeyErrorType.maybe('might not have the key: %r' % key))
+    return self.value
+
+  def get_iter(self, frame):
+    return IterType.get_object(elemall=self.key)
+
+
+##  DictType
+##
+class DictType(BuiltinAggregateType, InternalFunc):
   
   PYTHON_TYPE = dict
+  PYTHON_IMPL = DictObject
   
   class DictConversion(CompoundTypeNode):
     
     def __init__(self, frame, obj):
       self.frame = frame
-      self.dictobj = DictObject([])
+      self.dictobj = DictType.get_object()
       CompoundTypeNode.__init__(self, [self.dictobj])
       obj.connect(self)
       return
@@ -467,124 +541,13 @@ class DictType(BuiltinType, InternalFunc):
     
   def process_args(self, frame, args, kwargs):
     if kwargs:
-      return DictObject([ (StrType.get_object(), v) for (_,v) in kwargs.iteritems() ])
+      return DictType.get_object([ (StrType.get_object(), v) for (_,v) in kwargs.iteritems() ])
     if args:
       return self.DictConversion(frame, args[0])
     else:
-      return DictObject.get_null()
+      return DictType.get_object()
 
   def __init__(self):
     InternalFunc.__init__(self, 'dict', [], [ANY_TYPE]) # XXX take keyword argument!
     return
 
-class DictObject(BuiltinAggregateObject):
-
-  TYPEOBJ = DictType.get_typeobj()
-  
-  # dict.get
-  class Get(InternalConstFunc):
-    def __init__(self, dictobj):
-      self.dictobj = dictobj
-      self.found = CompoundTypeNode()
-      dictobj.value.connect(self.found)
-      InternalConstFunc.__init__(self, 'dict.get', self.found, [ANY_TYPE], [ANY_TYPE])
-      return
-    def __repr__(self):
-      return '%r.get' % self.dictobj
-    def accept_arg(self, frame, i):
-      if i == 0:
-        return None
-      return self.found
-
-  # dict.setdefault
-  class SetDefault(InternalConstFunc):
-    def __init__(self, dictobj):
-      self.dictobj = dictobj
-      InternalConstFunc.__init__(self, 'dict.setdefault', dictobj.default, [ANY_TYPE], [ANY_TYPE])
-      return
-    def __repr__(self):
-      return '%r.setdefault' % self.dictobj
-    def accept_arg(self, frame, i):
-      if i == 1:
-        self.args[i].connect(self.dictobj.value)
-      return None
-
-  def __init__(self, items=None, key=None, value=None):
-    if items != None:
-      assert key == None and value == None
-      self.key = ElementAll( k for (k,v) in items )
-      self.value = ElementAll( v for (k,v) in items )
-    elif key != None and value != None:
-      self.key = CompoundTypeNode([key])
-      self.value = CompoundTypeNode([value])
-    else:
-      self.key = CompoundTypeNode()
-      self.value = CompoundTypeNode()
-    self.default = CompoundTypeNode()
-    NoneType.get_object().connect(self.default)
-    self.value.connect(self.default)
-    BuiltinAggregateObject.__init__(self)
-    return
-  
-  def __repr__(self):
-    return '{%s: %s}' % (self.key, self.value)
-
-  def equal(self, obj, done=None):
-    if not isinstance(obj, DictObject): return False
-    return self.key.equal(obj.key, done) and self.value.equal(obj.value, done)
-  
-  def copy(self):
-    return DictObject(key=self.key, value=self.value)
-
-  def desc1(self, done):
-    return '{%s: %s}' % (self.key.desc1(done), self.value.desc1(done))
-
-  def bind(self, key, value):
-    key.connect(self.key)
-    value.connect(self.value)
-    return
-
-  def get_attr(self, name, write=False):
-    if name == 'clear':
-      return InternalConstFunc('dict.clear', NoneType.get_object())
-    elif name == 'copy':
-      return InternalConstFunc('dict.copy', self.copy())
-    elif name == 'fromkeys':
-      return self.FromKeys()
-    elif name == 'get':
-      return self.Get(self)
-    elif name == 'has_key':
-      return InternalConstFunc('dict.has_key', BoolType.get_object(), [ANY_TYPE])
-    elif name == 'items':
-      return InternalConstFunc('dict.items', ListObject([ TupleObject([self.key, self.value]) ]))
-    elif name == 'iteritems':
-      return InternalConstFunc('dict.iteritems', IterObject([ TupleObject([self.key, self.value]) ]))
-    elif name == 'iterkeys':
-      return InternalConstFunc('dict.iterkeys', IterObject([ TupleObject([self.key]) ]))
-    elif name == 'itervalues':
-      return InternalConstFunc('dict.itervalues', IterObject([ TupleObject([self.value]) ]))
-    elif name == 'keys':
-      return InternalConstFunc('dict.keys', ListObject([ TupleObject([self.key]) ]))
-    elif name == 'pop':
-      return self.Get(self)
-    elif name == 'popitem':
-      return InternalConstFunc('dict.popitem', TupleObject([self.key, self.value]))
-    elif name == 'setdefault':
-      return self.SetDefault(self)
-    elif name == 'update':
-      return self.Update(self)
-    elif name == 'values':
-      return InternalConstFunc('dict.keys', ListObject([ TupleObject([self.key]) ]))
-    raise NodeAttrError(name)
-
-  def get_element(self, frame, subs, write=False):
-    assert len(subs) == 1
-    key = subs[0]
-    if write:
-      key.connect(self.key)
-    else:
-      frame.raise_expt(KeyErrorType.maybe('might not have the key: %r' % key))
-    return self.value
-
-  def get_iter(self, frame):
-    return IterObject(elemall=self.key)

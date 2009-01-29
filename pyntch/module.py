@@ -141,14 +141,18 @@ class Interpreter(object):
     if fullname in klass.MODULE_CACHE:
       module = klass.MODULE_CACHE[fullname]
     else:
+      modpath = klass.module_path
+      modname = fullname
       try:
-        i = fullname.rindex('.')
-        parent = klass.load_module(fullname[:i])
-        modpath = [ os.path.dirname(parent.path) ]
-        name = fullname[i+1:]
-      except ValueError:
-        modpath = klass.module_path
-        name = fullname
-      path = klass.find_module(name, modpath)
+        path = klass.find_module(modname, modpath)
+      except klass.ModuleNotFound:
+        try:
+          i = fullname.rindex('.')
+          parent = klass.load_module(fullname[:i])
+          modpath = [ os.path.dirname(parent.path) ]
+          modname = fullname[i+1:]
+        except ValueError:
+          raise
+      path = klass.find_module(modname, modpath)
       module = klass.load_file(path, fullname)
     return module

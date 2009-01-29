@@ -111,7 +111,7 @@ class BinaryOp(MustBeDefinedNode):
     }
   def recv(self, _):
     from builtin_types import BUILTIN_OBJECTS, NumberType, IntType, BaseStringType
-    from aggregate_types import ListType, ListObject, TupleType, TupleObject
+    from aggregate_types import ListType, ListObject, TupleType
     for lobj in self.left:
       for robj in self.right:
         if (lobj,robj) in self.done: continue
@@ -143,28 +143,28 @@ class BinaryOp(MustBeDefinedNode):
         # for list operation, only Add and Mul is supported.
         if (lobj.is_type(ListType.get_typeobj()) and robj.is_type(ListType.get_typeobj()) and
             self.op == 'Add'):
-          self.update_types([ListObject.concat(lobj, robj)])
+          self.update_types([ListType.concat(lobj, robj)])
           continue
         if (lobj.is_type(ListType.get_typeobj()) and robj.is_type(IntType.get_typeobj()) and
             self.op == 'Mul'):
-          self.update_types([ListObject.multiply(lobj)])
+          self.update_types([ListType.multiply(lobj)])
           continue
         if (lobj.is_type(IntType.get_typeobj()) and robj.is_type(ListType.get_typeobj()) and
             self.op == 'Mul'):
-          self.update_types([ListObject.multiply(robj)])
+          self.update_types([ListType.multiply(robj)])
           continue
         # for tuple operation, only Add and Mul is supported.
         if (lobj.is_type(TupleType.get_typeobj()) and robj.is_type(TupleType.get_typeobj()) and
             self.op == 'Add'):
-          self.update_types([TupleObject.concat(lobj, robj)])
+          self.update_types([TupleType.concat(lobj, robj)])
           continue
         if (lobj.is_type(TupleType.get_typeobj()) and robj.is_type(IntType.get_typeobj()) and
             self.op == 'Mul'):
-          self.update_types([TupleObject.multiply(lobj)])
+          self.update_types([TupleType.multiply(lobj)])
           continue
         if (lobj.is_type(IntType.get_typeobj()) and robj.is_type(TupleType.get_typeobj()) and
             self.op == 'Mul'):
-          self.update_types([TupleObject.multiply(robj)])
+          self.update_types([TupleType.multiply(robj)])
           continue
         # other operations.
         k = (ltype.get_name(), self.op, rtype.get_name())
@@ -256,7 +256,7 @@ class BooleanOp(CompoundTypeNode, ExceptionRaiser):
     self.nodes = nodes
     CompoundTypeNode.__init__(self)
     ExceptionRaiser.__init__(self, parent_frame, loc)
-    if op != 'Or' or not [ 1 for node in nodes if isinstance(node, SimpleTypeNode) ]:
+    if op == 'Or' and not [ 1 for node in nodes if isinstance(node, SimpleTypeNode) ]:
       BoolType.get_object().connect(self)
     for node in self.nodes:
       node.connect(self)
@@ -372,7 +372,7 @@ class IterRef(CompoundTypeNode, ExceptionRaiser):
       try:
         obj.get_seq(self).connect(self)
       except NodeTypeError:
-        self.raise_expt(TypeErrorType.occur('%r is not an iterator: %r' % (self.target, obj)))
+        self.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
     return
 
 
@@ -400,12 +400,21 @@ class SliceRef(CompoundTypeNode, ExceptionRaiser):
       return '%r[:]' % self.target
 
   def recv_target(self, src):
+    from aggregate_types import TupleType, ListType, TupleObject
     for obj in src:
       try:
-        obj.get_element(self, [self.lower, self.upper]).connect(self)
+        elemall = obj.get_element(self, [self.lower, self.upper])
+        if isinstance(obj, TupleObject):
+          TupleType.get_object(elemall=elemall).connect(self)
+        else:
+          ListType.get_object(elemall=elemall).connect(self)
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
+
+  def get_iter(self, frame):
+    from aggregate_types import IterType
+    return IterType.get_object(elemall=self)
 
 
 ##  SliceAssign
@@ -478,9 +487,9 @@ class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
             src.connect(dest)
       else:
         try:
-          src = obj.get_seq(self)
+          elemall = obj.get_seq(self)
           for dest in self.elements:
-            src.connect(dest)
+            elemall.connect(dest)
         except NodeTypeError:
-          self.raise_expt(TypeErrorType.occur('not iterable: %r' % src))
+          self.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
     return

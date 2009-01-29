@@ -23,12 +23,12 @@ class FuncType(BuiltinType, TreeReporter):
       return '<FuncBody %s>' % self.name
 
     def set_retval(self, evals):
-      from aggregate_types import IterObject
+      from aggregate_types import IterType
       returns = [ obj for (t,obj) in evals if t == 'r' ]
       yields = [ obj for (t,obj) in evals if t == 'y' ]
       assert returns
       if yields:
-        retvals = [ IterObject([ slot.value for slot in yields ]) ]
+        retvals = [ IterType.get_object([ slot.value for slot in yields ]) ]
       else:
         retvals = returns
       for obj in retvals:
@@ -104,7 +104,7 @@ class FuncType(BuiltinType, TreeReporter):
 
   def call(self, frame, args, kwargs):
     from builtin_types import StrType
-    from aggregate_types import DictObject, TupleObject
+    from aggregate_types import DictType, TupleType
     from expression import TupleUnpack
     self.callers.append(frame)
     # Copy the list of argument variables.
@@ -148,9 +148,9 @@ class FuncType(BuiltinType, TreeReporter):
         frame.raise_expt(TypeErrorType.occur('too many argument for %s: at most %d' % (self.name, len(self.argvars))))
     # Handle remaining arguments: kwargs and varargs.
     if self.kwarg:
-      self.space[self.kwarg].bind(DictObject(key=StrType.get_object(), value=varkwargs))
+      self.space[self.kwarg].bind(DictType.get_object(key=StrType.get_object(), value=varkwargs))
     if self.vararg:
-      self.space[self.vararg].bind(TupleObject(tuple(varargs)))
+      self.space[self.vararg].bind(TupleType.get_object(varargs))
     if len(self.defaults) < len(argvars):
       frame.raise_expt(TypeErrorType.occur('too few argument for %s: %d or more' % (self.name, len(argvars))))
     self.body.connect_expt(frame)

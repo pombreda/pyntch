@@ -89,15 +89,7 @@ class SimpleTypeNode(TypeNode):
     return
 
   def __repr__(self):
-    return '<%s>' % self.get_type().get_name()
-
-  def get_type(self):
-    return self.typeobj
-
-  def is_type(self, *typeobjs):
-    for typeobj in typeobjs:
-      if issubclass(self.typeobj.__class__, typeobj.__class__): return True
-    return False
+    return '<%s>' % self.typeobj.get_name()
 
   def desc1(self, _):
     return repr(self)
@@ -110,8 +102,10 @@ class SimpleTypeNode(TypeNode):
 ##
 class CompoundTypeNode(TypeNode):
 
-  def __init__(self, types=None):
-    TypeNode.__init__(self, types or [])
+  def __init__(self, types=[]):
+    TypeNode.__init__(self, [])
+    for obj in types:
+      obj.connect(self)
     return
 
   def __repr__(self):
@@ -144,7 +138,9 @@ class CompoundTypeNode(TypeNode):
   def update_types(self, types):
     d = []
     for obj1 in types:
+      assert not isinstance(obj1, CompoundTypeNode), obj1
       for obj2 in self.types:
+        assert not isinstance(obj2, CompoundTypeNode), obj2
         if obj1.equal(obj2): break
       else:
         d.append(obj1)
@@ -184,6 +180,7 @@ class UndefinedTypeNode(TypeNode):
 class BuiltinType(SimpleTypeNode):
 
   PYTHON_TYPE = None # must be defined by subclass
+  PYTHON_IMPL = None
   
   def __init__(self):
     SimpleTypeNode.__init__(self, self)
@@ -196,6 +193,11 @@ class BuiltinType(SimpleTypeNode):
   def get_type(klass):
     from builtin_types import TypeType
     return TypeType.get_typeobj()
+  
+  @classmethod
+  def is_type(self, *typeobjs):
+    from builtin_types import TypeType
+    return TypeType.get_typeobj() in typeobjs
 
   # get_name()
   # returns the name of the Python type of this object.
@@ -217,5 +219,21 @@ class BuiltinType(SimpleTypeNode):
   @classmethod
   def get_object(klass):
     if not klass.OBJECT:
-      klass.OBJECT = SimpleTypeNode(klass.get_typeobj())
+      klass.OBJECT = klass.PYTHON_IMPL(klass.get_typeobj())
     return klass.OBJECT
+
+
+##  BuiltinObject
+##
+class BuiltinObject(SimpleTypeNode):
+
+  def get_type(self):
+    return self.typeobj
+
+  def get_attr(self, name, write=False):
+    return self.get_type().get_attr(name, write=write)
+  
+  def is_type(self, *typeobjs):
+    for typeobj in typeobjs:
+      if issubclass(self.typeobj.__class__, typeobj.__class__): return True
+    return False

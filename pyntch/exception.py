@@ -3,7 +3,8 @@ import sys
 stderr = sys.stderr
 
 from compiler import ast
-from typenode import TypeNode, BuiltinType, SimpleTypeNode, CompoundTypeNode, NodeTypeError
+from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeTypeError, \
+     BuiltinType, BuiltinObject
 
 
 ##  ExceptionType
@@ -13,16 +14,7 @@ from typenode import TypeNode, BuiltinType, SimpleTypeNode, CompoundTypeNode, No
 ##  throughout the entire program so we define it here for a
 ##  convenience.
 ##
-class ExceptionType(BuiltinType):
-
-  PYTHON_TYPE = Exception
-
-  @classmethod
-  def occur(klass, message):
-    return ExceptionObject(klass.get_typeobj(), message)
-  maybe = occur
-
-class ExceptionObject(SimpleTypeNode):
+class ExceptionObject(BuiltinObject):
 
   def __init__(self, typeobj, message, args=None):
     self.typeobj = typeobj
@@ -41,6 +33,16 @@ class ExceptionObject(SimpleTypeNode):
     if name == 'message':
       return StrType.get_object()
     raise NodeAttrError(name)
+
+class ExceptionType(BuiltinType):
+
+  PYTHON_TYPE = Exception
+  PYTHON_IMPL = ExceptionObject
+
+  @classmethod
+  def occur(klass, message):
+    return klass.PYTHON_IMPL(klass.get_typeobj(), message)
+  maybe = occur
 
 class TracebackObject(TypeNode):
 
@@ -352,13 +354,13 @@ class ElementTypeChecker(TypeChecker):
   
   def recv_elemobj(self, src):
     for obj in src:
-      if typeobj in self.validtypes:
+      for typeobj in self.validtypes:
         if obj.is_type(typeobj):
           self.update_types([obj])
           break
-      elif self.blame:
-        self.parent_frame.raise_expt(TypeErrorType.occur(
-          '%s (%s) must be [%s]' % (self.blame, obj, '|'.join(map(repr, self.validtypes)))))
+      else:
+        s = '|'.join(map(repr, self.validtypes))
+        self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be [%s]' % (self.blame, obj, s)))
     return
 
 
