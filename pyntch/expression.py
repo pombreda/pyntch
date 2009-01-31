@@ -110,7 +110,7 @@ class BinaryOp(MustBeDefinedNode):
     ('int', 'Mul', 'unicode'): 'unicode',
     }
   def recv(self, _):
-    from builtin_types import BUILTIN_OBJECTS, NumberType, IntType, BaseStringType
+    from basic_types import BUILTIN_OBJECTS, NumberType, IntType, BaseStringType
     from aggregate_types import ListType, ListObject, TupleType
     for lobj in self.left:
       for robj in self.right:
@@ -227,7 +227,7 @@ class UnaryOp(CompoundTypeNode, ExceptionRaiser):
 class CompareOp(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, expr0, comps):
-    from builtin_types import BoolType
+    from basic_types import BoolType
     self.expr0 = expr0
     self.comps = comps
     CompoundTypeNode.__init__(self, [BoolType.get_object()])
@@ -251,7 +251,7 @@ class CompareOp(CompoundTypeNode, ExceptionRaiser):
 class BooleanOp(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, op, nodes):
-    from builtin_types import BoolType
+    from basic_types import BoolType
     self.op = op
     self.nodes = nodes
     CompoundTypeNode.__init__(self)
@@ -271,7 +271,7 @@ class BooleanOp(CompoundTypeNode, ExceptionRaiser):
 class NotOp(CompoundTypeNode, ExceptionRaiser):
   
   def __init__(self, parent_frame, loc, value):
-    from builtin_types import BoolType
+    from basic_types import BoolType
     self.value = value
     CompoundTypeNode.__init__(self, [BoolType.get_object()])
     ExceptionRaiser.__init__(self, parent_frame, loc)

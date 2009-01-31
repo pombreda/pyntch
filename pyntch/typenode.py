@@ -191,12 +191,12 @@ class BuiltinType(SimpleTypeNode):
 
   @classmethod
   def get_type(klass):
-    from builtin_types import TypeType
+    from basic_types import TypeType
     return TypeType.get_typeobj()
   
   @classmethod
   def is_type(self, *typeobjs):
-    from builtin_types import TypeType
+    from basic_types import TypeType
     return TypeType.get_typeobj() in typeobjs
 
   # get_name()

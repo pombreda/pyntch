@@ -10,7 +10,7 @@ from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeTypeError, 
 ##  ExceptionType
 ##
 ##  ExceptionType is a built-in Python type so it should be
-##  defined within the builtin_types module, but it's used
+##  defined within the basic_types module, but it's used
 ##  throughout the entire program so we define it here for a
 ##  convenience.
 ##
@@ -27,7 +27,7 @@ class ExceptionObject(BuiltinObject):
     return '<%s: %s>' % (self.get_type().get_name(), self.message)
 
   def get_attr(self, name, write=False):
-    from builtin_types import StrType
+    from basic_types import StrType
     if name == 'args':
       return self.args # XXX None is returned.
     if name == 'message':
