@@ -96,7 +96,7 @@ class OrdFunc(BuiltinConstFunc):
 class RangeFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'range', ListType.get_object([IntType.get_object()]), 
+    BuiltinConstFunc.__init__(self, 'range', ListType.create_sequence([IntType.get_object()]), 
                               [IntType],
                               [IntType, IntType])
     return
@@ -125,7 +125,7 @@ class CmpFunc(BuiltinConstFunc):
 class DirFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'dir', ListType.get_object([StrType.get_object()]), [], [ANY])
+    BuiltinConstFunc.__init__(self, 'dir', ListType.create_sequence([StrType.get_object()]), [], [ANY])
     return
 
 
@@ -211,7 +211,7 @@ class IterFunc(BuiltinFunc):
     
     def __init__(self, frame, obj):
       self.frame = frame
-      self.iterobj = IterType.get_object()
+      self.iterobj = IterType.create_sequence()
       CompoundTypeNode.__init__(self, [self.iterobj])
       obj.connect(self)
       return

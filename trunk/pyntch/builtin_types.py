@@ -13,6 +13,20 @@ from function import ClassType, InstanceType
 ANY = TypeChecker.ANY
 
 
+##  BuiltinBasicType
+##
+class BuiltinBasicType(BuiltinType):
+
+  # get_object()
+  OBJECT = None
+  @classmethod
+  def get_object(klass):
+    assert klass.TYPE_INSTANCE
+    if not klass.OBJECT:
+      klass.OBJECT = klass.TYPE_INSTANCE(klass.get_typeobj())
+    return klass.OBJECT
+
+
 ##  BuiltinCallable
 ##
 class BuiltinCallable(SimpleTypeNode):
@@ -97,16 +111,16 @@ class GeneratorSlot(CompoundTypeNode):
 ##  Simple Types
 ##
 class NoneObject(BuiltinObject): pass
-class NoneType(BuiltinType):
+class NoneType(BuiltinBasicType):
   TYPE_NAME = 'NoneType'
   TYPE_INSTANCE = NoneObject
 
 class BoolObject(BuiltinObject): pass
-class BoolType(BuiltinType):
+class BoolType(BuiltinBasicType):
   TYPE_NAME = 'bool'
   TYPE_INSTANCE = BoolObject
 
-class NumberType(BuiltinType):
+class NumberType(BuiltinBasicType):
   RANK = 0
   # get_rank()
   @classmethod
@@ -144,7 +158,7 @@ class IntType(NumberType, BuiltinConstCallable):
 
   def __init__(self):
     IntType.TYPE = self
-    BuiltinType.__init__(self)
+    BuiltinBasicType.__init__(self)
     BuiltinConstCallable.__init__(self, 'int', IntType.get_object(), [], [ANY, IntType])
     return
   
@@ -173,7 +187,7 @@ class BaseStringObject(BuiltinObject):
   
   def get_iter(self, frame):
     from aggregate_types import IterType
-    return IterType.get_object(elemall=self)
+    return IterType.create_sequence(elemall=self)
 
   def get_element(self, frame, subs, write=False):
     if write:
@@ -182,7 +196,7 @@ class BaseStringObject(BuiltinObject):
       frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
     return self
 
-class BaseStringType(BuiltinType, BuiltinConstCallable):
+class BaseStringType(BuiltinBasicType, BuiltinConstCallable):
   TYPE_NAME = 'basestring'
 
   def get_attr(self, name, write=False):
@@ -243,7 +257,7 @@ class BaseStringType(BuiltinType, BuiltinConstCallable):
                                [BaseStringType])
     elif name == 'partition':
       return BuiltinConstCallable('str.partiion',
-                               TupleType.get_object([self.get_object(), self.get_object(), self.get_object()]),
+                               TupleType.create_sequence([self.get_object(), self.get_object(), self.get_object()]),
                                [BaseStringType])
     elif name == 'replace':
       return BuiltinConstCallable('str.replace', self.get_object(),
@@ -260,19 +274,19 @@ class BaseStringType(BuiltinType, BuiltinConstCallable):
                                [IntType], [BaseStringType])
     elif name == 'rpartition':
       return BuiltinConstCallable('str.rpartiion',
-                               TupleType.get_object([self.get_object(), self.get_object(), self.get_object()]),
+                               TupleType.create_sequence([self.get_object(), self.get_object(), self.get_object()]),
                                [BaseStringType])
     elif name == 'rsplit':
-      return BuiltinConstCallable('str.rsplit', ListType.get_object([self.get_object()]),
+      return BuiltinConstCallable('str.rsplit', ListType.create_sequence([self.get_object()]),
                                [], [BaseStringType, IntType])
     elif name == 'rstrip':
       return BuiltinConstCallable('str.rstrip', self.get_object(),
                                [BaseStringType])
     elif name == 'split':
-      return BuiltinConstCallable('str.split', ListType.get_object([self.get_object()]),
+      return BuiltinConstCallable('str.split', ListType.create_sequence([self.get_object()]),
                                [], [BaseStringType, IntType])
     elif name == 'splitlines':
-      return BuiltinConstCallable('str.splitlines', ListType.get_object([self.get_object()]),
+      return BuiltinConstCallable('str.splitlines', ListType.create_sequence([self.get_object()]),
                                [], [ANY])
     elif name == 'startswith':
       return BuiltinConstCallable('str.startswith', BoolType.get_object(),
@@ -317,9 +331,12 @@ class BaseStringType(BuiltinType, BuiltinConstCallable):
       frame.raise_expt(TypeErrorType.occur('cannot instantiate a basestring type.'))
       return UndefinedTypeNode()
     return BuiltinConstCallable.call(self, frame, args, kwargs)
+
+  def create_sequence(self, elements=None, elemall=None):
+    return self.get_object()
   
   def __init__(self):
-    BuiltinType.__init__(self)
+    BuiltinBasicType.__init__(self)
     BuiltinConstCallable.__init__(self, 'basestring', None)
     return
   
@@ -337,7 +354,7 @@ class StrType(BaseStringType):
     
   def __init__(self):
     StrType.TYPE = self
-    BuiltinType.__init__(self)
+    BuiltinBasicType.__init__(self)
     BuiltinConstCallable.__init__(self, 'str', StrType.get_object(), [], [ANY])
     return
 
@@ -365,7 +382,7 @@ class UnicodeType(BaseStringType):
 
   def __init__(self):
     UnicodeType.TYPE = self
-    BuiltinType.__init__(self)
+    BuiltinBasicType.__init__(self)
     BuiltinConstCallable.__init__(self, 'unicode', UnicodeType.get_object(),
                                [], [ANY])
     return
@@ -376,15 +393,15 @@ class UnicodeType(BaseStringType):
 class FileObject(BuiltinObject):
   def get_iter(self, frame):
     from aggregate_types import IterType
-    return IterType.get_object(elemall=StrType.get_object())
+    return IterType.create_sequence(elemall=StrType.get_object())
   
-class FileType(BuiltinType, BuiltinConstCallable):
+class FileType(BuiltinBasicType, BuiltinConstCallable):
   TYPE_NAME = 'file'
   TYPE_INSTANCE = FileObject
   
   def __init__(self):
     FileType.TYPE = self
-    BuiltinType.__init__(self)
+    BuiltinBasicType.__init__(self)
     BuiltinConstCallable.__init__(self, 'file', FileType.get_object(),
                                [StrType], [StrType, IntType],
                                [IOErrorType.maybe('might not able to open a file.')])
@@ -421,7 +438,7 @@ class FileType(BuiltinType, BuiltinConstCallable):
                                [], [IntType],
                                [EOFErrorType.maybe('might receive an EOF.')])
     elif name == 'readlines':
-      return BuiltinConstCallable('file.readlines', ListType.get_object([StrType.get_object()]),
+      return BuiltinConstCallable('file.readlines', ListType.create_sequence([StrType.get_object()]),
                                [], [IntType],
                                [EOFErrorType.maybe('might receive an EOF.')])
     elif name == 'seek':
@@ -450,19 +467,19 @@ class FileType(BuiltinType, BuiltinConstCallable):
 ##  ObjectType
 ##
 class ObjectObject(BuiltinObject): pass
-class ObjectType(BuiltinType, BuiltinConstCallable):
+class ObjectType(BuiltinBasicType, BuiltinConstCallable):
   TYPE_NAME = 'object'
   TYPE_INSTANCE = ObjectObject
   
   def __init__(self):
     ObjectType.TYPE = self
-    BuiltinType.__init__(self)
+    BuiltinBasicType.__init__(self)
     BuiltinConstCallable.__init__(self, 'object', ObjectType.get_object())
     return
 
 ##  TypeType
 ##
-class TypeType(BuiltinType):
+class TypeType(BuiltinBasicType):
   TYPE_NAME = 'type'
 
 

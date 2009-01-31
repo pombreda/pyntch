@@ -31,7 +31,7 @@ class FuncType(BuiltinType, TreeReporter):
       yields = [ obj for (t,obj) in evals if t == 'y' ]
       assert returns
       if yields:
-        retvals = [ IterType.get_object([ slot.value for slot in yields ]) ]
+        retvals = [ IterType.create_sequence([ slot.value for slot in yields ]) ]
       else:
         retvals = returns
       for obj in retvals:
@@ -148,9 +148,9 @@ class FuncType(BuiltinType, TreeReporter):
         frame.raise_expt(TypeErrorType.occur('too many argument for %s: at most %d' % (self.name, len(self.argvars))))
     # Handle remaining arguments: kwargs and varargs.
     if self.kwarg:
-      self.space[self.kwarg].bind(DictType.get_object(key=StrType.get_object(), value=varkwargs))
+      self.space[self.kwarg].bind(DictType.create_dict(key=StrType.get_object(), value=varkwargs))
     if self.vararg:
-      self.space[self.vararg].bind(TupleType.get_object(varargs))
+      self.space[self.vararg].bind(TupleType.create_sequence(varargs))
     if len(self.defaults) < len(argvars):
       frame.raise_expt(TypeErrorType.occur('too few argument for %s: %d or more' % (self.name, len(argvars))))
     self.body.connect_expt(frame)

@@ -213,15 +213,6 @@ class BuiltinType(SimpleTypeNode):
       klass.TYPE = klass()
     return klass.TYPE
 
-  # get_object()
-  OBJECT = None
-  @classmethod
-  def get_object(klass):
-    assert klass.TYPE_INSTANCE
-    if not klass.OBJECT:
-      klass.OBJECT = klass.TYPE_INSTANCE(klass.get_typeobj())
-    return klass.OBJECT
-
 
 ##  BuiltinObject
 ##
