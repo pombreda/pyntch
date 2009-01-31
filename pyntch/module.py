@@ -1,39 +1,39 @@
 #!/usr/bin/env python
 import sys, os.path
 stderr = sys.stderr
-from typenode import TreeReporter, BuiltinType
+from typenode import TreeReporter, BuiltinType, BuiltinObject
 from exception import ExceptionFrame
 from namespace import Namespace
 
 
 ##  ModuleType
 ##
-class ModuleType(BuiltinType):
+class ModuleObject(BuiltinObject):
   
   def __init__(self, name, space):
     self.name = name
     self.space = space
-    BuiltinType.__init__(self)
+    BuiltinObject.__init__(self, ModuleType.get_typeobj())
     return
   
   def __repr__(self):
     return '<Module %s>' % (self.name,)
 
-  @classmethod
-  def get_name(klass):
-    return 'module'
-
   def get_attr(self, name, write=False):
     return self.space.register_var(name)
+  
+class ModuleType(BuiltinType):
+  TYPE_NAME = 'module'
+  TYPE_INSTANCE = ModuleObject
 
 
-##  PythonModuleType
+##  PythonModuleObject
 ##
-class PythonModuleType(ModuleType, TreeReporter, ExceptionFrame):
+class PythonModuleObject(ModuleObject, TreeReporter, ExceptionFrame):
 
   def __init__(self, name, parent_space, path=None):
     self.path = path
-    ModuleType.__init__(self, name, Namespace(parent_space, name))
+    ModuleObject.__init__(self, name, Namespace(parent_space, name))
     TreeReporter.__init__(self, None, name)
     ExceptionFrame.__init__(self)
     return
@@ -47,6 +47,12 @@ class PythonModuleType(ModuleType, TreeReporter, ExceptionFrame):
     self.space.register_names(tree)
     build_stmt(self, self, self.space, tree, evals, isfuncdef=True)
     return
+
+  def get_name(self):
+    return self.name
+  def get_path(self):
+    return self.path
+  get_loc = get_path
 
   def show(self, p):
     p('[%s]' % self.name)
@@ -85,9 +91,9 @@ class Interpreter(object):
     default.import_all(builtin)
     klass.DEFAULT_NAMESPACE = default
     klass.MODULE_CACHE = {
-      '__builtin__': ModuleType('__builtin__', builtin),
-      'types': ModuleType('types', types),
-      'exceptions': ModuleType('exceptions', exceptions),
+      '__builtin__': ModuleObject('__builtin__', builtin),
+      'types': ModuleObject('types', types),
+      'exceptions': ModuleObject('exceptions', exceptions),
       }
     return
 
@@ -115,20 +121,20 @@ class Interpreter(object):
     from compiler import parseFile
     if klass.debug:
       print >>stderr, 'load_file: %r' % path
-    def rec(n):
-      n._modname = modname
-      for c in n.getChildNodes():
-        rec(c)
-      return
     dirname = os.path.dirname(path)
     if dirname not in klass.module_path:
       klass.module_path.insert(0, dirname)
-    module = PythonModuleType(modname, klass.DEFAULT_NAMESPACE, path)
+    module = PythonModuleObject(modname, klass.DEFAULT_NAMESPACE, path)
     klass.MODULE_CACHE[modname] = module
     try:
       tree = parseFile(path)
     except IOError:
-      raise klass.ModuleNotFound(modname)
+      raise klass.ModuleNotFound(modname, path)
+    def rec(n):
+      n._module = module
+      for c in n.getChildNodes():
+        rec(c)
+      return
     rec(tree)
     module.load(tree)
     return module

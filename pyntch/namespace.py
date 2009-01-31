@@ -300,7 +300,7 @@ class Namespace(object):
           self.register_names(qif.test)
     
     else:
-      raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._modname, tree.lineno))
+      raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._module.get_loc(), tree.lineno))
     return
 
   def import_all(self, space):
@@ -314,6 +314,7 @@ class Namespace(object):
 class BuiltinTypesNamespace(Namespace):
   
   def __init__(self, parent):
+    import function
     import builtin_types
     import aggregate_types
     Namespace.__init__(self, parent, 'types')
@@ -347,7 +348,7 @@ class BuiltinTypesNamespace(Namespace):
     #self.register_var('FunctionType').bind(function.FuncType.get_typeobj())
     #self.register_var('LambdaType').bind(function.LambdaFuncType.get_typeobj())
     #self.register_var('GeneratorType').bind(function.IterType.get_typeobj())
-    #self.register_var('InstanceType').bind(function.InstanceType.get_typeobj())
+    self.register_var('InstanceType').bind(function.InstanceType.get_typeobj())
     #self.register_var('MethodType').bind(function.MethodType.get_typeobj())
     
     #self.register_var('ModuleType').bind(module.ModuleType.get_typeobj())

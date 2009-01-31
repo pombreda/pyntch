@@ -72,10 +72,10 @@ class TypeNode(object):
   
   def equal(self, obj, _=None):
     raise NotImplementedError
-  def describe(self):
-    return self.desc1(set())
   def desc1(self, _):
     raise NotImplementedError
+  def describe(self):
+    return self.desc1(set())
 
 
 ##  SimpleTypeNode
@@ -102,14 +102,14 @@ class SimpleTypeNode(TypeNode):
 ##
 class CompoundTypeNode(TypeNode):
 
-  def __init__(self, types=[]):
+  def __init__(self, nodes=None):
     TypeNode.__init__(self, [])
-    for obj in types:
+    for obj in (nodes or []):
       obj.connect(self)
     return
 
   def __repr__(self):
-    return self.describe()
+    return '<CompoundTypeNode: %s>' % self.describe()
 
   def equal(self, obj, done=None):
     if self is obj: return True
@@ -179,8 +179,8 @@ class UndefinedTypeNode(TypeNode):
 ##
 class BuiltinType(SimpleTypeNode):
 
-  PYTHON_TYPE = None # must be defined by subclass
-  PYTHON_IMPL = None
+  TYPE_NAME = None # must be defined by subclass
+  TYPE_INSTANCE = None
   
   def __init__(self):
     SimpleTypeNode.__init__(self, self)
@@ -203,8 +203,7 @@ class BuiltinType(SimpleTypeNode):
   # returns the name of the Python type of this object.
   @classmethod
   def get_name(klass):
-    assert isinstance(klass.PYTHON_TYPE, type)
-    return klass.PYTHON_TYPE.__name__
+    return klass.TYPE_NAME
 
   # get_typeobj()
   TYPE = None
@@ -218,8 +217,9 @@ class BuiltinType(SimpleTypeNode):
   OBJECT = None
   @classmethod
   def get_object(klass):
+    assert klass.TYPE_INSTANCE
     if not klass.OBJECT:
-      klass.OBJECT = klass.PYTHON_IMPL(klass.get_typeobj())
+      klass.OBJECT = klass.TYPE_INSTANCE(klass.get_typeobj())
     return klass.OBJECT
 
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-from typenode import TreeReporter, SimpleTypeNode, CompoundTypeNode, BuiltinType, NodeTypeError, NodeAttrError
+from typenode import TreeReporter, SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, \
+     BuiltinType, BuiltinObject
 from namespace import Namespace, Variable
 from exception import TypeErrorType, ExceptionFrame
 
@@ -8,15 +9,17 @@ from exception import TypeErrorType, ExceptionFrame
 ##  FuncType
 ##
 class FuncType(BuiltinType, TreeReporter):
+
+  TYPE_NAME = 'function'
   
   ##  FuncBody
   ##
   class FuncBody(CompoundTypeNode, ExceptionFrame):
 
-    def __init__(self, name):
-      CompoundTypeNode.__init__(self)
-      ExceptionFrame.__init__(self)
+    def __init__(self, name, loc):
       self.name = name
+      ExceptionFrame.__init__(self, loc=loc)
+      CompoundTypeNode.__init__(self)
       return
 
     def __repr__(self):
@@ -36,7 +39,7 @@ class FuncType(BuiltinType, TreeReporter):
       return
 
   def __init__(self, parent_reporter, parent_frame, parent_space,
-               name, argnames, defaults, varargs, kwargs, code):
+               name, argnames, defaults, varargs, kwargs, code, loc):
     from expression import TupleUnpack
     def maprec(func, x):
       if isinstance(x, tuple):
@@ -48,6 +51,7 @@ class FuncType(BuiltinType, TreeReporter):
     self.name = name
     # prepare local variables that hold passed arguments.
     self.space = Namespace(parent_space, name)
+    self.loc = loc
     # handle "**kwd".
     self.kwarg = None
     if kwargs:
@@ -85,7 +89,7 @@ class FuncType(BuiltinType, TreeReporter):
 
   def build_body(self, name, tree):
     from syntax import build_stmt
-    body = self.FuncBody(name)
+    body = self.FuncBody(name, tree)
     evals = []
     self.space.register_names(tree)
     build_stmt(self, body, self.space, tree, evals, isfuncdef=True)
@@ -95,10 +99,6 @@ class FuncType(BuiltinType, TreeReporter):
   def __repr__(self):
     return ('<Function %s>' % (self.name))
 
-  @classmethod
-  def get_name(klass):
-    return 'function'
-  
   def get_type(self):
     return self
 
@@ -157,9 +157,10 @@ class FuncType(BuiltinType, TreeReporter):
     return self.body
 
   def show(self, p):
+    p('### %s(%s)' % (self.loc._module.get_loc(), self.loc.lineno))
     for frame in self.callers:
       if frame.loc:
-        p('# called at %s(%d)' % (frame.loc._modname, frame.loc.lineno))
+        p('# called at %s(%s)' % (frame.loc._module.get_loc(), frame.loc.lineno))
     names = set()
     def recjoin(sep, seq):
       for x in seq:
@@ -193,23 +194,19 @@ class ClassMethodType(FuncType): pass
 class LambdaFuncType(FuncType):
   
   def __init__(self, parent_reporter, parent_frame, parent_space,
-               argnames, defaults, varargs, kwargs, code):
+               argnames, defaults, varargs, kwargs, code, loc):
     name = '__lambda_%x' % id(code)
     FuncType.__init__(self, parent_reporter, parent_frame, parent_space,
-                      name, argnames, defaults, varargs, kwargs, code)
+                      name, argnames, defaults, varargs, kwargs, code, loc)
     return
 
   def build_body(self, name, tree):
     from syntax import build_expr
-    body = self.FuncBody(name)
+    body = self.FuncBody(name, tree)
     evals = []
     evals.append(('r', build_expr(self, body, self.space, tree, evals)))
     body.set_retval(evals)
     return body
-
-  @classmethod
-  def get_name(klass):
-    return 'lambda'
   
   def __repr__(self):
     return ('<LambdaFunc %s>' % (self.name))
@@ -219,6 +216,8 @@ class LambdaFuncType(FuncType):
 ##
 class MethodType(BuiltinType):
 
+  TYPE_NAME = 'method'
+
   def __init__(self, arg0, func):
     self.arg0 = arg0
     self.func = func
@@ -227,10 +226,6 @@ class MethodType(BuiltinType):
 
   def __repr__(self):
     return '<method %r(%s=%r)>' % (self.func, self.func.argnames[0], self.arg0)
-
-  @classmethod
-  def get_name(klass):
-    return 'method'
   
   def get_type(self):
     return self
@@ -242,6 +237,8 @@ class MethodType(BuiltinType):
 ##  ClassType
 ##
 class ClassType(BuiltinType, TreeReporter):
+
+  TYPE_NAME = 'class'
   
   ##  ClassAttr
   ##
@@ -328,12 +325,13 @@ class ClassType(BuiltinType, TreeReporter):
     def recv(self, _): # ignore return value
       return
 
-  def __init__(self, parent_reporter, parent_frame, parent_space, name, bases, code, evals):
+  def __init__(self, parent_reporter, parent_frame, parent_space, name, bases, code, evals, loc):
     from syntax import build_stmt
     BuiltinType.__init__(self)
     TreeReporter.__init__(self, parent_reporter, name)
     self.name = name
     self.bases = bases
+    self.loc = loc
     self.boundmethods = {}
     space = Namespace(parent_space, name)
     if code:
@@ -346,7 +344,7 @@ class ClassType(BuiltinType, TreeReporter):
       attr = self.ClassAttr(name, self, [])
       var.connect(attr)
       self.attrs[name] = attr
-    self.instance = InstanceType(self)
+    self.instance = InstanceObject(self)
     self.baseklass = CompoundTypeNode()
     for base in bases:
       base.connect(self.baseklass)
@@ -356,10 +354,6 @@ class ClassType(BuiltinType, TreeReporter):
   def __repr__(self):
     return ('<Class %s>' % (self.name,))
 
-  @classmethod
-  def get_name(klass):
-    return 'class'
-  
   def get_type(self):
     return self
 
@@ -394,9 +388,10 @@ class ClassType(BuiltinType, TreeReporter):
     return self.InitMethodBody(self.instance).call(frame, args, kwargs)
   
   def show(self, p):
+    p('### %s(%s)' % (self.loc._module.get_loc(), self.loc.lineno))
     for frame in self.callers:
       if frame.loc:
-        p('# called at %s(%d)' % (frame.loc._modname, frame.loc.lineno))
+        p('# called at %s(%d)' % (frame.loc._module.get_loc(), frame.loc.lineno))
     if self.bases:
       p('class %s(%s):' % (self.name, ', '.join( repr(base) for base in self.bases )))
     else:
@@ -413,7 +408,9 @@ class ClassType(BuiltinType, TreeReporter):
 
 ##  InstanceType
 ##
-class InstanceType(SimpleTypeNode):
+class InstanceObject(BuiltinObject):
+
+  TYPE_NAME = 'instance'
   
   ##  InstanceAttr
   ##
@@ -466,10 +463,6 @@ class InstanceType(SimpleTypeNode):
   
   def __repr__(self):
     return ('<Instance %s>' % (self.klass.name,))
-
-  @classmethod
-  def get_name(klass):
-    return 'instance'
   
   def get_type(self):
     return self.klass
@@ -478,7 +471,7 @@ class InstanceType(SimpleTypeNode):
     for typeobj in typeobjs:
       if isinstance(typeobj, ClassType):
         return self.klass.is_subclass(typeobj)
-    return SimpleTypeNode.is_type(*typeobjs)
+    return BuiltinObject.is_type(self, *typeobjs)
 
   def get_attr(self, name, write=False):
     if name not in self.attrs:
@@ -503,3 +496,7 @@ class InstanceType(SimpleTypeNode):
     else:
       method = self.boundmethods[func]
     return method
+
+class InstanceType(BuiltinType):
+  TYPE_NAME = 'object'
+  TYPE_INSTANCE = InstanceObject
