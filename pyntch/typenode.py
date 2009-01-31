@@ -69,6 +69,8 @@ class TypeNode(object):
     raise NodeTypeError('not callable')
   def get_seq(self, frame):
     return self.get_iter(frame).get_attr('next').call(frame, (), {})
+  def create_sequence(self, elements=None, elemall=None):
+    raise NodeTypeError('not sequence type')
   
   def equal(self, obj, _=None):
     raise NotImplementedError

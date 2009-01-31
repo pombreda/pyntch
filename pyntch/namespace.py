@@ -194,10 +194,7 @@ class Namespace(object):
           self.import_all(module.space)
         else:
           asname = name1 or name0
-          try:
-            self.register_var(asname).bind(module.space[name0])
-          except KeyError:
-            raise Interpreter.ModuleNotFound(name0)
+          self.register_var(asname).bind(module.space.register_var(name0))
 
     # print, printnl
     elif isinstance(tree, (ast.Print, ast.Printnl)):
@@ -373,6 +370,9 @@ class BuiltinExceptionsNamespace(Namespace):
     self.register_var('AttributeError').bind(exception.AttributeErrorType())
     self.register_var('EnvironmentError').bind(exception.EnvironmentErrorType())
     self.register_var('IOError').bind(exception.IOErrorType())
+    self.register_var('OSError').bind(exception.OSErrorType())
+    self.register_var('WindowsError').bind(exception.WindowsErrorType())
+    self.register_var('VMSError').bind(exception.VMSErrorType())
     self.register_var('EOFError').bind(exception.EOFErrorType())
     self.register_var('ImportError').bind(exception.ImportErrorType())
     self.register_var('LookupError').bind(exception.LookupErrorType())

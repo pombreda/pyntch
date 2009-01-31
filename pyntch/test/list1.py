@@ -17,12 +17,14 @@ c.extend('b')
 c.extend(1)
 c.extend(c)
 
+def fkey(x): return 'x'
+def fcmp(x,y): return 1
 e = [1,2,3]
 e.reverse()
 e.sort()
-e.sort(key=lambda x:x+1)
+e.sort(key=fkey)
+e.sort(cmp=fcmp, key=fkey)
 e.sort(reverse=True)
-e.sort(cmp=lambda x,y:1)
 
 f1 = b1[:1]
 f2 = b1[1:3]

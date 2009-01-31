@@ -5,17 +5,21 @@ README
 # TODO:
 #  hier class types.
 #  handle equal()
-#  iterator support: it.next(), gen.send(), etc.
+#  slice, get_element, sliceobj
+#  handle star, dstar.
 #  optional method: __add__, __eq__, __iter__ etc.
-#  automatic coercion. (when?)
-#  re-raise in except:
+#  automatic coercion for builtin functions.
+#  re-raise in except.
+#  StopIteration
+#  test cases.
 
 Pyntch is a PYthoN Type CHecker.  It examines a Python source code
 and infers possible types of the variables, class attributes, and
-return values of functions therein. Then it detects possible
-errors caused by type mismatch. Optionally, Pyntch can infer
-possible exceptions that arise from functions and methods. Unlike
-Pychecker or Pyflakes, it does not check the style issue.
+the return values of the functions defined there. Then it detects
+possible errors caused by type mismatch. Optionally, Pyntch can
+infer possible exceptions that arise from functions and
+methods. Unlike Pychecker or Pyflakes, it does not check the style
+issue.
 
 Pyntch can detect the following kinds of errors:
 

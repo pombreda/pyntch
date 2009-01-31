@@ -64,6 +64,8 @@ class TracebackObject(TypeNode):
   def desc1(self, _):
     return repr(self)
 
+class StopIterationType(ExceptionType):
+  TYPE_NAME = 'StopIteration'
 class StandardErrorType(ExceptionType):
   TYPE_NAME = 'StandardError'
 class ArithmeticErrorType(StandardErrorType):
@@ -82,12 +84,12 @@ class EnvironmentErrorType(StandardErrorType):
   TYPE_NAME = 'EnvironmentError'
 class IOErrorType(EnvironmentErrorType):
   TYPE_NAME = 'IOError'
-#class OSErrorType(EnvironmentErrorType):
-#  TYPE_NAME = 'OSError'
-#class WindowsErrorType(OSErrorType):
-#  TYPE_NAME = 'OSError # I mean WindowsError.'
-#class VMSErrorType(OSErrorType):
-#  TYPE_NAME = 'OSError # I mean VMSError.'
+class OSErrorType(EnvironmentErrorType):
+  TYPE_NAME = 'OSError'
+class WindowsErrorType(OSErrorType):
+  TYPE_NAME = 'OSError' # I mean WindowsError.
+class VMSErrorType(OSErrorType):
+  TYPE_NAME = 'OSError' # I mean VMSError.
 class EOFErrorType(StandardErrorType):
   TYPE_NAME = 'EOFError'
 class ImportErrorType(StandardErrorType):
