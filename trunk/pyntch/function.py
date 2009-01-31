@@ -26,12 +26,12 @@ class FuncType(BuiltinType, TreeReporter):
       return '<FuncBody %s>' % self.name
 
     def set_retval(self, evals):
-      from aggregate_types import IterType
+      from aggregate_types import GeneratorType
       returns = [ obj for (t,obj) in evals if t == 'r' ]
       yields = [ obj for (t,obj) in evals if t == 'y' ]
       assert returns
       if yields:
-        retvals = [ IterType.create_sequence([ slot.value for slot in yields ]) ]
+        retvals = [ GeneratorType.create_sequence(yields) ]
       else:
         retvals = returns
       for obj in retvals:

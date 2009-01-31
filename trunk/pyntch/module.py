@@ -151,14 +151,14 @@ class Interpreter(object):
       modname = fullname
       try:
         path = klass.find_module(modname, modpath)
-      except klass.ModuleNotFound:
+      except klass.ModuleNotFound, e:
         try:
           i = fullname.rindex('.')
           parent = klass.load_module(fullname[:i])
           modpath = [ os.path.dirname(parent.path) ]
           modname = fullname[i+1:]
         except ValueError:
-          raise
+          raise e
       path = klass.find_module(modname, modpath)
       module = klass.load_file(path, fullname)
     return module

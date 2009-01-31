@@ -98,16 +98,6 @@ class BuiltinConstCallable(BuiltinCallable):
     return self.retype
 
 
-##  GeneratorSlot
-##
-class GeneratorSlot(CompoundTypeNode):
-
-  def __init__(self, value):
-    CompoundTypeNode.__init__(self)
-    self.value = value
-    return
-
-
 ##  Simple Types
 ##
 class NoneObject(BuiltinObject): pass

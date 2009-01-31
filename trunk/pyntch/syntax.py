@@ -43,8 +43,8 @@ def build_assign(reporter, frame, space, n, v, evals):
 ##  Constructs a TypeNode from a given syntax tree.
 ##
 def build_expr(reporter, frame, space, tree, evals):
-  from basic_types import BUILTIN_OBJECTS, GeneratorSlot
-  from aggregate_types import IterType, ListType, DictType, TupleType
+  from basic_types import BUILTIN_OBJECTS
+  from aggregate_types import IterType, GeneratorType, ListType, DictType, TupleType
 
   if isinstance(tree, ast.Const):
     typename = type(tree.value).__name__
@@ -168,8 +168,9 @@ def build_expr(reporter, frame, space, tree, evals):
   # yield (for python 2.5)
   elif isinstance(tree, ast.Yield):
     value = build_expr(reporter, frame, space, tree.value, evals)
-    expr = GeneratorSlot(value)
-    evals.append(('y', expr)) # XXX ???
+    slot = GeneratorType.create_slot(value)
+    evals.append(('y', slot))
+    expr = slot.sent
 
   # ifexp
   elif isinstance(tree, ast.IfExp):

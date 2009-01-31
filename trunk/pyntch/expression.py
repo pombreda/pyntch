@@ -2,7 +2,7 @@
 
 from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError
 from exception import ExceptionRaiser, MustBeDefinedNode, \
-     TypeErrorType, AttributeErrorType
+     TypeErrorType, AttributeErrorType, ValueErrorType
 
 
 ##  FunCall
