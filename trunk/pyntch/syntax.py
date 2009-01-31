@@ -43,7 +43,7 @@ def build_assign(reporter, frame, space, n, v, evals):
 ##  Constructs a TypeNode from a given syntax tree.
 ##
 def build_expr(reporter, frame, space, tree, evals):
-  from builtin_types import BUILTIN_OBJECTS, GeneratorSlot
+  from basic_types import BUILTIN_OBJECTS, GeneratorSlot
   from aggregate_types import IterType, ListType, DictType, TupleType
 
   if isinstance(tree, ast.Const):
@@ -221,7 +221,7 @@ def build_typecheck(reporter, frame, space, tree, msg, evals):
 ##  build_stmt
 ##
 def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
-  from builtin_types import NoneType, StrType
+  from basic_types import NoneType, StrType
   assert isinstance(frame, ExceptionFrame)
 
   if isinstance(tree, ast.Module):

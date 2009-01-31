@@ -8,7 +8,7 @@ from exception import ExceptionRaiser, TypeChecker
 from exception import TypeErrorType
 from namespace import Namespace
 from function import ClassType, InstanceType
-from builtin_types import TypeType, NumberType, BoolType, IntType, LongType, FloatType, \
+from basic_types import TypeType, NumberType, BoolType, IntType, LongType, FloatType, \
      BaseStringType, StrType, UnicodeType, ANY, \
      BuiltinCallable, BuiltinConstCallable
 from aggregate_types import ListType, TupleType, IterType

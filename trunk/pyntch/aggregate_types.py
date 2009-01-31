@@ -3,7 +3,7 @@ from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrEr
      BuiltinType, BuiltinObject
 from exception import TypeChecker, \
      TypeErrorType, IndexErrorType, ValueErrorType, KeyErrorType
-from builtin_types import BuiltinCallable, BuiltinConstCallable, BoolType, IntType, StrType, NoneType, ANY
+from basic_types import BuiltinCallable, BuiltinConstCallable, BoolType, IntType, StrType, NoneType, ANY
 
 
 

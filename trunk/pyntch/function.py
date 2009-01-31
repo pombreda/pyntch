@@ -103,7 +103,7 @@ class FuncType(BuiltinType, TreeReporter):
     return self
 
   def call(self, frame, args, kwargs):
-    from builtin_types import StrType
+    from basic_types import StrType
     from aggregate_types import DictType, TupleType
     from expression import TupleUnpack
     self.callers.append(frame)

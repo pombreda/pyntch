@@ -315,32 +315,32 @@ class BuiltinTypesNamespace(Namespace):
   
   def __init__(self, parent):
     import function
-    import builtin_types
+    import basic_types
     import aggregate_types
     Namespace.__init__(self, parent, 'types')
     # types
-    self.register_var('type').bind(builtin_types.TypeType.get_typeobj())
-    self.register_var('NoneType').bind(builtin_types.NoneType.get_typeobj())
-    self.register_var('int').bind(builtin_types.IntType.get_typeobj())
-    self.register_var('long').bind(builtin_types.LongType.get_typeobj())
-    self.register_var('float').bind(builtin_types.FloatType.get_typeobj())
-    self.register_var('complex').bind(builtin_types.ComplexType.get_typeobj())
-    self.register_var('bool').bind(builtin_types.BoolType.get_typeobj())
-    self.register_var('basestring').bind(builtin_types.BaseStringType.get_typeobj())
-    self.register_var('str').bind(builtin_types.StrType.get_typeobj())
-    self.register_var('unicode').bind(builtin_types.UnicodeType.get_typeobj())
-    self.register_var('object').bind(builtin_types.ObjectType.get_typeobj())
-    self.register_var('file').bind(builtin_types.FileType.get_typeobj())
-    self.register_var('open').bind(builtin_types.FileType.get_typeobj())
+    self.register_var('type').bind(basic_types.TypeType.get_typeobj())
+    self.register_var('NoneType').bind(basic_types.NoneType.get_typeobj())
+    self.register_var('int').bind(basic_types.IntType.get_typeobj())
+    self.register_var('long').bind(basic_types.LongType.get_typeobj())
+    self.register_var('float').bind(basic_types.FloatType.get_typeobj())
+    self.register_var('complex').bind(basic_types.ComplexType.get_typeobj())
+    self.register_var('bool').bind(basic_types.BoolType.get_typeobj())
+    self.register_var('basestring').bind(basic_types.BaseStringType.get_typeobj())
+    self.register_var('str').bind(basic_types.StrType.get_typeobj())
+    self.register_var('unicode').bind(basic_types.UnicodeType.get_typeobj())
+    self.register_var('object').bind(basic_types.ObjectType.get_typeobj())
+    self.register_var('file').bind(basic_types.FileType.get_typeobj())
+    self.register_var('open').bind(basic_types.FileType.get_typeobj())
     self.register_var('list').bind(aggregate_types.ListType.get_typeobj())
     self.register_var('tuple').bind(aggregate_types.TupleType.get_typeobj())
     self.register_var('set').bind(aggregate_types.SetType.get_typeobj())
     self.register_var('dict').bind(aggregate_types.DictType.get_typeobj())
-    #self.register_var('xrange').bind(builtin_types.XRangeType.get_typeobj())
-    #self.register_var('staticmethod').bind(builtin_types.StaticMethodType.get_typeobj())
-    #self.register_var('classmethod').bind(builtin_types.ClassMethodType.get_typeobj())
-    #self.register_var('reversed').bind(builtin_types.ReversedType.get_typeobj())
-    #self.register_var('frozenset').bind(builtin_types.FrozenSetType.get_typeobj())
+    #self.register_var('xrange').bind(basic_types.XRangeType.get_typeobj())
+    #self.register_var('staticmethod').bind(basic_types.StaticMethodType.get_typeobj())
+    #self.register_var('classmethod').bind(basic_types.ClassMethodType.get_typeobj())
+    #self.register_var('reversed').bind(basic_types.ReversedType.get_typeobj())
+    #self.register_var('frozenset').bind(basic_types.FrozenSetType.get_typeobj())
     
     #self.register_var('BuiltinFunctionType').bind(builtin_funcs.BuiltinFunc.get_typeobj())
     #self.register_var('BuiltinMethodType').bind(builtin_funcs.BuiltinFunc.get_typeobj())
@@ -353,8 +353,8 @@ class BuiltinTypesNamespace(Namespace):
     
     #self.register_var('ModuleType').bind(module.ModuleType.get_typeobj())
     
-    #self.register_var('buffer').bind(builtin_types.BufferType.get_typeobj())
-    #self.register_var('property').bind(builtin_types.PropertyType.get_typeobj())
+    #self.register_var('buffer').bind(basic_types.BufferType.get_typeobj())
+    #self.register_var('property').bind(basic_types.PropertyType.get_typeobj())
     return
   
 class BuiltinExceptionsNamespace(Namespace):
@@ -399,7 +399,7 @@ class BuiltinExceptionsNamespace(Namespace):
 class BuiltinNamespace(Namespace):
 
   def __init__(self, parent):
-    import builtin_types
+    import basic_types
     import builtin_funcs
     Namespace.__init__(self, parent, '__builtin__')
     # abs,all,any,apply,divmod,enumerate,
@@ -428,18 +428,18 @@ class BuiltinNamespace(Namespace):
     # vars,eval,locals,globals,compile,getattr,hasattr,setattr,delattr,reload,__import__,execfile,input
 
     # Builtin constants.
-    self.register_var('True').bind(builtin_types.BoolType.get_object())
-    self.register_var('False').bind(builtin_types.BoolType.get_object())
-    self.register_var('None').bind(builtin_types.NoneType.get_object())
+    self.register_var('True').bind(basic_types.BoolType.get_object())
+    self.register_var('False').bind(basic_types.BoolType.get_object())
+    self.register_var('None').bind(basic_types.NoneType.get_object())
     return
 
 class DefaultNamespace(Namespace):
   
   def __init__(self):
-    import builtin_types
+    import basic_types
     Namespace.__init__(self, None, '(default)')
-    self.register_var('__file__').bind(builtin_types.StrType.get_object())
-    self.register_var('__name__').bind(builtin_types.StrType.get_object())
+    self.register_var('__file__').bind(basic_types.StrType.get_object())
+    self.register_var('__name__').bind(basic_types.StrType.get_object())
     return
   
   def fullname(self):
