@@ -9,35 +9,51 @@ X = VERBOSE = 0
 T = TEMPLATE = 0
 DEBUG = 0
 
-class rematch:
+class rematch(object):
   def group(self, i=0):
-    return
+    assert isinstance(i, int)
+    return ''
   def groups(self):
-    return
+    return ['']
 
-class compile:
+class compile(object):
   def __init__(self, pattern='', flags=0):
     assert isinstance(pattern, str)
+    assert isinstance(flags, int)
     return
   def search(self, string, flags=0):
+    assert isinstance(string, basestring)
+    assert isinstance(flags, int)
     if 1:
       return None
     else:
       return rematch()
   def match(self, string, flags=0):
+    assert isinstance(string, basestring)
+    assert isinstance(flags, int)
     if 1:
       return None
     else:
       return rematch()
   def sub(self, repl, string, count=0):
-    return string
+    assert isinstance(string, basestring)
+    assert isinstance(count, int)
+    return ''
   def subn(self, repl, string, count=0):
-    return (string, 0)
+    assert isinstance(string, basestring)
+    assert isinstance(count, int)
+    return ('', 0)
   def split(self, string, maxsplit=0):
+    assert isinstance(string, basestring)
+    assert isinstance(maxsplit, int)
     return ['']
   def findall(self, string, flags=0):
+    assert isinstance(string, basestring)
+    assert isinstance(flags, int)
     return [rematch()]
   def finditer(self, string, flags=0):
+    assert isinstance(string, basestring)
+    assert isinstance(flags, int)
     return ['']
 
 def match(pattern, string, flags=0):
@@ -55,4 +71,5 @@ def findall(pattern, string, flags=0):
 def finditer(pattern, string, flags=0):
   return compile(pattern, flags).finditer(string)
 def escape(pattern):
-  return pattern
+  assert isinstance(pattern, basestring)
+  return ''

@@ -44,7 +44,7 @@ def build_assign(reporter, frame, space, n, v, evals):
 ##
 def build_expr(reporter, frame, space, tree, evals):
   from builtin_types import BUILTIN_OBJECTS, GeneratorSlot
-  from aggregate_types import ListType, DictType, TupleType
+  from aggregate_types import IterType, ListType, DictType, TupleType
 
   if isinstance(tree, ast.Const):
     typename = type(tree.value).__name__
@@ -86,17 +86,17 @@ def build_expr(reporter, frame, space, tree, evals):
 
   elif isinstance(tree, ast.Tuple):
     elements = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
-    expr = TupleType.get_object(elements=elements)
+    expr = TupleType.create_sequence(elements=elements)
 
   elif isinstance(tree, ast.List):
     elements = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
-    expr = ListType.get_object(elements=elements)
+    expr = ListType.create_sequence(elements=elements)
 
   elif isinstance(tree, ast.Dict):
     items = [ (build_expr(reporter, frame, space, k, evals),
                build_expr(reporter, frame, space, v, evals))
               for (k,v) in tree.items ]
-    expr = DictType.get_object(items=items)
+    expr = DictType.create_dict(items=items)
 
   # +, -, *, /, %, //, **, <<, >>
   elif isinstance(tree, (ast.Add, ast.Sub, ast.Mul, ast.Div,
@@ -147,7 +147,7 @@ def build_expr(reporter, frame, space, tree, evals):
   # list comprehension
   elif isinstance(tree, ast.ListComp):
     elements = [ build_expr(reporter, frame, space, tree.expr, evals) ]
-    expr = ListType.get_object(elements)
+    expr = ListType.create_sequence(elements)
     for qual in tree.quals:
       seq = build_expr(reporter, frame, space, qual.list, evals)
       build_assign(reporter, frame, space, qual.assign, IterRef(frame, qual.list, seq), evals)
@@ -158,7 +158,7 @@ def build_expr(reporter, frame, space, tree, evals):
   elif isinstance(tree, ast.GenExpr):
     gen = tree.code
     elements = [ build_expr(reporter, frame, space, gen.expr, evals) ]
-    expr = ListType.get_object(elements)
+    expr = IterType.create_sequence(elements)
     for qual in gen.quals:
       seq = build_expr(reporter, frame, space, qual.iter, evals)
       build_assign(reporter, frame, space, qual.assign, IterRef(frame, qual.iter, seq), evals)

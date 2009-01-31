@@ -9,12 +9,12 @@ from builtin_types import BuiltinCallable, BuiltinConstCallable, BoolType, IntTy
 
 ##  Aggregate Types
 ##
-class BuiltinAggregateType(BuiltinType):
+class BuiltinSequenceType(BuiltinType):
   
-  # get_object() now creates an actual instance.
   @classmethod
-  def get_object(klass, *args, **kwargs):
-    return klass.TYPE_INSTANCE(klass.get_typeobj(), *args, **kwargs)
+  def create_sequence(klass, elements=None, elemall=None):
+    return klass.TYPE_INSTANCE(klass.get_typeobj(), elements=elements, elemall=elemall)
+
 
 
 ##  BuiltinSequenceObject
@@ -80,7 +80,7 @@ class BuiltinSequenceObject(BuiltinObject):
     return
 
   def get_iter(self, frame):
-    return IterType.get_object(elemall=self.elemall)
+    return IterType.create_sequence(elemall=self.elemall)
 
 
 ##  List
@@ -138,14 +138,14 @@ class ListObject(BuiltinSequenceObject):
     
 ##  ListType
 ##
-class ListType(BuiltinAggregateType, BuiltinCallable):
+class ListType(BuiltinSequenceType, BuiltinCallable):
   
   TYPE_NAME = 'list'
   TYPE_INSTANCE = ListObject
   
   @classmethod
   def concat(klass, obj1, obj2):
-    return klass.get_object([obj1.elemall, obj2.elemall])
+    return klass.create_sequence([obj1.elemall, obj2.elemall])
 
   @classmethod
   def multiply(klass, obj):
@@ -156,9 +156,9 @@ class ListType(BuiltinAggregateType, BuiltinCallable):
       frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
       return UndefinedTypeNode()
     if args:
-      return BuiltinSequenceObject.SequenceConverter(frame, ListType.get_object(), args[0])
+      return BuiltinSequenceObject.SequenceConverter(frame, ListType.create_sequence(), args[0])
     else:
-      return ListType.get_object()
+      return ListType.create_sequence()
 
   def __init__(self):
     BuiltinCallable.__init__(self, 'list', [], [ANY])
@@ -214,7 +214,7 @@ class TupleObject(BuiltinSequenceObject):
 
 ##  TupleType
 ##
-class TupleType(BuiltinAggregateType, BuiltinCallable):
+class TupleType(BuiltinSequenceType, BuiltinCallable):
   
   TYPE_NAME = 'tuple'
   TYPE_INSTANCE = TupleObject
@@ -224,9 +224,9 @@ class TupleType(BuiltinAggregateType, BuiltinCallable):
       frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
       return UndefinedTypeNode()
     if args:
-      return BuiltinSequenceObject.SequenceConverter(frame, TupleType.get_object(), args[0])
+      return BuiltinSequenceObject.SequenceConverter(frame, TupleType.create_sequence(), args[0])
     else:
-      return TupleType.get_object()
+      return TupleType.create_sequence()
 
   def __init__(self):
     BuiltinCallable.__init__(self, 'tuple', [], [ANY])
@@ -241,7 +241,7 @@ class SetObject(BuiltinSequenceObject):
     return '([%s])' % self.elemall.desc1(done)
 
   def copy(self):
-    return SetType.get_object(elemall=self.elemall)
+    return SetType.create_sequence(elemall=self.elemall)
 
   def equal(self, obj, done=None):
     if not isinstance(obj, SetObject): return False
@@ -289,7 +289,7 @@ class SetObject(BuiltinSequenceObject):
       
     def __init__(self, name, src1):
       self.src1 = src1
-      BuiltinConstCallable.__init__(self, name, SetType.get_object(), [ANY])
+      BuiltinConstCallable.__init__(self, name, SetType.create_sequence(), [ANY])
       return
     
     def __repr__(self):
@@ -343,7 +343,7 @@ class SetObject(BuiltinSequenceObject):
 
 ##  SetType
 ##
-class SetType(BuiltinAggregateType, BuiltinCallable):
+class SetType(BuiltinSequenceType, BuiltinCallable):
 
   TYPE_NAME = 'set'
   TYPE_INSTANCE = SetObject
@@ -353,9 +353,9 @@ class SetType(BuiltinAggregateType, BuiltinCallable):
       frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
       return UndefinedTypeNode()
     if args:
-      return BuiltinSequenceObject.SequenceConverter(frame, SetType.get_object(), args[0])
+      return BuiltinSequenceObject.SequenceConverter(frame, SetType.create_sequence(), args[0])
     else:
-      return SetType.get_object()
+      return SetType.create_sequence()
 
   def __init__(self):
     BuiltinCallable.__init__(self, 'set', [], [ANY])
@@ -383,7 +383,7 @@ class IterObject(BuiltinSequenceObject):
 
 ##  IterType
 ##
-class IterType(BuiltinAggregateType):
+class IterType(BuiltinSequenceType):
 
   TYPE_NAME = 'iterator'
   TYPE_INSTANCE = IterObject
@@ -450,7 +450,7 @@ class DictObject(BuiltinObject):
   class FromKeys(BuiltinConstCallable):
     
     def __init__(self, _, name):
-      self.dictobj = DictType.get_object()
+      self.dictobj = DictType.get_dict()
       BuiltinConstCallable.__init__(self, name, self.dictobj, [ANY], [ANY])
       return
     
@@ -556,7 +556,7 @@ class DictObject(BuiltinObject):
     return self.key.equal(obj.key, done) and self.value.equal(obj.value, done)
   
   def copy(self):
-    return DictType.get_object(key=[self.key], value=[self.value])
+    return DictType.get_dict(key=[self.key], value=[self.value])
 
   def desc1(self, done):
     return '{%s: %s}' % (self.key.desc1(done), self.value.desc1(done))
@@ -573,26 +573,30 @@ class DictObject(BuiltinObject):
     elif name == 'has_key':
       return BuiltinConstCallable('dict.has_key', BoolType.get_object(), [ANY])
     elif name == 'items':
-      return BuiltinConstCallable('dict.items', ListType.get_object([ TupleType.get_object([self.key, self.value]) ]))
+      return BuiltinConstCallable('dict.items',
+                                  ListType.create_sequence([ TupleType.create_sequence([self.key, self.value]) ]))
     elif name == 'iteritems':
-      return BuiltinConstCallable('dict.iteritems', IterType.get_object([ TupleType.get_object([self.key, self.value]) ]))
+      return BuiltinConstCallable('dict.iteritems',
+                                  IterType.create_sequence([ TupleType.create_sequence([self.key, self.value]) ]))
     elif name == 'iterkeys':
-      return BuiltinConstCallable('dict.iterkeys', IterType.get_object([ TupleType.get_object([self.key]) ]))
+      return BuiltinConstCallable('dict.iterkeys',
+                                  IterType.create_sequence([ TupleType.create_sequence([self.key]) ]))
     elif name == 'itervalues':
-      return BuiltinConstCallable('dict.itervalues', IterType.get_object([ TupleType.get_object([self.value]) ]))
+      return BuiltinConstCallable('dict.itervalues',
+                                  IterType.create_sequence([ TupleType.create_sequence([self.value]) ]))
     elif name == 'keys':
-      return BuiltinConstCallable('dict.keys', ListType.get_object([ self.key ]))
+      return BuiltinConstCallable('dict.keys', ListType.create_sequence([ self.key ]))
     elif name == 'pop':
       return DictObject.Pop(self, 'dict.pop')
     elif name == 'popitem':
-      return BuiltinConstCallable('dict.popitem', TupleType.get_object([self.key, self.value]),
+      return BuiltinConstCallable('dict.popitem', TupleType.create_sequence([self.key, self.value]),
                                   expts=[KeyErrorType.maybe('might not able to pop from an empty dict.')])
     elif name == 'setdefault':
       return DictObject.SetDefault(self, 'dict.setdefault')
     elif name == 'update':
       return DictObject.Update(self, 'dict.update')
     elif name == 'values':
-      return BuiltinConstCallable('dict.values', ListType.get_object([ self.value ]))
+      return BuiltinConstCallable('dict.values', ListType.create_sequence([ self.value ]))
     raise NodeAttrError(name)
 
   def get_element(self, frame, subs, write=False):
@@ -605,25 +609,28 @@ class DictObject(BuiltinObject):
     return self.value
 
   def get_iter(self, frame):
-    return IterType.get_object(elemall=self.key)
+    return IterType.create_sequence(elemall=self.key)
 
 
 ##  DictType
 ##
-class DictType(BuiltinAggregateType, BuiltinCallable):
+class DictType(BuiltinType, BuiltinCallable):
   
   TYPE_NAME = 'dict'
   TYPE_INSTANCE = DictObject
   
   def process_args(self, frame, args, kwargs):
     if kwargs:
-      return DictType.get_object(key=[StrType.get_object()], value=kwargs.values())
+      return DictType.get_dict(key=[StrType.get_object()], value=kwargs.values())
     if args:
-      return DictObject.DictConverter(frame, DictType.get_object(), [args[0]])
+      return DictObject.DictConverter(frame, DictType.get_dict(), [args[0]])
     else:
-      return DictType.get_object()
+      return DictType.get_dict()
 
   def __init__(self):
     BuiltinCallable.__init__(self, 'dict', [], [ANY])
     return
 
+  @classmethod
+  def create_dict(klass, items=None, key=None, value=None):
+    return DictObject(klass.get_typeobj(), items=items, key=key, value=value)

@@ -404,17 +404,15 @@ class SliceRef(CompoundTypeNode, ExceptionRaiser):
     for obj in src:
       try:
         elemall = obj.get_element(self, [self.lower, self.upper])
-        if obj.is_type(TupleType.get_typeobj()):
-          TupleType.get_object(elemall=elemall).connect(self)
-        else:
-          ListType.get_object(elemall=elemall).connect(self)
+        typeobj = obj.get_type()
+        typeobj.create_sequence(elemall=elemall).connect(self)
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
 
   def get_iter(self, frame):
     from aggregate_types import IterType
-    return IterType.get_object(elemall=self)
+    return IterType.create_sequence(elemall=self)
 
 
 ##  SliceAssign

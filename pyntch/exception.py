@@ -54,7 +54,7 @@ class TracebackObject(TypeNode):
 
   def __repr__(self):
     if self.loc:
-      return '%s at %s(%d)' % (self.expt, self.loc._module.get_loc(), self.loc.lineno)
+      return '%s at %s(%s)' % (self.expt, self.loc._module.get_loc(), self.loc.lineno)
     else:
       return '%s at ???' % (self.expt)
 
