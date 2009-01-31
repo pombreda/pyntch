@@ -3,10 +3,8 @@ README
 
 
 # TODO:
-#  internalfunc -> callable
-#  functype -> funcobject
 #  hier class types.
-#  remove equal()
+#  handle equal()
 #  iterator support: it.next(), gen.send(), etc.
 #  optional method: __add__, __eq__, __iter__ etc.
 #  automatic coercion. (when?)

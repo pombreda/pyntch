@@ -36,12 +36,12 @@ class ExceptionObject(BuiltinObject):
 
 class ExceptionType(BuiltinType):
 
-  PYTHON_TYPE = Exception
-  PYTHON_IMPL = ExceptionObject
+  TYPE_NAME = Exception
+  TYPE_INSTANCE = ExceptionObject
 
   @classmethod
   def occur(klass, message):
-    return klass.PYTHON_IMPL(klass.get_typeobj(), message)
+    return klass.TYPE_INSTANCE(klass.get_typeobj(), message)
   maybe = occur
 
 class TracebackObject(TypeNode):
@@ -54,7 +54,7 @@ class TracebackObject(TypeNode):
 
   def __repr__(self):
     if self.loc:
-      return '%s at %s(%d)' % (self.expt, self.loc._modname, self.loc.lineno)
+      return '%s at %s(%d)' % (self.expt, self.loc._module.get_loc(), self.loc.lineno)
     else:
       return '%s at ???' % (self.expt)
 
@@ -65,71 +65,71 @@ class TracebackObject(TypeNode):
     return repr(self)
 
 class StandardErrorType(ExceptionType):
-  PYTHON_TYPE = StandardError
+  TYPE_NAME = 'StandardError'
 class ArithmeticErrorType(StandardErrorType):
-  PYTHON_TYPE = ArithmeticError
+  TYPE_NAME = 'ArithmeticError'
 class FloatingPointErrorType(ArithmeticErrorType):
-  PYTHON_TYPE = FloatingPointError
+  TYPE_NAME = 'FloatingPointError'
 class OverflowErrorType(ArithmeticErrorType):
-  PYTHON_TYPE = OverflowError
+  TYPE_NAME = 'OverflowError'
 class ZeroDivisionErrorType(ArithmeticErrorType):
-  PYTHON_TYPE = ZeroDivisionError
+  TYPE_NAME = 'ZeroDivisionError'
 class AssertionErrorType(StandardErrorType):
-  PYTHON_TYPE = AssertionError
+  TYPE_NAME = 'AssertionError'
 class AttributeErrorType(StandardErrorType):
-  PYTHON_TYPE = AttributeError
+  TYPE_NAME = 'AttributeError'
 class EnvironmentErrorType(StandardErrorType):
-  PYTHON_TYPE = EnvironmentError
+  TYPE_NAME = 'EnvironmentError'
 class IOErrorType(EnvironmentErrorType):
-  PYTHON_TYPE = IOError
+  TYPE_NAME = 'IOError'
 #class OSErrorType(EnvironmentErrorType):
-#  PYTHON_TYPE = OSError
+#  TYPE_NAME = 'OSError'
 #class WindowsErrorType(OSErrorType):
-#  PYTHON_TYPE = OSError # I mean WindowsError.
+#  TYPE_NAME = 'OSError # I mean WindowsError.'
 #class VMSErrorType(OSErrorType):
-#  PYTHON_TYPE = OSError # I mean VMSError.
+#  TYPE_NAME = 'OSError # I mean VMSError.'
 class EOFErrorType(StandardErrorType):
-  PYTHON_TYPE = EOFError
+  TYPE_NAME = 'EOFError'
 class ImportErrorType(StandardErrorType):
-  PYTHON_TYPE = ImportError
+  TYPE_NAME = 'ImportError'
 class LookupErrorType(StandardErrorType):
-  PYTHON_TYPE = LookupError
+  TYPE_NAME = 'LookupError'
 class IndexErrorType(LookupErrorType):
-  PYTHON_TYPE = IndexError
+  TYPE_NAME = 'IndexError'
 class KeyErrorType(LookupErrorType):
-  PYTHON_TYPE = KeyError
+  TYPE_NAME = 'KeyError'
 class MemoryErrorType(StandardErrorType):
-  PYTHON_TYPE = MemoryError
+  TYPE_NAME = 'MemoryError'
 class NameErrorType(StandardErrorType):
-  PYTHON_TYPE = NameError
+  TYPE_NAME = 'NameError'
 class UnboundLocalErrorType(NameErrorType):
-  PYTHON_TYPE = UnboundLocalError
+  TYPE_NAME = 'UnboundLocalError'
 class ReferenceErrorType(StandardErrorType):
-  PYTHON_TYPE = ReferenceError
+  TYPE_NAME = 'ReferenceError'
 class RuntimeErrorType(StandardErrorType):
-  PYTHON_TYPE = RuntimeError
+  TYPE_NAME = 'RuntimeError'
 class NotImplementedErrorType(RuntimeErrorType):
-  PYTHON_TYPE = NotImplementedError
+  TYPE_NAME = 'NotImplementedError'
 class SyntaxErrorType(StandardErrorType):
-  PYTHON_TYPE = SyntaxError
+  TYPE_NAME = 'SyntaxError'
 class IndentationErrorType(SyntaxErrorType):
-  PYTHON_TYPE = IndentationError
+  TYPE_NAME = 'IndentationError'
 class TabErrorType(IndentationErrorType):
-  PYTHON_TYPE = TabError
+  TYPE_NAME = 'TabError'
 class SystemErrorType(StandardErrorType):
-  PYTHON_TYPE = SystemError
+  TYPE_NAME = 'SystemError'
 class TypeErrorType(StandardErrorType):
-  PYTHON_TYPE = TypeError
+  TYPE_NAME = 'TypeError'
 class ValueErrorType(StandardErrorType):
-  PYTHON_TYPE = ValueError
+  TYPE_NAME = 'ValueError'
 class UnicodeErrorType(ValueErrorType):
-  PYTHON_TYPE = UnicodeError
+  TYPE_NAME = 'UnicodeError'
 class UnicodeDecodeErrorType(UnicodeErrorType):
-  PYTHON_TYPE = UnicodeDecodeError
+  TYPE_NAME = 'UnicodeDecodeError'
 class UnicodeEncodeErrorType(UnicodeErrorType):
-  PYTHON_TYPE = UnicodeEncodeError
+  TYPE_NAME = 'UnicodeEncodeError'
 class UnicodeTranslateErrorType(UnicodeErrorType):
-  PYTHON_TYPE = UnicodeTranslateError
+  TYPE_NAME = 'UnicodeTranslateError'
 
 
 ##  ExceptionFrame
@@ -145,21 +145,24 @@ class ExceptionFrame(object):
 
   class ExceptionAnnotator(CompoundTypeNode):
     
-    def __init__(self, loc):
-      self.loc = loc
+    def __init__(self, frame):
+      self.frame = frame
       CompoundTypeNode.__init__(self)
       return
+
+    def __repr__(self):
+      return '<Exceptions at %r>' % self.frame
     
     def recv(self, src):
       for obj in src:
         assert isinstance(obj, TracebackObject), obj
-        if not obj.loc: obj.loc = self.loc
+        if not obj.loc: obj.loc = self.frame.loc
         self.update_types([obj])
       return
 
   def __init__(self, parent=None, loc=None):
     self.loc = loc
-    self.annotator = self.ExceptionAnnotator(loc)
+    self.annotator = self.ExceptionAnnotator(self)
     if parent:
       self.connect_expt(parent)
     return
@@ -311,16 +314,17 @@ class ExceptionMaker(CompoundTypeNode, ExceptionRaiser):
 ##  TypeChecker
 ##
 class TypeChecker(CompoundTypeNode):
+
+  ANY = 'any'
   
   def __init__(self, parent_frame, types, blame=None):
-    CompoundTypeNode.__init__(self)
     self.parent_frame = parent_frame
-    self.validtypes = CompoundTypeNode()
     self.blame = blame
-    if not isinstance(types, (tuple,list)):
-      types = (types,)
-    for obj in types:
-      obj.connect(self.validtypes)
+    if types == self.ANY:
+      self.validtypes = self.ANY
+    else:
+      self.validtypes = CompoundTypeNode(types)
+    CompoundTypeNode.__init__(self)
     return
 
   def __repr__(self):
@@ -328,20 +332,19 @@ class TypeChecker(CompoundTypeNode):
             (','.join(map(repr, self.types)), self.validtypes))
 
   def recv(self, src):
+    if self.validtypes == self.ANY: return
     for obj in src:
       for typeobj in self.validtypes:
-        if obj.is_type(typeobj):
-          self.update_types([obj])
-          break
+        if obj.is_type(typeobj): break
       else:
         s = '|'.join( typeobj.get_name() for typeobj in self.validtypes )
         self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be %s' % (self.blame, obj, s)))
     return
 
 
-##  ElementTypeChecker
+##  SequenceTypeChecker
 ##
-class ElementTypeChecker(TypeChecker):
+class SequenceTypeChecker(TypeChecker):
   
   def recv(self, src):
     for obj in src:
@@ -353,11 +356,10 @@ class ElementTypeChecker(TypeChecker):
     return
   
   def recv_elemobj(self, src):
+    if self.validtypes == self.ANY: return
     for obj in src:
       for typeobj in self.validtypes:
-        if obj.is_type(typeobj):
-          self.update_types([obj])
-          break
+        if obj.is_type(typeobj): break
       else:
         s = '|'.join(map(repr, self.validtypes))
         self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be [%s]' % (self.blame, obj, s)))

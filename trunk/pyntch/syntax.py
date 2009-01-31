@@ -34,7 +34,7 @@ def build_assign(reporter, frame, space, n, v, evals):
       upper = build_expr(reporter, frame, space, n.upper, evals)
     SliceAssign(frame, n, obj, lower, upper, v)
   else:
-    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (n, n._modname, n.lineno))
+    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (n, n._module.get_name(), n.lineno))
   return
 
 
@@ -115,7 +115,7 @@ def build_expr(reporter, frame, space, tree, evals):
     for right in nodes:
       expr = BinaryOp(frame, tree, op, expr, right)
   
-  # ==, !=, <=, >=, <, >
+  # ==, !=, <=, >=, <, >, in, not in, is, is not
   elif isinstance(tree, ast.Compare):
     expr0 = build_expr(reporter, frame, space, tree.expr, evals)
     comps = [ (op, build_expr(reporter, frame, space, node, evals)) for (op,node) in tree.ops ]
@@ -142,7 +142,7 @@ def build_expr(reporter, frame, space, tree, evals):
   elif isinstance(tree, ast.Lambda):
     defaults = [ build_expr(reporter, frame, space, value, evals) for value in tree.defaults ]
     expr = LambdaFuncType(reporter, frame, space, tree.argnames,
-                          defaults, tree.varargs, tree.kwargs, tree.code)
+                          defaults, tree.varargs, tree.kwargs, tree.code, tree)
 
   # list comprehension
   elif isinstance(tree, ast.ListComp):
@@ -184,7 +184,7 @@ def build_expr(reporter, frame, space, tree, evals):
 
   else:
     # unsupported AST.
-    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._modname, tree.lineno))
+    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._module.get_loc(), tree.lineno))
 
   assert isinstance(expr, (TypeNode, tuple)), expr
   evals.append((None, expr))
@@ -232,7 +232,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     name = tree.name
     defaults = [ build_expr(reporter, frame, space, value, evals) for value in tree.defaults ]
     func = FuncType(reporter, frame, space, name, tree.argnames,
-                    defaults, tree.varargs, tree.kwargs, tree.code)
+                    defaults, tree.varargs, tree.kwargs, tree.code, tree)
     if tree.decorators:
       for node in tree.decorators:
         decor = build_expr(reporter, frame, space, node, evals)
@@ -243,7 +243,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, ast.Class):
     name = tree.name
     bases = [ build_expr(reporter, frame, space, base, evals) for base in tree.bases ]
-    klass = ClassType(reporter, frame, space, name, bases, tree.code, evals)
+    klass = ClassType(reporter, frame, space, name, bases, tree.code, evals, tree)
     space[name].bind(klass)
 
   # assign
@@ -342,7 +342,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, (ast.Print, ast.Printnl)):
     for node in tree.nodes:
       value = build_expr(reporter, frame, space, node, evals)
-      value.connect(StrType.StrConversion(frame))
+      value.connect(StrType.StrConvChecker(frame))
 
   # discard
   elif isinstance(tree, ast.Discard):
@@ -382,6 +382,6 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     ExceptionFrame(frame, tree).raise_expt(RuntimeErrorType.occur('exec is not supported.'))
   
   else:
-    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._modname, tree.lineno))
+    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._module.get_loc(), tree.lineno))
 
   return

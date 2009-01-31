@@ -9,34 +9,36 @@ from exception import TypeErrorType
 from namespace import Namespace
 from function import ClassType, InstanceType
 from builtin_types import TypeType, NumberType, BoolType, IntType, LongType, FloatType, \
-     BaseStringType, StrType, UnicodeType, ANY_TYPE, \
-     InternalFunc, InternalConstFunc
+     BaseStringType, StrType, UnicodeType, ANY, \
+     BuiltinCallable, BuiltinConstCallable
 from aggregate_types import ListType, TupleType, IterType
 
 
 ##  BuiltinFunc
-class BuiltinFunc(InternalFunc, BuiltinType):
+class BuiltinFunc(BuiltinCallable, BuiltinType):
+
+  TYPE_NAME = 'builtinfunc'
+  
   def __init__(self, name, args=None, optargs=None, expts=None):
-    InternalFunc.__init__(self, name, args=args, optargs=optargs, expts=expts)
+    BuiltinCallable.__init__(self, name, args=args, optargs=optargs, expts=expts)
     BuiltinType.__init__(self)
     return
+  
   def __repr__(self):
     return '<builtin %s>' % self.name
-  @classmethod
-  def get_name(self):
-    return 'builtin'
 
 ##  BuiltinConstFunc
-class BuiltinConstFunc(InternalConstFunc, BuiltinType):
+class BuiltinConstFunc(BuiltinConstCallable, BuiltinType):
+
+  TYPE_NAME = 'builtinfunc'
+
   def __init__(self, name, retype, args=None, optargs=None, expts=None):
-    InternalConstFunc.__init__(self, name, retype, args=args, optargs=optargs, expts=expts)
+    BuiltinConstCallable.__init__(self, name, retype, args=args, optargs=optargs, expts=expts)
     BuiltinType.__init__(self)
     return
+  
   def __repr__(self):
     return '<builtin %s>' % self.name
-  @classmethod
-  def get_name(self):
-    return 'builtin'
 
 
 ##  ReprFunc
@@ -45,7 +47,7 @@ class ReprFunc(BuiltinConstFunc):
 
   def __init__(self):
     BuiltinConstFunc.__init__(self, 'repr', StrType.get_object(),
-                              [ANY_TYPE])
+                              [ANY])
     return
 
 
@@ -55,7 +57,7 @@ class LenFunc(BuiltinConstFunc):
 
   def __init__(self):
     BuiltinConstFunc.__init__(self, 'len', IntType.get_object(),
-                              [ANY_TYPE])
+                              [ANY])
     return
 
 
@@ -105,7 +107,7 @@ class RangeFunc(BuiltinConstFunc):
 class CallableFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'callable', BoolType.get_object(), [ANY_TYPE])
+    BuiltinConstFunc.__init__(self, 'callable', BoolType.get_object(), [ANY])
     return
 
 
@@ -114,7 +116,7 @@ class CallableFunc(BuiltinConstFunc):
 class CmpFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'cmp', IntType.get_object(), [ANY_TYPE, ANY_TYPE])
+    BuiltinConstFunc.__init__(self, 'cmp', IntType.get_object(), [ANY, ANY])
     return
 
 
@@ -123,7 +125,7 @@ class CmpFunc(BuiltinConstFunc):
 class DirFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'dir', ListType.get_object([StrType.get_object()]), [], [ANY_TYPE])
+    BuiltinConstFunc.__init__(self, 'dir', ListType.get_object([StrType.get_object()]), [], [ANY])
     return
 
 
@@ -132,7 +134,7 @@ class DirFunc(BuiltinConstFunc):
 class HashFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'hash', IntType.get_object(), [ANY_TYPE])
+    BuiltinConstFunc.__init__(self, 'hash', IntType.get_object(), [ANY])
     return
 
 
@@ -150,7 +152,7 @@ class HexFunc(BuiltinConstFunc):
 class IdFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'id', IntType.get_object(), [ANY_TYPE])
+    BuiltinConstFunc.__init__(self, 'id', IntType.get_object(), [ANY])
     return
 
 
@@ -159,7 +161,7 @@ class IdFunc(BuiltinConstFunc):
 class IsInstanceFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'isinstance', BoolType.get_object(), [ANY_TYPE, TypeType])
+    BuiltinConstFunc.__init__(self, 'isinstance', BoolType.get_object(), [ANY, TypeType])
     return
 
 
@@ -226,5 +228,5 @@ class IterFunc(BuiltinFunc):
     return self.IterConversion(frame, args[0])
 
   def __init__(self):
-    BuiltinFunc.__init__(self, 'iter', [ANY_TYPE])
+    BuiltinFunc.__init__(self, 'iter', [ANY])
     return

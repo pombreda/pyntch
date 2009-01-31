@@ -404,7 +404,7 @@ class SliceRef(CompoundTypeNode, ExceptionRaiser):
     for obj in src:
       try:
         elemall = obj.get_element(self, [self.lower, self.upper])
-        if isinstance(obj, TupleObject):
+        if obj.is_type(TupleType.get_typeobj()):
           TupleType.get_object(elemall=elemall).connect(self)
         else:
           ListType.get_object(elemall=elemall).connect(self)
@@ -437,7 +437,7 @@ class SliceAssign(CompoundTypeNode, ExceptionRaiser):
   def recv_target(self, src):
     for obj in src:
       try:
-        self.value.connect(obj.get_element(self, [self.lower, self.upper], write=True))
+        self.value.get_seq(self).connect(obj.get_element(self, [self.lower, self.upper], write=True))
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
