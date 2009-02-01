@@ -253,6 +253,10 @@ class TupleType(BuiltinSequenceType, BuiltinCallable):
   
   TYPE_NAME = 'tuple'
   TYPE_INSTANCE = TupleObject
+
+  @classmethod
+  def create_tuple(klass, elements):
+    return klass.TYPE_INSTANCE(klass.get_typeobj(), elements=elements)
   
   @classmethod
   def concat(klass, obj1, obj2):
@@ -276,10 +280,6 @@ class TupleType(BuiltinSequenceType, BuiltinCallable):
   def __init__(self):
     BuiltinCallable.__init__(self, 'tuple', [], [ANY])
     return
-
-  @classmethod
-  def create_tuple(klass, elements):
-    return klass.TYPE_INSTANCE(klass.get_typeobj(), elements=elements)
 
 
 ##  SetObject

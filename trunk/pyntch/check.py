@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys, os.path
-from typenode import TypeNode
+from typenode import TypeNode, CompoundTypeNode
 from exception import ExecutionFrame, MustBeDefinedNode
 from namespace import Namespace
 from module import Interpreter
@@ -35,6 +35,7 @@ def main(argv):
       module = Interpreter.load_module(fname)
     MustBeDefinedNode.check()
     module.showrec(sys.stdout)
+  print TypeNode.N
   return 0
 
 if __name__ == '__main__': sys.exit(main(sys.argv))

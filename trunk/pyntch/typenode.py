@@ -38,10 +38,14 @@ class NodeAttrError(NodeError): pass
 class TypeNode(object):
 
   debug = 0
+  N = 0
 
   def __init__(self, types):
     self.types = set(types)
     self.sendto = []
+    TypeNode.N += 1
+    if TypeNode.N % 1000 == 0:
+      print >>stderr, 'nodes:', TypeNode.N
     return
 
   def __iter__(self):
@@ -113,6 +117,7 @@ class SimpleTypeNode(TypeNode):
 class CompoundTypeNode(TypeNode):
 
   def __init__(self, nodes=None):
+    self._sigs = set()
     TypeNode.__init__(self, [])
     for obj in (nodes or []):
       obj.connect(self)
@@ -126,7 +131,7 @@ class CompoundTypeNode(TypeNode):
       return '...'
     elif self.types:
       s = []
-      done.add(self)
+      done = done.union([self])
       for obj in self.types:
         s.append(obj.desc1(done))
       return '|'.join(s)
@@ -137,14 +142,21 @@ class CompoundTypeNode(TypeNode):
     self.update_types(src.types)
     return
 
+  W = 0
+  T = 0
+  
   def update_types(self, types):
     d = []
-    sigs = set( obj.signature() for obj in self.types )
     for obj in types:
-      if obj.signature() not in sigs: 
+      if obj.signature() not in self._sigs: 
         d.append(obj)
+    CompoundTypeNode.W += 1
+    if CompoundTypeNode.W % 1000 == 0:
+      print >>stderr, 'update:', CompoundTypeNode.W, CompoundTypeNode.T
     if not d: return
+    CompoundTypeNode.T += len(d)
     self.types.update(d)
+    self._sigs = set( obj.signature() for obj in self.types )
     for receiver in self.sendto:
       receiver(self)
     return
@@ -182,6 +194,7 @@ class BuiltinType(SimpleTypeNode):
   TYPE_INSTANCE = None
   
   def __init__(self):
+    self.__class__.TYPEOBJ = self
     SimpleTypeNode.__init__(self, self)
     return
 
@@ -203,14 +216,15 @@ class BuiltinType(SimpleTypeNode):
   @classmethod
   def get_name(klass):
     return klass.TYPE_NAME
+  fullname = get_name
 
   # get_typeobj()
-  TYPE = None
+  TYPEOBJ = None
   @classmethod
   def get_typeobj(klass):
-    if not klass.TYPE:
-      klass.TYPE = klass()
-    return klass.TYPE
+    if klass.TYPEOBJ == None:
+      klass.TYPEOBJ = klass()
+    return klass.TYPEOBJ
 
 
 ##  BuiltinObject

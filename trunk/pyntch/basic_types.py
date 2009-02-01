@@ -98,6 +98,17 @@ class BuiltinConstCallable(BuiltinCallable):
     return self.retype
 
 
+##  TypeType
+##
+class TypeType(BuiltinBasicType, BuiltinConstCallable):
+  TYPE_NAME = 'type'
+
+  def __init__(self):
+    BuiltinBasicType.__init__(self)
+    BuiltinConstCallable.__init__(self, 'type', self, [ANY])
+    return
+
+
 ##  Simple Types
 ##
 class NoneObject(BuiltinObject): pass
@@ -147,7 +158,6 @@ class IntType(NumberType, BuiltinConstCallable):
       return BuiltinConstCallable.accept_arg(self, frame, i)
 
   def __init__(self):
-    IntType.TYPE = self
     BuiltinBasicType.__init__(self)
     BuiltinConstCallable.__init__(self, 'int', IntType.get_object(), [], [ANY, IntType])
     return
@@ -343,9 +353,8 @@ class StrType(BaseStringType):
     return BaseStringType.get_attr(self, name, write=write)
     
   def __init__(self):
-    StrType.TYPE = self
     BuiltinBasicType.__init__(self)
-    BuiltinConstCallable.__init__(self, 'str', StrType.get_object(), [], [ANY])
+    BuiltinConstCallable.__init__(self, 'str', self, [], [ANY])
     return
 
 class UnicodeObject(BaseStringObject): pass
@@ -371,10 +380,8 @@ class UnicodeType(BaseStringType):
     return BaseStringType.get_attr(self, name, write=write)
 
   def __init__(self):
-    UnicodeType.TYPE = self
     BuiltinBasicType.__init__(self)
-    BuiltinConstCallable.__init__(self, 'unicode', UnicodeType.get_object(),
-                               [], [ANY])
+    BuiltinConstCallable.__init__(self, 'unicode', self, [], [ANY])
     return
   
 
@@ -390,11 +397,10 @@ class FileType(BuiltinBasicType, BuiltinConstCallable):
   TYPE_INSTANCE = FileObject
   
   def __init__(self):
-    FileType.TYPE = self
     BuiltinBasicType.__init__(self)
-    BuiltinConstCallable.__init__(self, 'file', FileType.get_object(),
-                               [StrType], [StrType, IntType],
-                               [IOErrorType.maybe('might not able to open a file.')])
+    BuiltinConstCallable.__init__(self, 'file', self,
+                                  [StrType], [StrType, IntType],
+                                  [IOErrorType.maybe('might not able to open a file.')])
     return
 
   def get_attr(self, name, write=False):
@@ -462,21 +468,12 @@ class ObjectType(BuiltinBasicType, BuiltinConstCallable):
   TYPE_INSTANCE = ObjectObject
   
   def __init__(self):
-    ObjectType.TYPE = self
     BuiltinBasicType.__init__(self)
     BuiltinConstCallable.__init__(self, 'object', ObjectType.get_object())
     return
 
-##  TypeType
-##
-class TypeType(BuiltinBasicType):
-  TYPE_NAME = 'type'
 
-
-
-#
-BUILTIN_OBJECTS = dict(
+BUILTIN_OBJECT = dict(
   (cls.get_name(), cls.get_object()) for cls in
-  ( NoneType, BoolType, IntType, LongType, FloatType, ComplexType, StrType, UnicodeType )
-  )
+  ( NoneType, BoolType, IntType, LongType, FloatType, ComplexType, StrType, UnicodeType, FileType ))
 

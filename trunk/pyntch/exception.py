@@ -36,7 +36,7 @@ class ExceptionObject(BuiltinObject):
 
 class ExceptionType(BuiltinType):
 
-  TYPE_NAME = Exception
+  TYPE_NAME = 'Exception'
   TYPE_INSTANCE = ExceptionObject
   OBJECTS = {}
 
@@ -186,6 +186,9 @@ class ExecutionFrame(object):
     if self.debug:
       print >>stderr, 'raise_expt: %r <- %r' % (self, expt)
     TracebackObject(expt).connect(self.annotator)
+    return
+
+  def associate_frame(self, frame):
     return
 
   def show(self, p):

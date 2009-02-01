@@ -43,12 +43,12 @@ def build_assign(reporter, frame, space, n, v, evals):
 ##  Constructs a TypeNode from a given syntax tree.
 ##
 def build_expr(reporter, frame, space, tree, evals):
-  from basic_types import BUILTIN_OBJECTS
+  from basic_types import BUILTIN_OBJECT
   from aggregate_types import IterType, GeneratorType, ListType, DictType, TupleType
 
   if isinstance(tree, ast.Const):
     typename = type(tree.value).__name__
-    expr = BUILTIN_OBJECTS[typename]
+    expr = BUILTIN_OBJECT[typename]
 
   elif isinstance(tree, ast.Name):
     try:
@@ -91,6 +91,7 @@ def build_expr(reporter, frame, space, tree, evals):
   elif isinstance(tree, ast.Tuple):
     elements = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
     expr = TupleType.create_tuple(elements)
+    print 'tuple:', expr, 'sig:', expr.signature()
 
   elif isinstance(tree, ast.List):
     elements = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
