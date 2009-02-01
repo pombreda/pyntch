@@ -18,6 +18,16 @@ class BuiltinSequenceType(BuiltinType):
 ##  BuiltinSequenceObject
 ##
 class BuiltinSequenceObject(BuiltinObject):
+
+  def expand(self, nodes, done):
+    if self in done: return
+    done.add(self)
+    for obj in self.elemall.types:
+      if isinstance(obj, self.__class__):
+        obj.expand(nodes, done)
+      else:
+        nodes.add(obj)
+    return
   
   class SequenceConverter(CompoundTypeNode):
     def __init__(self, frame, target, src):
@@ -73,16 +83,6 @@ class BuiltinSequenceObject(BuiltinObject):
     BuiltinObject.__init__(self, typeobj)
     return
 
-  def sig1(self, done):
-    if self in done: return None
-    done.add(self)
-    types = []
-    for obj in self.elemall:
-      types.append(obj.sig1(done))
-      if obj in done: return None
-    types.sort()
-    return tuple(types)
-
   def get_iter(self, frame):
     return IterType.create_iter(self.elemall)
 
@@ -90,37 +90,6 @@ class BuiltinSequenceObject(BuiltinObject):
 ##  List
 ##
 class ListObject(BuiltinSequenceObject):
-
-  def desc1(self, done):
-    return '[%s]' % self.elemall.desc1(done)
-
-  def get_attr(self, name, write=False):
-    if name == 'append':
-      return self.SequenceAppender('list.append', self, args=[ANY])
-    elif name == 'count':
-      return BuiltinConstCallable('list.count', IntType.get_object(), [ANY])
-    elif name == 'extend':
-      return self.SequenceExtender('list.extend', self, args=[ANY])
-    elif name == 'index':
-      return BuiltinConstCallable('list.index', IntType.get_object(), [ANY], [IntType, IntType],
-                               expts=[ValueErrorType.maybe('might not able to find the element.')])
-    elif name == 'insert':
-      return self.InsertMethod('list.insert', self, [IntType, ANY])
-    elif name == 'pop':
-      return BuiltinConstCallable('list.pop', self.elemall, [], [IntType],
-                               expts=[ValueErrorType.maybe('might be empty list or out of range.')])
-    elif name == 'remove':
-      return BuiltinConstCallable('list.remove', NoneType.get_object(), [ANY],
-                               expts=[ValueErrorType.maybe('might not able to remove the element.')])
-    elif name == 'reverse':
-      return BuiltinConstCallable('list.remove', NoneType.get_object())
-    elif name == 'sort':
-      return self.SortMethod('list.sort', self)
-    raise NodeAttrError(name)
-
-  def get_element(self, frame, subs, write=False):
-    frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
-    return self.elemall
 
   ##  Methods
   ##
@@ -183,6 +152,36 @@ class ListObject(BuiltinSequenceObject):
           frame.raise_expt(TypeErrorType.occur('%s cannot take keyword: %s' % (self.name, k)))
       return self.Processor(frame, self.target, params['cmp'], params['key'])
 
+  def desc1(self, done):
+    return '[%s]' % self.elemall.desc1(done)
+
+  def get_attr(self, name, write=False):
+    if name == 'append':
+      return self.SequenceAppender('list.append', self, args=[ANY])
+    elif name == 'count':
+      return BuiltinConstCallable('list.count', IntType.get_object(), [ANY])
+    elif name == 'extend':
+      return self.SequenceExtender('list.extend', self, args=[ANY])
+    elif name == 'index':
+      return BuiltinConstCallable('list.index', IntType.get_object(), [ANY], [IntType, IntType],
+                               expts=[ValueErrorType.maybe('might not able to find the element.')])
+    elif name == 'insert':
+      return self.InsertMethod('list.insert', self, [IntType, ANY])
+    elif name == 'pop':
+      return BuiltinConstCallable('list.pop', self.elemall, [], [IntType],
+                               expts=[ValueErrorType.maybe('might be empty list or out of range.')])
+    elif name == 'remove':
+      return BuiltinConstCallable('list.remove', NoneType.get_object(), [ANY],
+                               expts=[ValueErrorType.maybe('might not able to remove the element.')])
+    elif name == 'reverse':
+      return BuiltinConstCallable('list.remove', NoneType.get_object())
+    elif name == 'sort':
+      return self.SortMethod('list.sort', self)
+    raise NodeAttrError(name)
+
+  def get_element(self, frame, subs, write=False):
+    frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
+    return self.elemall
 
     
 ##  ListType
@@ -191,6 +190,7 @@ class ListType(BuiltinSequenceType, BuiltinCallable):
   
   TYPE_NAME = 'list'
   TYPE_INSTANCE = ListObject
+  CACHE = {}
   
   @classmethod
   def concat(klass, obj1, obj2):
@@ -199,7 +199,7 @@ class ListType(BuiltinSequenceType, BuiltinCallable):
   @classmethod
   def multiply(klass, obj):
     return obj
-  
+    
   def process_args(self, frame, args, kwargs):
     if kwargs:
       frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
@@ -325,6 +325,7 @@ class SetObject(BuiltinSequenceObject):
         return
         
       def update_intersection(self):
+        XXX
         d = []
         for obj1 in self.types1:
           for obj2 in self.types2:
@@ -439,7 +440,7 @@ class IterType(BuiltinSequenceType):
   @classmethod
   def create_sequence(klass, elemall=None):
     raise NodeTypeError('not sequence type')
-  
+
   @classmethod
   def create_iter(klass, elemall=None):
     return klass.TYPE_INSTANCE(klass.get_typeobj(), elemall=elemall)
@@ -591,7 +592,7 @@ class DictObject(BuiltinObject):
     
     def process_args(self, frame, args, kwargs):
       if len(args) == 1:
-        self.found.update_types([NoneType.get_object()])
+        self.found.update_type(NoneType.get_object())
       return BuiltinConstCallable.process_args(self, frame, args, kwargs)
     
     def accept_arg(self, frame, i):
@@ -630,7 +631,7 @@ class DictObject(BuiltinObject):
     
     def process_args(self, frame, args, kwargs):
       if len(args) == 1:
-        self.found.update_types([NoneType.get_object()])
+        self.found.update_type(NoneType.get_object())
       return BuiltinConstCallable.process_args(self, frame, args, kwargs)
     
     def accept_arg(self, frame, i):

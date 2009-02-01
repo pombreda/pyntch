@@ -304,7 +304,7 @@ class ClassType(BuiltinType, TreeReporter):
           obj.call(self, self.args, self.kwargs).connect(self.retval)
         except NodeTypeError:
           pass
-        self.update_types([obj])
+        self.update_type(obj)
       return
 
     def check_undefined(self):
@@ -435,7 +435,7 @@ class InstanceObject(BuiltinObject):
           obj = self.klass.bind_func(obj)
         elif isinstance(obj, FuncType):
           obj = self.instance.bind_func(obj)
-        self.update_types([obj])
+        self.update_type(obj)
       return
     
   def __init__(self, klass):

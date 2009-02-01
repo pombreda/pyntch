@@ -67,8 +67,6 @@ class TracebackObject(TypeNode):
 
   def desc1(self, _):
     return repr(self)
-  def sig1(self, _):
-    return (self.expt, self.loc)
 
 class StopIterationType(ExceptionType):
   TYPE_NAME = 'StopIteration'
@@ -165,7 +163,7 @@ class ExecutionFrame(object):
       for obj in src:
         assert isinstance(obj, TracebackObject), obj
         if not obj.loc: obj.loc = self.frame.loc
-        self.update_types([obj])
+        self.update_type(obj)
       return
 
   def __init__(self, parent=None, loc=None):
@@ -218,7 +216,7 @@ class ExceptionCatcher(ExecutionFrame):
             var = self.handlers[expt.get_type()]
             expt.connect(var)
           except KeyError:
-            self.update_types([obj])
+            self.update_type(obj)
       return
 
     def recv_expt(self, src, var):
@@ -405,7 +403,7 @@ class KeyValueTypeChecker(TypeChecker):
     for obj in src:
       if typeobj in self.validkeys:
         if obj.is_type(typeobj):
-          self.update_types([obj])
+          self.update_type(obj)
           break
       elif self.blame:
         self.parent_frame.raise_expt(TypeErrorType.occur(
@@ -416,7 +414,7 @@ class KeyValueTypeChecker(TypeChecker):
     for obj in src:
       if typeobj in self.validtypes:
         if obj.is_type(typeobj):
-          self.update_types([obj])
+          self.update_type(obj)
           break
       elif self.blame:
         self.parent_frame.raise_expt(TypeErrorType.occur(

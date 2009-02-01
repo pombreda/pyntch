@@ -51,7 +51,7 @@ class AttrRef(MustBeDefinedNode):
       try:
         obj.get_attr(self.attrname).connect(self)
       except NodeAttrError:
-        self.raise_expt(AttributeErrorType.occur(
+        self.raise_expt(AttributeErrorType.maybe(
           'cannot get attribute: %r might be %r, no attr %s.' % (self.target, obj, self.attrname)))
     return
 
@@ -123,56 +123,56 @@ class BinaryOp(MustBeDefinedNode):
         rtype = robj.get_type()
         if (lobj.is_type(BaseStringType.get_typeobj()) and
             self.op == 'Mod'):
-          self.update_types([lobj])
+          self.update_type(lobj)
           continue
         # for numeric operation, the one with a higher rank is chosen.
         if (lobj.is_type(NumberType.get_typeobj()) and robj.is_type(NumberType.get_typeobj()) and
             self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power')):
           if ltype.get_rank() < rtype.get_rank():
-            self.update_types([robj])
+            self.update_type(robj)
           else:
-            self.update_types([lobj])
+            self.update_type(lobj)
           continue
         if (lobj.is_type(IntType.get_typeobj()) and robj.is_type(IntType.get_typeobj()) and
             self.op in ('Bitand','Bitor','Bitxor')):
-          self.update_types([robj])
+          self.update_type(robj)
           continue
         # for string operation, only Add is supported.
         if (lobj.is_type(BaseStringType.get_typeobj()) and robj.is_type(BaseStringType.get_typeobj()) and
             self.op == 'Add'):
-          self.update_types([lobj])
+          self.update_type(lobj)
           continue
         # for list operation, only Add and Mul is supported.
         if (lobj.is_type(ListType.get_typeobj()) and robj.is_type(ListType.get_typeobj()) and
             self.op == 'Add'):
-          self.update_types([ListType.concat(lobj, robj)])
+          self.update_type(ListType.concat(lobj, robj))
           continue
         if (lobj.is_type(ListType.get_typeobj()) and robj.is_type(IntType.get_typeobj()) and
             self.op == 'Mul'):
-          self.update_types([ListType.multiply(lobj)])
+          self.update_type(ListType.multiply(lobj))
           continue
         if (lobj.is_type(IntType.get_typeobj()) and robj.is_type(ListType.get_typeobj()) and
             self.op == 'Mul'):
-          self.update_types([ListType.multiply(robj)])
+          self.update_type(ListType.multiply(robj))
           continue
         # for tuple operation, only Add and Mul is supported.
         if (lobj.is_type(TupleType.get_typeobj()) and robj.is_type(TupleType.get_typeobj()) and
             self.op == 'Add'):
-          self.update_types([TupleType.concat(lobj, robj)])
+          self.update_type(TupleType.concat(lobj, robj))
           continue
         if (lobj.is_type(TupleType.get_typeobj()) and robj.is_type(IntType.get_typeobj()) and
             self.op == 'Mul'):
-          self.update_types([TupleType.multiply(lobj)])
+          self.update_type(TupleType.multiply(lobj))
           continue
         if (lobj.is_type(IntType.get_typeobj()) and robj.is_type(TupleType.get_typeobj()) and
             self.op == 'Mul'):
-          self.update_types([TupleType.multiply(robj)])
+          self.update_type(TupleType.multiply(robj))
           continue
         # other operations.
         k = (ltype.get_name(), self.op, rtype.get_name())
         if k in self.VALID_TYPES:
           v = BUILTIN_OBJECT[self.VALID_TYPES[k]]
-          self.update_types([v])
+          self.update_type(v)
           continue
         self.raise_expt(TypeErrorType.occur(
           'unsupported operand %s for %r and %r' % (self.op, lobj, robj)))
@@ -407,9 +407,7 @@ class SliceRef(CompoundTypeNode, ExecutionFrame):
     from aggregate_types import TupleType, ListType, TupleObject
     for obj in src:
       try:
-        elemall = obj.get_element(self, [self.lower, self.upper])
-        typeobj = obj.get_type()
-        typeobj.create_sequence(elemall).connect(self)
+        obj.get_element(self, [self.lower, self.upper]).connect(self)
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return

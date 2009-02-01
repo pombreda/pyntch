@@ -91,7 +91,6 @@ def build_expr(reporter, frame, space, tree, evals):
   elif isinstance(tree, ast.Tuple):
     elements = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
     expr = TupleType.create_tuple(elements)
-    print 'tuple:', expr, 'sig:', expr.signature()
 
   elif isinstance(tree, ast.List):
     elements = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
