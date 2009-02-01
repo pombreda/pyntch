@@ -16,10 +16,11 @@ class FuncType(BuiltinType, TreeReporter):
   ##
   class FuncBody(CompoundTypeNode, ExecutionFrame):
 
-    def __init__(self, name, loc):
+    def __init__(self, frame, name, loc):
       self.name = name
       ExecutionFrame.__init__(self, loc=loc)
       CompoundTypeNode.__init__(self)
+      self.associate_frame(frame)
       return
 
     def __repr__(self):
@@ -89,7 +90,7 @@ class FuncType(BuiltinType, TreeReporter):
 
   def build_body(self, name, tree):
     from syntax import build_stmt
-    body = self.FuncBody(name, tree)
+    body = self.FuncBody(self, name, tree)
     evals = []
     self.space.register_names(tree)
     build_stmt(self, body, self.space, tree, evals, isfuncdef=True)
@@ -97,7 +98,10 @@ class FuncType(BuiltinType, TreeReporter):
     return body
 
   def __repr__(self):
-    return ('<function %s>' % self.space.fullname())
+    return ('<function %s>' % self.fullname())
+
+  def fullname(self):
+    return self.space.fullname()
 
   def get_type(self):
     return self
@@ -202,7 +206,7 @@ class LambdaFuncType(FuncType):
 
   def build_body(self, name, tree):
     from syntax import build_expr
-    body = self.FuncBody(name, tree)
+    body = self.FuncBody(self, name, tree)
     evals = []
     evals.append(('r', build_expr(self, body, self.space, tree, evals)))
     body.set_retval(evals)
@@ -333,8 +337,11 @@ class ClassType(BuiltinType, TreeReporter):
     return
 
   def __repr__(self):
-    return ('<class %s>' % self.space.fullname())
+    return ('<class %s>' % self.fullname())
 
+  def fullname(self):
+    return self.space.fullname()
+  
   def get_type(self):
     return self
 
@@ -350,7 +357,7 @@ class ClassType(BuiltinType, TreeReporter):
 
   def get_attr(self, name, write=False):
     if name not in self.attrs:
-      attr = self.ClassAttr(name, self, self.bases)
+      attr = self.ClassAttr(name, self, self.baseklass)
       self.attrs[name] = attr
     else:
       attr = self.attrs[name]
@@ -373,9 +380,9 @@ class ClassType(BuiltinType, TreeReporter):
     p('### %s(%s)' % (self.loc._module.get_loc(), self.loc.lineno))
     for frame in self.callers:
       if frame.loc:
-        p('# called at %s(%d)' % (frame.loc._module.get_loc(), frame.loc.lineno))
+        p('# instantiated at %s(%d)' % (frame.loc._module.get_loc(), frame.loc.lineno))
     if self.bases:
-      p('class %s(%s):' % (self.name, ', '.join( repr(base) for base in self.bases )))
+      p('class %s(%s):' % (self.name, ', '.join( base.fullname() for base in self.baseklass.types )))
     else:
       p('class %s:' % self.name)
     blocks = set( name for (name,_) in self.children )
@@ -441,7 +448,7 @@ class InstanceObject(BuiltinObject):
     return
   
   def __repr__(self):
-    return ('<instance %s>' % (self.klass))
+    return ('<instance %s>' % self.klass.fullname())
   
   def get_type(self):
     return self.klass

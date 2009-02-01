@@ -112,7 +112,7 @@ class BinaryOp(MustBeDefinedNode):
     ('int', 'Mul', 'unicode'): 'unicode',
     }
   def recv(self, _):
-    from basic_types import BUILTIN_OBJECTS, NumberType, IntType, BaseStringType
+    from basic_types import NumberType, IntType, BaseStringType, BUILTIN_OBJECT
     from aggregate_types import ListType, ListObject, TupleType
     for lobj in self.left:
       for robj in self.right:
@@ -171,7 +171,7 @@ class BinaryOp(MustBeDefinedNode):
         # other operations.
         k = (ltype.get_name(), self.op, rtype.get_name())
         if k in self.VALID_TYPES:
-          v = BUILTIN_OBJECTS[self.VALID_TYPES[k]]
+          v = BUILTIN_OBJECT[self.VALID_TYPES[k]]
           self.update_types([v])
           continue
         self.raise_expt(TypeErrorType.occur(

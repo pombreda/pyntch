@@ -361,6 +361,7 @@ class BuiltinExceptionsNamespace(Namespace):
     Namespace.__init__(self, parent, 'exceptions')
     # exceptions
     self.register_var('Exception').bind(exception.ExceptionType())
+    self.register_var('StopIteration').bind(exception.StopIterationType())
     self.register_var('StandardError').bind(exception.StandardErrorType())
     self.register_var('ArithmeticError').bind(exception.ArithmeticErrorType())
     self.register_var('FloatingPointError').bind(exception.FloatingPointErrorType())
