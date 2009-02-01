@@ -43,12 +43,50 @@ WNOHANG = 0
 WUNTRACED = 0
 W_OK = 0
 X_OK = 0
-_STAT = (0,0,0,0,0,0,0,0,0,0) # UNIX
-_STATVFS = (0,0,0,0,0,0,0,0,0,0) # UNIX
 
 class error(object): pass
-class stat_result(object): pass
-class statvfs_result(object): pass
+
+class stat_result(object):
+  def __init__(self):
+    self.st_atime = 0
+    self.st_blksize = 0
+    self.st_blocks = 0
+    self.st_ctime = 0
+    self.st_dev = 0
+    self.st_gid = 0
+    self.st_ino = 0
+    self.st_mode = 0
+    self.st_mtime = 0
+    self.st_nlink = 0
+    self.st_rdev = 0
+    self.st_size = 0
+    self.st_uid = 0
+    return
+  def __len__(self):
+    return 10
+  def __iter__(self):
+    return iter((0,0,0,0,0,0,0,0,0,0))
+
+class statvfs_result(object):
+  def __init__(self):
+    self.f_bavail = 0
+    self.f_bfree = 0
+    self.f_blocks = 0
+    self.f_bsize = 0
+    self.f_favail = 0
+    self.f_ffree = 0
+    self.f_files = 0
+    self.f_flag = 0
+    self.f_frsize = 0
+    self.f_namemax = 0
+    return
+  def __len__(self):
+    return 10
+  def __iter__(self):
+    return iter((0,0,0,0,0,0,0,0,0,0))
+
+_STAT = stat_result()
+_STATVFS = statvfs_result()
 
 pathconf_names = {'': 0}
 sysconf_names = {'': 0}

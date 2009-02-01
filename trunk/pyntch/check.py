@@ -2,7 +2,7 @@
 
 import sys, os.path
 from typenode import TypeNode
-from exception import ExceptionFrame, MustBeDefinedNode
+from exception import ExecutionFrame, MustBeDefinedNode
 from namespace import Namespace
 from module import Interpreter
 
@@ -22,7 +22,7 @@ def main(argv):
     if k == '-d': debug += 1
     elif k == '-p': modpath.extend(v.split(':'))
   TypeNode.debug = debug
-  #ExceptionFrame.debug = debug
+  #ExecutionFrame.debug = debug
   #Namespace.debug = debug
   #Interpreter.debug = debug
   Interpreter.initialize(modpath)

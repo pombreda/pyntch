@@ -3,8 +3,7 @@
 ##  This module should not be imported as toplevel,
 ##  as it causes circular imports!
 
-from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, BuiltinType
-from exception import ExceptionRaiser, TypeChecker
+from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, BuiltinType
 from exception import TypeErrorType
 from namespace import Namespace
 from function import ClassType, InstanceType
@@ -96,7 +95,7 @@ class OrdFunc(BuiltinConstFunc):
 class RangeFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'range', ListType.create_sequence([IntType.get_object()]), 
+    BuiltinConstFunc.__init__(self, 'range', ListType.create_sequence(IntType.get_object()), 
                               [IntType],
                               [IntType, IntType])
     return
@@ -125,7 +124,7 @@ class CmpFunc(BuiltinConstFunc):
 class DirFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'dir', ListType.create_sequence([StrType.get_object()]), [], [ANY])
+    BuiltinConstFunc.__init__(self, 'dir', ListType.create_sequence(StrType.get_object()), [], [ANY])
     return
 
 
@@ -211,7 +210,7 @@ class IterFunc(BuiltinFunc):
     
     def __init__(self, frame, obj):
       self.frame = frame
-      self.iterobj = IterType.create_sequence()
+      self.iterobj = IterType.create_iter()
       CompoundTypeNode.__init__(self, [self.iterobj])
       obj.connect(self)
       return
@@ -220,7 +219,7 @@ class IterFunc(BuiltinFunc):
       for obj in src:
         try:
           obj.get_iter(self.frame).connect(self.iterobj.elemall)
-        except NodeTypeError:
+        except (NodeTypeError, NodeAttrError):
           self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
       return self.iterobj
   

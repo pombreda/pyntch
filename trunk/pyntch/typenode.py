@@ -40,12 +40,12 @@ class TypeNode(object):
   debug = 0
 
   def __init__(self, types):
-    self.types = types
+    self.types = set(types)
     self.sendto = []
     return
 
   def __iter__(self):
-    return iter(self.types)
+    return iter(list(self.types))
 
   def connect(self, node, receiver=None):
     #assert isinstance(node, CompoundTypeNode), node
@@ -57,7 +57,7 @@ class TypeNode(object):
     return
 
   def recv(self, src):
-    raise NodeTypeError('cannot receive a value.')
+    raise NodeTypeError('cannot receive a value: %r' % self)
 
   def get_attr(self, name, write=False):
     raise NodeAttrError(name)
@@ -68,16 +68,24 @@ class TypeNode(object):
   def call(self, frame, args, kwargs):
     raise NodeTypeError('not callable')
   def get_seq(self, frame):
-    return self.get_iter(frame).get_attr('next').call(frame, (), {})
-  def create_sequence(self, elements=None, elemall=None):
+    from exception import ExceptionCatcher, StopIterationType
+    frame1 = ExceptionCatcher(frame)
+    frame1.add_handler(StopIterationType.occur(''))
+    return self.get_iter(frame).get_attr('next').call(frame1, (), {})
+  
+  def create_sequence(self, elemall=None):
+    raise NodeTypeError('not sequence type')
+  def create_iter(self, elemall=None):
     raise NodeTypeError('not sequence type')
   
-  def equal(self, obj, _=None):
-    raise NotImplementedError
   def desc1(self, _):
-    raise NotImplementedError
+    raise NotImplementedError, self
+  def sig1(self, _):
+    raise NotImplementedError, self
   def describe(self):
     return self.desc1(set())
+  def signature(self):
+    return self.sig1(set())
 
 
 ##  SimpleTypeNode
@@ -96,9 +104,9 @@ class SimpleTypeNode(TypeNode):
   def desc1(self, _):
     return repr(self)
 
-  def equal(self, obj, _=None):
-    return self is obj
-
+  def sig1(self, _):
+    return self
+  
 
 ##  CompoundTypeNode
 ##
@@ -113,23 +121,15 @@ class CompoundTypeNode(TypeNode):
   def __repr__(self):
     return '<CompoundTypeNode: %s>' % self.describe()
 
-  def equal(self, obj, done=None):
-    if self is obj: return True
-    if not isinstance(obj, CompoundTypeNode): return False
-    if len(self.types) != len(obj.types): return False
-    if done == None: done = set()
-    if self in done or obj in done: return False
-    done.add(self)
-    done.add(obj)
-    for (t1,t2) in zip(self.types, obj.types):
-      if not t1.equal(t2, done): return False
-    return True
-
   def desc1(self, done):
     if self in done:
       return '...'
     elif self.types:
-      return ('|'.join( obj.desc1(done.union([self])) for obj in self.types ))
+      s = []
+      done.add(self)
+      for obj in self.types:
+        s.append(obj.desc1(done))
+      return '|'.join(s)
     else:
       return '?'
                                   
@@ -139,15 +139,12 @@ class CompoundTypeNode(TypeNode):
 
   def update_types(self, types):
     d = []
-    for obj1 in types:
-      assert not isinstance(obj1, CompoundTypeNode), obj1
-      for obj2 in self.types:
-        assert not isinstance(obj2, CompoundTypeNode), obj2
-        if obj1.equal(obj2): break
-      else:
-        d.append(obj1)
+    sigs = set( obj.signature() for obj in self.types )
+    for obj in types:
+      if obj.signature() not in sigs: 
+        d.append(obj)
     if not d: return
-    self.types.extend(d)
+    self.types.update(d)
     for receiver in self.sendto:
       receiver(self)
     return
@@ -223,6 +220,9 @@ class BuiltinObject(SimpleTypeNode):
   def get_type(self):
     return self.typeobj
 
+  def sig1(self, done):
+    return self.get_type()
+  
   def get_attr(self, name, write=False):
     return self.get_type().get_attr(name, write=write)
   

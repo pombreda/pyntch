@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 from compiler import ast
-from typenode import TypeNode, UndefinedTypeNode
-from exception import ExceptionFrame, ExceptionCatcher, ExceptionMaker, TypeChecker
+from typenode import TypeNode, UndefinedTypeNode, CompoundTypeNode
+from exception import ExecutionFrame, ExceptionCatcher, ExceptionMaker, TypeChecker
 from exception import NameErrorType, RuntimeErrorType
 from function import FuncType, LambdaFuncType, ClassType
 from expression import AttrAssign, AttrRef, SubAssign, SubRef, IterRef, SliceAssign, SliceRef, \
@@ -54,7 +54,7 @@ def build_expr(reporter, frame, space, tree, evals):
     try:
       expr = space[tree.name]
     except KeyError:
-      ExceptionFrame(frame, tree).raise_expt(NameErrorType.occur('name %r is not defined.' % tree.name))
+      ExecutionFrame(frame, tree).raise_expt(NameErrorType.occur('name %r is not defined.' % tree.name))
       expr = UndefinedTypeNode(tree.name)
 
   elif isinstance(tree, ast.CallFunc):
@@ -64,6 +64,10 @@ def build_expr(reporter, frame, space, tree, evals):
     kwargs = dict( (arg1.name, build_expr(reporter, frame, space, arg1.expr, evals))
                    for arg1 in tree.args if isinstance(arg1, ast.Keyword) )
     # XXX handle: tree.star_args, tree.dstar_args
+    if tree.star_args:
+      build_expr(reporter, frame, space, tree.star_args, evals)
+    if tree.dstar_args:
+      build_expr(reporter, frame, space, tree.dstar_args, evals)
     expr = FunCall(frame, tree, func, args, kwargs)
 
   elif isinstance(tree, ast.Getattr):
@@ -86,17 +90,17 @@ def build_expr(reporter, frame, space, tree, evals):
 
   elif isinstance(tree, ast.Tuple):
     elements = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
-    expr = TupleType.create_sequence(elements=elements)
+    expr = TupleType.create_tuple(elements)
 
   elif isinstance(tree, ast.List):
     elements = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
-    expr = ListType.create_sequence(elements=elements)
+    expr = ListType.create_sequence(CompoundTypeNode(elements))
 
   elif isinstance(tree, ast.Dict):
     items = [ (build_expr(reporter, frame, space, k, evals),
                build_expr(reporter, frame, space, v, evals))
               for (k,v) in tree.items ]
-    expr = DictType.create_dict(items=items)
+    expr = DictType.create_dict(items)
 
   # +, -, *, /, %, //, **, <<, >>
   elif isinstance(tree, (ast.Add, ast.Sub, ast.Mul, ast.Div,
@@ -147,7 +151,7 @@ def build_expr(reporter, frame, space, tree, evals):
   # list comprehension
   elif isinstance(tree, ast.ListComp):
     elements = [ build_expr(reporter, frame, space, tree.expr, evals) ]
-    expr = ListType.create_sequence(elements)
+    expr = ListType.create_sequence(CompoundTypeNode(elements))
     for qual in tree.quals:
       seq = build_expr(reporter, frame, space, qual.list, evals)
       build_assign(reporter, frame, space, qual.assign, IterRef(frame, qual.list, seq), evals)
@@ -158,7 +162,7 @@ def build_expr(reporter, frame, space, tree, evals):
   elif isinstance(tree, ast.GenExpr):
     gen = tree.code
     elements = [ build_expr(reporter, frame, space, gen.expr, evals) ]
-    expr = IterType.create_sequence(elements)
+    expr = IterType.create_iter(CompoundTypeNode(elements))
     for qual in gen.quals:
       seq = build_expr(reporter, frame, space, qual.iter, evals)
       build_assign(reporter, frame, space, qual.assign, IterRef(frame, qual.iter, seq), evals)
@@ -180,7 +184,7 @@ def build_expr(reporter, frame, space, tree, evals):
     expr = IfExpOp(frame, tree, test, then, else_)
 
   elif isinstance(tree, ast.Backquote):
-    ExceptionFrame(frame, tree).raise_expt(RuntimeErrorType.occur('backquote is not supported.'))
+    ExecutionFrame(frame, tree).raise_expt(RuntimeErrorType.occur('backquote is not supported.'))
     expr = UndefinedTypeNode('backquote')
 
   else:
@@ -223,7 +227,7 @@ def build_typecheck(reporter, frame, space, tree, msg, evals):
 ##
 def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   from basic_types import NoneType, StrType
-  assert isinstance(frame, ExceptionFrame)
+  assert isinstance(frame, ExecutionFrame)
 
   if isinstance(tree, ast.Module):
     build_stmt(reporter, frame, space, tree.node, evals)
@@ -257,7 +261,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, ast.AugAssign):
     left = build_expr(reporter, frame, space, tree.node, evals)
     if isinstance(left, UndefinedTypeNode):
-      ExceptionFrame(frame, tree).raise_expt(NameErrorType.occur('cannot assign to an undefined variable.'))
+      ExecutionFrame(frame, tree).raise_expt(NameErrorType.occur('cannot assign to an undefined variable.'))
     else:
       right = build_expr(reporter, frame, space, tree.expr, evals)
       value = AssignOp(frame, tree, tree.op, left, right)
@@ -334,10 +338,12 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     if tree.expr2:
       expttype = build_expr(reporter, frame, space, tree.expr1, evals)
       exptarg = build_expr(reporter, frame, space, tree.expr2, evals)
-      ExceptionFrame(frame, tree).raise_expt(ExceptionMaker(frame, tree, expttype, (exptarg,)))
+      locframe = ExecutionFrame(frame, tree)
+      locframe.raise_expt(ExceptionMaker(locframe, expttype, (exptarg,)))
     elif tree.expr1:
       expttype = build_expr(reporter, frame, space, tree.expr1, evals)
-      ExceptionFrame(frame, tree).raise_expt(ExceptionMaker(frame, tree, expttype, ()))
+      locframe = ExecutionFrame(frame, tree)
+      locframe.raise_expt(ExceptionMaker(locframe, expttype, ()))
 
   # printnl
   elif isinstance(tree, (ast.Print, ast.Printnl)):
@@ -380,7 +386,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
 
   # unsupported
   elif isinstance(tree, ast.Exec):
-    ExceptionFrame(frame, tree).raise_expt(RuntimeErrorType.occur('exec is not supported.'))
+    ExecutionFrame(frame, tree).raise_expt(RuntimeErrorType.occur('exec is not supported.'))
   
   else:
     raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._module.get_loc(), tree.lineno))
