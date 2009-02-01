@@ -84,12 +84,8 @@ class TypeNode(object):
   
   def desc1(self, _):
     raise NotImplementedError, self
-  def sig1(self, _):
-    raise NotImplementedError, self
   def describe(self):
     return self.desc1(set())
-  def signature(self):
-    return self.sig1(set())
 
 
 ##  SimpleTypeNode
@@ -107,9 +103,6 @@ class SimpleTypeNode(TypeNode):
 
   def desc1(self, _):
     return repr(self)
-
-  def sig1(self, _):
-    return self
   
 
 ##  CompoundTypeNode
@@ -117,7 +110,6 @@ class SimpleTypeNode(TypeNode):
 class CompoundTypeNode(TypeNode):
 
   def __init__(self, nodes=None):
-    self._sigs = set()
     TypeNode.__init__(self, [])
     for obj in (nodes or []):
       obj.connect(self)
@@ -139,24 +131,17 @@ class CompoundTypeNode(TypeNode):
       return '?'
                                   
   def recv(self, src):
-    self.update_types(src.types)
+    for obj in src:
+      self.update_type(obj)
     return
-
-  W = 0
-  T = 0
   
-  def update_types(self, types):
-    d = []
-    for obj in types:
-      if obj.signature() not in self._sigs: 
-        d.append(obj)
-    CompoundTypeNode.W += 1
-    if CompoundTypeNode.W % 1000 == 0:
-      print >>stderr, 'update:', CompoundTypeNode.W, CompoundTypeNode.T
-    if not d: return
-    CompoundTypeNode.T += len(d)
-    self.types.update(d)
-    self._sigs = set( obj.signature() for obj in self.types )
+  def update_type(self, obj):
+    from aggregate_types import BuiltinSequenceObject
+    if obj in self.types: return
+    if isinstance(obj, BuiltinSequenceObject):
+      for x in self.types:
+        if isinstance(x, BuiltinSequenceObject): return
+    self.types.add(obj)
     for receiver in self.sendto:
       receiver(self)
     return
@@ -233,9 +218,6 @@ class BuiltinObject(SimpleTypeNode):
 
   def get_type(self):
     return self.typeobj
-
-  def sig1(self, done):
-    return self.get_type()
   
   def get_attr(self, name, write=False):
     return self.get_type().get_attr(name, write=write)
