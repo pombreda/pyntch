@@ -15,6 +15,12 @@ class rematch(object):
     return ''
   def groups(self):
     return ['']
+  def start(self, i=0):
+    assert isinstance(i, int)
+    return 0
+  def end(self, i=0):
+    assert isinstance(i, int)
+    return 0
 
 class compile(object):
   def __init__(self, pattern='', flags=0):

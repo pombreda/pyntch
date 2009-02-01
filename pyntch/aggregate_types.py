@@ -6,14 +6,13 @@ from exception import TypeChecker, \
 from basic_types import BuiltinCallable, BuiltinConstCallable, BoolType, IntType, StrType, NoneType, ANY
 
 
-
 ##  Aggregate Types
 ##
 class BuiltinSequenceType(BuiltinType):
   
   @classmethod
-  def create_sequence(klass, elements=None, elemall=None):
-    return klass.TYPE_INSTANCE(klass.get_typeobj(), elements=elements, elemall=elemall)
+  def create_sequence(klass, elemall=None):
+    return klass.TYPE_INSTANCE(klass.get_typeobj(), elemall=elemall)
 
 
 ##  BuiltinSequenceObject
@@ -24,7 +23,7 @@ class BuiltinSequenceObject(BuiltinObject):
     def __init__(self, frame, target, src):
       self.frame = frame
       self.target = target
-      CompoundTypeNode.__init__(self, [self.target, src])
+      CompoundTypeNode.__init__(self, [src])
       return
     def __repr__(self):
       return 'convert(%r)' % self.target
@@ -32,7 +31,7 @@ class BuiltinSequenceObject(BuiltinObject):
       for obj in src:
         try:
           obj.get_seq(self.frame).connect(self.target.elemall)
-        except NodeTypeError:
+        except (NodeTypeError, NodeAttrError):
           self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
       return
   
@@ -57,7 +56,7 @@ class BuiltinSequenceObject(BuiltinObject):
         for obj in src:
           try:
             obj.get_seq(self.frame).connect(self.target.elemall)
-          except NodeTypeError:
+          except (NodeTypeError, NodeAttrError):
             self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
         return
     def __init__(self, name, target, retype=NoneType.get_object(), args=None, optargs=None):
@@ -69,17 +68,23 @@ class BuiltinSequenceObject(BuiltinObject):
     def accept_arg(self, frame, _):
       return self.Processor(frame, self.target)
 
-  def __init__(self, typeobj, elements=None, elemall=None):
-    self.elements = elements
-    if elemall != None:
-      self.elemall = CompoundTypeNode([elemall])
-    else:
-      self.elemall = CompoundTypeNode(elements or [])
+  def __init__(self, typeobj, elemall=None):
+    self.elemall = elemall or CompoundTypeNode()
     BuiltinObject.__init__(self, typeobj)
     return
 
+  def sig1(self, done):
+    if self in done: return None
+    done.add(self)
+    types = []
+    for obj in self.elemall:
+      types.append(obj.sig1(done))
+      if obj in done: return None
+    types.sort()
+    return tuple(types)
+
   def get_iter(self, frame):
-    return IterType.create_sequence(elemall=self.elemall)
+    return IterType.create_iter(self.elemall)
 
 
 ##  List
@@ -89,10 +94,6 @@ class ListObject(BuiltinSequenceObject):
   def desc1(self, done):
     return '[%s]' % self.elemall.desc1(done)
 
-  def equal(self, obj, done=None):
-    if not isinstance(obj, ListObject): return False
-    return self.elemall.equal(obj.elemall, done)
-  
   def get_attr(self, name, write=False):
     if name == 'append':
       return self.SequenceAppender('list.append', self, args=[ANY])
@@ -193,7 +194,7 @@ class ListType(BuiltinSequenceType, BuiltinCallable):
   
   @classmethod
   def concat(klass, obj1, obj2):
-    return klass.create_sequence([obj1.elemall, obj2.elemall])
+    return klass.create_sequence(CompoundTypeNode([obj1.elemall, obj2.elemall]))
 
   @classmethod
   def multiply(klass, obj):
@@ -204,7 +205,9 @@ class ListType(BuiltinSequenceType, BuiltinCallable):
       frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
       return UndefinedTypeNode()
     if args:
-      return BuiltinSequenceObject.SequenceConverter(frame, ListType.create_sequence(), args[0])
+      listobj = ListType.create_sequence()
+      BuiltinSequenceObject.SequenceConverter(frame, listobj, args[0])
+      return listobj
     else:
       return ListType.create_sequence()
 
@@ -217,22 +220,19 @@ class ListType(BuiltinSequenceType, BuiltinCallable):
 ##
 class TupleObject(BuiltinSequenceObject):
   
+  def __init__(self, typeobj, elemall=None, elements=None):
+    self.elements = elements
+    if elements != None:
+      elemall = CompoundTypeNode(elements)
+    BuiltinSequenceObject.__init__(self, typeobj, elemall)
+    return
+
   def __repr__(self):
     if self.elements == None:
       return '(*%s)' % self.elemall.describe()
     else:
       return '(%s)' % ','.join( obj.describe() for obj in self.elements )
 
-  def equal(self, obj, done=None):
-    if not isinstance(obj, TupleObject): return False
-    if self.elements and obj.elements:
-      if len(self.elements) != len(obj.elements): return False
-      for (e1,e2) in zip(self.elements, obj.elements):
-        if not e1.equal(e2, done): return False
-      return True
-    if self.elements or obj.elements: return False
-    return self.elemall.equal(obj.elemall, done)
-  
   def desc1(self, done):
     if self.elements == None:
       return '(%s*)' % self.elemall.desc1(done)
@@ -256,27 +256,30 @@ class TupleType(BuiltinSequenceType, BuiltinCallable):
   
   @classmethod
   def concat(klass, obj1, obj2):
-    if obj1.elements == None or obj2.elements == None:
-      return klass.create_sequence(elemall=CompoundTypeNode([obj1.elemall, obj2.elemall]))
-    else:
-      return klass.create_sequence(elements=obj1.elements+obj2.elements)
+    return klass.create_sequence(CompoundTypeNode([obj1.elemall, obj2.elemall]))
 
   @classmethod
   def multiply(klass, obj):
-    return klass.create_sequence(elemall=obj.elemall)
+    return klass.create_sequence(obj.elemall)
 
   def process_args(self, frame, args, kwargs):
     if kwargs:
       frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
       return UndefinedTypeNode()
     if args:
-      return BuiltinSequenceObject.SequenceConverter(frame, TupleType.create_sequence(), args[0])
+      tupleobj = TupleType.create_sequence()
+      BuiltinSequenceObject.SequenceConverter(frame, tupleobj, args[0])
+      return tupleobj
     else:
       return TupleType.create_sequence()
 
   def __init__(self):
     BuiltinCallable.__init__(self, 'tuple', [], [ANY])
     return
+
+  @classmethod
+  def create_tuple(klass, elements):
+    return klass.TYPE_INSTANCE(klass.get_typeobj(), elements=elements)
 
 
 ##  SetObject
@@ -287,11 +290,7 @@ class SetObject(BuiltinSequenceObject):
     return '([%s])' % self.elemall.desc1(done)
 
   def copy(self):
-    return SetType.create_sequence(elemall=self.elemall)
-
-  def equal(self, obj, done=None):
-    if not isinstance(obj, SetObject): return False
-    return self.elemall.equal(obj.elemall, done)
+    return SetType.create_sequence(self.elemall)
 
   class Intersection(BuiltinConstCallable):
     
@@ -311,7 +310,7 @@ class SetObject(BuiltinSequenceObject):
         for obj in src:
           try:
             obj.get_seq(self.frame).connect(self.types1)
-          except NodeTypeError:
+          except (NodeTypeError, NodeAttrError):
             self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
         self.update_intersection()
         return
@@ -320,7 +319,7 @@ class SetObject(BuiltinSequenceObject):
         for obj in src:
           try:
             obj.get_seq(self.frame).connect(self.types2)
-          except NodeTypeError:
+          except (NodeTypeError, NodeAttrError):
             self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
         self.update_intersection()
         return
@@ -329,7 +328,7 @@ class SetObject(BuiltinSequenceObject):
         d = []
         for obj1 in self.types1:
           for obj2 in self.types2:
-            if obj1.equal(obj2):
+            if obj1.signature() == obj2.signature():
               obj1.connect(self.target.elemall)
         return
       
@@ -399,7 +398,9 @@ class SetType(BuiltinSequenceType, BuiltinCallable):
       frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
       return UndefinedTypeNode()
     if args:
-      return BuiltinSequenceObject.SequenceConverter(frame, SetType.create_sequence(), args[0])
+      setobj = SetType.create_sequence()
+      BuiltinSequenceObject.SequenceConverter(frame, setobj, args[0])
+      return setobj
     else:
       return SetType.create_sequence()
 
@@ -435,6 +436,14 @@ class IterType(BuiltinSequenceType):
   TYPE_NAME = 'iterator'
   TYPE_INSTANCE = IterObject
 
+  @classmethod
+  def create_sequence(klass, elemall=None):
+    raise NodeTypeError('not sequence type')
+  
+  @classmethod
+  def create_iter(klass, elemall=None):
+    return klass.TYPE_INSTANCE(klass.get_typeobj(), elemall=elemall)
+
 
 ##  GeneratorObject
 ##
@@ -447,13 +456,13 @@ class GeneratorSlot(CompoundTypeNode):
 
 class GeneratorObject(IterObject):
   
-  def __init__(self, typeobj, elements=None, elemall=None):
+  def __init__(self, typeobj, elemall=None, elements=None):
     self.sent = CompoundTypeNode()
     if elements:
       for obj in elements:
         if isinstance(obj, GeneratorSlot):
           self.sent.connect(obj.sent)
-    IterObject.__init__(self, typeobj, elements=elements, elemall=elemall)
+    IterObject.__init__(self, typeobj, elemall=elemall)
     return
 
   class Send(BuiltinConstCallable):
@@ -493,6 +502,10 @@ class GeneratorType(IterType):
   def create_slot(klass, value):
     return GeneratorSlot(value)
 
+  @classmethod
+  def create_generator(klass, elements):
+    return klass.TYPE_INSTANCE(klass.get_typeobj(), elements=elements)
+
 
 ##  DictObject
 ##
@@ -501,17 +514,17 @@ class DictObject(BuiltinObject):
   # convert
   class DictConverter(CompoundTypeNode):
     
-    def __init__(self, frame, dictobj, srcs=[]):
+    def __init__(self, frame, dictobj, src):
       self.frame = frame
       self.dictobj = dictobj
-      CompoundTypeNode.__init__(self, [self.dictobj]+srcs)
+      CompoundTypeNode.__init__(self, [src])
       return
     
     def recv(self, src):
       for obj in src:
         try:
           obj.get_seq(self.frame).connect(self, self.recv_pair)
-        except NodeTypeError:
+        except (NodeTypeError, NodeAttrError):
           self.frame.raise_expt(TypeErrorType.occur('cannot convert to dict: %s' % obj))
       return
   
@@ -530,24 +543,24 @@ class DictObject(BuiltinObject):
           elem.connect(self.dictobj.key)
           elem.connect(self.dictobj.value)
           self.frame.raise_expt(TypeErrorType.maybe('might not be able to convert to dict: %s' % obj))
-        except NodeTypeError:
+        except (NodeTypeError, NodeAttrError):
           self.frame.raise_expt(TypeErrorType.occur('cannot convert to dict: %s' % obj))
       return
     
   # fromkeys
   class DictConverterFromKeys(CompoundTypeNode):
     
-    def __init__(self, frame, dictobj, srcs=[]):
+    def __init__(self, frame, dictobj, src):
       self.frame = frame
       self.dictobj = dictobj
-      CompoundTypeNode.__init__(self, [self.dictobj]+srcs)
+      CompoundTypeNode.__init__(self, [src])
       return
     
     def recv(self, src):
       for obj in src:
         try:
           obj.get_seq(self.frame).connect(self.dictobj.key)
-        except NodeTypeError:
+        except (NodeTypeError, NodeAttrError):
           self.frame.raise_expt(TypeErrorType.occur('cannot convert to dict: %s' % obj))
       return
 
@@ -560,15 +573,12 @@ class DictObject(BuiltinObject):
       return
     
     def process_args(self, frame, args, kwargs):
-      if len(args) < 2:
-        NoneType.get_object().connect(self.dictobj.value)
-      return BuiltinConstCallable.process_args(self, frame, args, kwargs)
-    
-    def accept_arg(self, frame, i):
-      if i == 0:
-        return DictObject.DictConverterFromKeys(frame, self.dictobj)
+      if 2 <= len(args):
+        args[1].connect(self.dictobj.value)
       else:
-        return self.dictobj.value
+        NoneType.get_object().connect(self.dictobj.value)
+      DictObject.DictConverterFromKeys(frame, self.dictobj, args[0])
+      return self.dictobj
     
   # dict.get
   class Get(BuiltinConstCallable):
@@ -637,8 +647,9 @@ class DictObject(BuiltinObject):
       BuiltinConstCallable.__init__(self, name, NoneType.get_object(), [ANY])
       return
     
-    def accept_arg(self, frame, _):
-      return DictObject.DictConverter(frame, self.dictobj)
+    def process_args(self, frame, args, kwargs):
+      DictObject.DictConverterFromKeys(frame, self.dictobj, args[0])
+      return self.dictobj
 
   def __init__(self, typeobj, items=None, key=None, value=None):
     if items != None:
@@ -656,10 +667,6 @@ class DictObject(BuiltinObject):
   def __repr__(self):
     return '{%s: %s}' % (self.key, self.value)
 
-  def equal(self, obj, done=None):
-    if not isinstance(obj, DictObject): return False
-    return self.key.equal(obj.key, done) and self.value.equal(obj.value, done)
-  
   def copy(self):
     return DictType.create_dict(key=[self.key], value=[self.value])
 
@@ -677,31 +684,33 @@ class DictObject(BuiltinObject):
       return DictObject.Get(self, 'dict.get')
     elif name == 'has_key':
       return BuiltinConstCallable('dict.has_key', BoolType.get_object(), [ANY])
+    elif name == 'keys':
+      return BuiltinConstCallable('dict.keys',
+                                  ListType.create_sequence(self.key))
+    elif name == 'values':
+      return BuiltinConstCallable('dict.values',
+                                  ListType.create_sequence(self.value))
     elif name == 'items':
       return BuiltinConstCallable('dict.items',
-                                  ListType.create_sequence([ TupleType.create_sequence([self.key, self.value]) ]))
-    elif name == 'iteritems':
-      return BuiltinConstCallable('dict.iteritems',
-                                  IterType.create_sequence([ TupleType.create_sequence([self.key, self.value]) ]))
+                                  ListType.create_sequence(TupleType.create_tuple([self.key, self.value])))
     elif name == 'iterkeys':
       return BuiltinConstCallable('dict.iterkeys',
-                                  IterType.create_sequence([ TupleType.create_sequence([self.key]) ]))
+                                  IterType.create_iter(self.key))
     elif name == 'itervalues':
       return BuiltinConstCallable('dict.itervalues',
-                                  IterType.create_sequence([ TupleType.create_sequence([self.value]) ]))
-    elif name == 'keys':
-      return BuiltinConstCallable('dict.keys', ListType.create_sequence([ self.key ]))
+                                  IterType.create_iter(self.value))
+    elif name == 'iteritems':
+      return BuiltinConstCallable('dict.iteritems',
+                                  IterType.create_iter(TupleType.create_tuple([self.key, self.value])))
     elif name == 'pop':
       return DictObject.Pop(self, 'dict.pop')
     elif name == 'popitem':
-      return BuiltinConstCallable('dict.popitem', TupleType.create_sequence([self.key, self.value]),
+      return BuiltinConstCallable('dict.popitem', TupleType.create_tuple([self.key, self.value]),
                                   expts=[KeyErrorType.maybe('might not able to pop from an empty dict.')])
     elif name == 'setdefault':
       return DictObject.SetDefault(self, 'dict.setdefault')
     elif name == 'update':
       return DictObject.Update(self, 'dict.update')
-    elif name == 'values':
-      return BuiltinConstCallable('dict.values', ListType.create_sequence([ self.value ]))
     raise NodeAttrError(name)
 
   def get_element(self, frame, subs, write=False):
@@ -713,7 +722,7 @@ class DictObject(BuiltinObject):
     return self.value
 
   def get_iter(self, frame):
-    return IterType.create_sequence(elemall=self.key)
+    return IterType.create_iter(self.key)
 
 
 ##  DictType
@@ -727,7 +736,9 @@ class DictType(BuiltinType, BuiltinCallable):
     if kwargs:
       return DictType.create_dict(key=[StrType.get_object()], value=kwargs.values())
     if args:
-      return DictObject.DictConverter(frame, DictType.create_dict(), [args[0]])
+      dictobj = DictType.create_dict()
+      DictObject.DictConverter(frame, dictobj, args[0])
+      return dictobj
     else:
       return DictType.create_dict()
 

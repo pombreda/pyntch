@@ -3,7 +3,7 @@ import sys
 stderr = sys.stderr
 
 from compiler import ast
-from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeTypeError, \
+from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, \
      BuiltinType, BuiltinObject
 
 
@@ -38,10 +38,17 @@ class ExceptionType(BuiltinType):
 
   TYPE_NAME = Exception
   TYPE_INSTANCE = ExceptionObject
+  OBJECTS = {}
 
   @classmethod
   def occur(klass, message):
-    return klass.TYPE_INSTANCE(klass.get_typeobj(), message)
+    k = (klass.get_typeobj(), message)
+    if k in klass.OBJECTS:
+      expt = klass.OBJECTS[k]
+    else:
+      expt = klass.TYPE_INSTANCE(klass.get_typeobj(), message)
+      klass.OBJECTS[k] = expt
+    return expt
   maybe = occur
 
 class TracebackObject(TypeNode):
@@ -58,11 +65,10 @@ class TracebackObject(TypeNode):
     else:
       return '%s at ???' % (self.expt)
 
-  def equal(self, obj, done=None):
-    return isinstance(obj, TracebackObject) and self.loc == obj.loc and self.expt.equal(obj.expt, done) 
-
   def desc1(self, _):
     return repr(self)
+  def sig1(self, _):
+    return (self.expt, self.loc)
 
 class StopIterationType(ExceptionType):
   TYPE_NAME = 'StopIteration'
@@ -134,14 +140,14 @@ class UnicodeTranslateErrorType(UnicodeErrorType):
   TYPE_NAME = 'UnicodeTranslateError'
 
 
-##  ExceptionFrame
+##  ExecutionFrame
 ##
-##  An ExceptionFrame object is a place where an exception belongs.
+##  An ExecutionFrame object is a place where an exception belongs.
 ##  Normally it's a body of function. Exceptions that are raised
-##  within this frame are propagated to other ExceptionFrames which
+##  within this frame are propagated to other ExecutionFrames which
 ##  invoke the function.
 ##
-class ExceptionFrame(object):
+class ExecutionFrame(object):
 
   debug = 0
 
@@ -170,7 +176,7 @@ class ExceptionFrame(object):
     return
 
   def connect_expt(self, frame):
-    assert isinstance(frame, ExceptionFrame)
+    assert isinstance(frame, ExecutionFrame)
     if self.debug:
       print >>stderr, 'connect_expt: %r <- %r' % (frame, self)
     self.annotator.connect(frame.annotator)
@@ -190,12 +196,13 @@ class ExceptionFrame(object):
 
 ##  ExceptionCatcher
 ##
-class ExceptionCatcher(ExceptionFrame):
+class ExceptionCatcher(ExecutionFrame):
 
   class ExceptionFilter(CompoundTypeNode):
     
     def __init__(self, catcher):
       self.catcher = catcher
+      self.handlers = {}
       CompoundTypeNode.__init__(self)
       return
     
@@ -203,20 +210,26 @@ class ExceptionCatcher(ExceptionFrame):
       if self.catcher.catchall: return
       for obj in src:
         assert isinstance(obj, TracebackObject), obj
-        caught = False
-        for expt1 in obj.expt:
-          for (expt0,var) in self.catcher.handlers.itervalues():
-            for typeobj in expt0:
-              if expt1.is_type(typeobj):
-                expt1.connect(var)
-                caught = True
-        if not caught:
-          self.update_types([obj])
+        for expt in obj.expt:
+          try:
+            var = self.handlers[expt.get_type()]
+            expt.connect(var)
+          except KeyError:
+            self.update_types([obj])
+      return
+
+    def recv_expt(self, src, var):
+      for obj in src:
+        self.handlers[obj.get_type()] = var
+      return
+
+    def catch(self, obj, var):
+      obj.connect(self, lambda src: self.recv_expt(src, var))
       return
 
   def __init__(self, parent):
     self.annotator = self.ExceptionFilter(self)
-    self.handlers = {}
+    self.vars = {}
     self.catchall = False
     self.connect_expt(parent)
     return
@@ -225,45 +238,41 @@ class ExceptionCatcher(ExceptionFrame):
     if self.catchall:
       return '<catch all>'
     else:
-      return '<catch %s>' % ', '.join(map(repr, self.handlers.iterkeys()))
+      return '<catch %s>' % ', '.join(map(repr, self.vars.iterkeys()))
 
   def add_all(self):
     self.catchall = True
     return
   
   def add_handler(self, src):
-    if src not in self.handlers:
-      self.handlers[src] = (CompoundTypeNode(), CompoundTypeNode())
+    if src not in self.vars:
+      self.vars[src] = CompoundTypeNode()
     src.connect(self, self.recv_handler_expt)
-    (_,var) = self.handlers[src]
-    return var
+    return self.vars[src]
 
   def recv_handler_expt(self, src):
     from aggregate_types import TupleType
-    (expt,_) = self.handlers[src]
     for obj in src:
       if obj.is_type(TupleType.get_typeobj()):
-        obj.elemall.connect(expt)
+        self.annotator.catch(obj.elemall, self.vars[src])
       else:
-        obj.connect(expt)
+        self.annotator.catch(obj, self.vars[src])
     return
-
-
-##  ExceptionRaiser
-##
-class ExceptionRaiser(ExceptionFrame): pass
 
 
 ##  MustBeDefinedNode
 ##
-class MustBeDefinedNode(CompoundTypeNode, ExceptionRaiser):
+class MustBeDefinedNode(CompoundTypeNode, ExecutionFrame):
 
   nodes = None
   
-  def __init__(self, parent, loc):
+  def __init__(self, parent=None, loc=None):
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent, loc)
+    ExecutionFrame.__init__(self, parent=parent, loc=loc)
     MustBeDefinedNode.nodes.append(self)
+    return
+
+  def check_undefined(self):
     return
   
   @classmethod
@@ -274,8 +283,7 @@ class MustBeDefinedNode(CompoundTypeNode, ExceptionRaiser):
   @classmethod
   def check(klass):
     for node in klass.nodes:
-      if not node.types:
-        node.raise_expt(node.undefined())
+      node.check_undefined()
     return
 
 
@@ -283,18 +291,18 @@ class MustBeDefinedNode(CompoundTypeNode, ExceptionRaiser):
 ##
 ##  Special behaviour on raising an exception.
 ##
-class ExceptionMaker(CompoundTypeNode, ExceptionRaiser):
+class ExceptionMaker(CompoundTypeNode, ExecutionFrame):
   
-  def __init__(self, parent_frame, loc, exctype, excargs):
-    CompoundTypeNode.__init__(self)
+  def __init__(self, parent, exctype, excargs):
     self.exctype = exctype
     self.excargs = excargs
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    CompoundTypeNode.__init__(self)
+    ExecutionFrame.__init__(self, parent=parent)
     exctype.connect(self, self.recv_type)
     return
   
   def __repr__(self):
-    return '<exception %r(%s)>' % (self.exctype, ','.join(map(repr, self.excargs)))
+    return '<exception %s>' % (self.describe())
 
   def recv_type(self, src):
     from function import ClassType
@@ -352,7 +360,7 @@ class SequenceTypeChecker(TypeChecker):
     for obj in src:
       try:
         obj.get_seq(self.parent_frame).connect(self, self.recv_elemobj)
-      except NodeTypeError:
+      except (NodeTypeError, NodeAttrError):
         if self.blame:
           self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be iterable' % (self.blame, obj)))
     return

@@ -1,20 +1,20 @@
 #!/usr/bin/env python
 
 from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError
-from exception import ExceptionRaiser, MustBeDefinedNode, \
+from exception import ExecutionFrame, MustBeDefinedNode, \
      TypeErrorType, AttributeErrorType, ValueErrorType
 
 
 ##  FunCall
 ##
-class FunCall(CompoundTypeNode, ExceptionRaiser):
+class FunCall(CompoundTypeNode, ExecutionFrame):
   
   def __init__(self, parent_frame, loc, func, args, kwargs={}):
     self.func = func
     self.args = args
     self.kwargs = kwargs
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    ExecutionFrame.__init__(self, parent_frame, loc)
     func.connect(self, self.recv_func)
     return
 
@@ -55,20 +55,22 @@ class AttrRef(MustBeDefinedNode):
           'cannot get attribute: %r might be %r, no attr %s.' % (self.target, obj, self.attrname)))
     return
 
-  def undefined(self):
-    return AttributeErrorType.occur('attribute not defined: %r.%s' % (self.target, self.attrname))
+  def check_undefined(self):
+    if not self.types:
+      self.raise_expt(AttributeErrorType.occur('attribute not defined: %r.%s' % (self.target, self.attrname)))
+    return
 
 
 ##  AttrAssign
 ##
-class AttrAssign(CompoundTypeNode, ExceptionRaiser):
+class AttrAssign(CompoundTypeNode, ExecutionFrame):
   
   def __init__(self, parent_frame, loc, target, attrname, value):
     self.target = target
     self.attrname = attrname
     self.value = value
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    ExecutionFrame.__init__(self, parent_frame, loc)
     target.connect(self, self.recv_target)
     return
 
@@ -95,7 +97,7 @@ class BinaryOp(MustBeDefinedNode):
     self.right = right
     self.done = set()
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    MustBeDefinedNode.__init__(self, parent_frame, loc)
     left.connect(self)
     right.connect(self)
     return
@@ -176,8 +178,10 @@ class BinaryOp(MustBeDefinedNode):
           'unsupported operand %s for %r and %r' % (self.op, lobj, robj)))
     return
   
-  def undefined(self):
-    return TypeErrorType.occur('unsupported operand %s for %r and %r' % (self.op, self.left, self.right))
+  def check_undefined(self):
+    if not self.types:
+      self.raise_expt(TypeErrorType.occur('unsupported operand %s for %r and %r' % (self.op, self.left, self.right)))
+    return
 
 
 ##  AssignOp
@@ -205,7 +209,7 @@ class AssignOp(BinaryOp):
 
 ##  UnaryOp
 ##
-class UnaryOp(CompoundTypeNode, ExceptionRaiser):
+class UnaryOp(CompoundTypeNode, ExecutionFrame):
   
   def __init__(self, parent_frame, loc, op, value):
     self.value = value
@@ -214,7 +218,7 @@ class UnaryOp(CompoundTypeNode, ExceptionRaiser):
     else:
       self.op = '-'
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    ExecutionFrame.__init__(self, parent_frame, loc)
     self.value.connect(self) # XXX handle optional methods
     return
   
@@ -224,14 +228,14 @@ class UnaryOp(CompoundTypeNode, ExceptionRaiser):
 
 ##  CompareOp
 ##
-class CompareOp(CompoundTypeNode, ExceptionRaiser):
+class CompareOp(CompoundTypeNode, ExecutionFrame):
   
   def __init__(self, parent_frame, loc, expr0, comps):
     from basic_types import BoolType
     self.expr0 = expr0
     self.comps = comps
     CompoundTypeNode.__init__(self, [BoolType.get_object()])
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    ExecutionFrame.__init__(self, parent_frame, loc)
     self.expr0.connect(self)
     for (_,expr) in self.comps:
       expr.connect(self)
@@ -248,14 +252,14 @@ class CompareOp(CompoundTypeNode, ExceptionRaiser):
 
 ##  BooleanOp
 ##
-class BooleanOp(CompoundTypeNode, ExceptionRaiser):
+class BooleanOp(CompoundTypeNode, ExecutionFrame):
   
   def __init__(self, parent_frame, loc, op, nodes):
     from basic_types import BoolType
     self.op = op
     self.nodes = nodes
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    ExecutionFrame.__init__(self, parent_frame, loc)
     if op == 'Or' and not [ 1 for node in nodes if isinstance(node, SimpleTypeNode) ]:
       BoolType.get_object().connect(self)
     for node in self.nodes:
@@ -268,13 +272,13 @@ class BooleanOp(CompoundTypeNode, ExceptionRaiser):
 
 ##  NotOp
 ##
-class NotOp(CompoundTypeNode, ExceptionRaiser):
+class NotOp(CompoundTypeNode, ExecutionFrame):
   
   def __init__(self, parent_frame, loc, value):
     from basic_types import BoolType
     self.value = value
     CompoundTypeNode.__init__(self, [BoolType.get_object()])
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    ExecutionFrame.__init__(self, parent_frame, loc)
     self.value.connect(self)
     return
   
@@ -288,14 +292,14 @@ class NotOp(CompoundTypeNode, ExceptionRaiser):
 
 ##  IfExpOp
 ##
-class IfExpOp(CompoundTypeNode, ExceptionRaiser):
+class IfExpOp(CompoundTypeNode, ExecutionFrame):
   
   def __init__(self, parent_frame, loc, test, then, else_):
     self.test = test
     self.then = then
     self.else_ = else_
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    ExecutionFrame.__init__(self, parent_frame, loc)
     then.connect(self)
     else_.connect(self)
     return
@@ -306,13 +310,13 @@ class IfExpOp(CompoundTypeNode, ExceptionRaiser):
 
 ##  SubRef
 ##
-class SubRef(CompoundTypeNode, ExceptionRaiser):
+class SubRef(CompoundTypeNode, ExecutionFrame):
   
   def __init__(self, parent_frame, loc, target, subs):
     self.target = target
     self.subs = subs
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    ExecutionFrame.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
     return
 
@@ -330,14 +334,14 @@ class SubRef(CompoundTypeNode, ExceptionRaiser):
 
 ##  SubAssign
 ##
-class SubAssign(CompoundTypeNode, ExceptionRaiser):
+class SubAssign(CompoundTypeNode, ExecutionFrame):
   
   def __init__(self, parent_frame, loc, target, subs, value):
     self.target = target
     self.subs = subs
     self.value = value
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    ExecutionFrame.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
     return
 
@@ -355,12 +359,12 @@ class SubAssign(CompoundTypeNode, ExceptionRaiser):
 
 ##  IterRef
 ##
-class IterRef(CompoundTypeNode, ExceptionRaiser):
+class IterRef(CompoundTypeNode, ExecutionFrame):
   
   def __init__(self, parent_frame, loc, target):
     self.target = target
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    ExecutionFrame.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
     return
 
@@ -371,21 +375,21 @@ class IterRef(CompoundTypeNode, ExceptionRaiser):
     for obj in src:
       try:
         obj.get_seq(self).connect(self)
-      except NodeTypeError:
+      except (NodeTypeError, NodeAttrError):
         self.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
     return
 
 
 ##  SliceRef
 ##
-class SliceRef(CompoundTypeNode, ExceptionRaiser):
+class SliceRef(CompoundTypeNode, ExecutionFrame):
   
   def __init__(self, parent_frame, loc, target, lower, upper):
     self.target = target
     self.lower = lower
     self.upper = upper
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    ExecutionFrame.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
     return
 
@@ -405,19 +409,19 @@ class SliceRef(CompoundTypeNode, ExceptionRaiser):
       try:
         elemall = obj.get_element(self, [self.lower, self.upper])
         typeobj = obj.get_type()
-        typeobj.create_sequence(elemall=elemall).connect(self)
+        typeobj.create_sequence(elemall).connect(self)
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
 
   def get_iter(self, frame):
     from aggregate_types import IterType
-    return IterType.create_sequence(elemall=self)
+    return IterType.create_iter(self)
 
 
 ##  SliceAssign
 ##
-class SliceAssign(CompoundTypeNode, ExceptionRaiser):
+class SliceAssign(CompoundTypeNode, ExecutionFrame):
   
   def __init__(self, parent_frame, loc, target, lower, upper, value):
     self.target = target
@@ -425,7 +429,7 @@ class SliceAssign(CompoundTypeNode, ExceptionRaiser):
     self.upper = upper
     self.value = value
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    ExecutionFrame.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
     return
 
@@ -436,14 +440,14 @@ class SliceAssign(CompoundTypeNode, ExceptionRaiser):
     for obj in src:
       try:
         self.value.get_seq(self).connect(obj.get_element(self, [self.lower, self.upper], write=True))
-      except NodeTypeError:
+      except (NodeTypeError, NodeAttrError):
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
 
 
 ##  TupleUnpack
 ##
-class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
+class TupleUnpack(CompoundTypeNode, ExecutionFrame):
 
   ##  Element
   ##
@@ -463,7 +467,7 @@ class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
     self.tupobj = tupobj
     self.elements = [ self.Element(self, i) for i in xrange(nelements) ]
     CompoundTypeNode.__init__(self)
-    ExceptionRaiser.__init__(self, parent_frame, loc)
+    ExecutionFrame.__init__(self, parent_frame, loc)
     self.tupobj.connect(self, self.recv_tupobj)
     return
 
@@ -488,6 +492,6 @@ class TupleUnpack(CompoundTypeNode, ExceptionRaiser):
           elemall = obj.get_seq(self)
           for dest in self.elements:
             elemall.connect(dest)
-        except NodeTypeError:
+        except (NodeTypeError, NodeAttrError):
           self.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
     return

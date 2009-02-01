@@ -2,7 +2,7 @@
 import sys, os.path
 stderr = sys.stderr
 from typenode import TreeReporter, BuiltinType, BuiltinObject
-from exception import ExceptionFrame
+from exception import ExecutionFrame
 from namespace import Namespace
 
 
@@ -29,13 +29,13 @@ class ModuleType(BuiltinType):
 
 ##  PythonModuleObject
 ##
-class PythonModuleObject(ModuleObject, TreeReporter, ExceptionFrame):
+class PythonModuleObject(ModuleObject, TreeReporter, ExecutionFrame):
 
   def __init__(self, name, parent_space, path=None):
     self.path = path
     ModuleObject.__init__(self, name, Namespace(parent_space, name))
     TreeReporter.__init__(self, None, name)
-    ExceptionFrame.__init__(self)
+    ExecutionFrame.__init__(self)
     return
   
   def __repr__(self):
@@ -119,8 +119,7 @@ class Interpreter(object):
   @classmethod
   def load_file(klass, path, modname):
     from compiler import parseFile
-    if klass.debug:
-      print >>stderr, 'load_file: %r' % path
+    print >>stderr, 'loading: %r' % path
     dirname = os.path.dirname(path)
     if dirname not in klass.module_path:
       klass.module_path.insert(0, dirname)

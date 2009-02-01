@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-
-class A:
+class A(object):
   
   a = 1
   
@@ -10,10 +9,10 @@ class A:
     A.b = 2
     return
   
-  def foo(self, x):
-    self.y = x
-    return 'B'
+  def foo(self, y):
+    self.x = y
+    return self.b
 
-a = A(123)
-a.foo(456)
-print a.z
+p = A(123)
+q = p.foo('456')
+r = p.zzz

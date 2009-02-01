@@ -3,7 +3,7 @@
 from typenode import TreeReporter, SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, \
      BuiltinType, BuiltinObject
 from namespace import Namespace, Variable
-from exception import TypeErrorType, ExceptionFrame
+from exception import TypeErrorType, ExecutionFrame, MustBeDefinedNode
 
 
 ##  FuncType
@@ -14,16 +14,16 @@ class FuncType(BuiltinType, TreeReporter):
   
   ##  FuncBody
   ##
-  class FuncBody(CompoundTypeNode, ExceptionFrame):
+  class FuncBody(CompoundTypeNode, ExecutionFrame):
 
     def __init__(self, name, loc):
       self.name = name
-      ExceptionFrame.__init__(self, loc=loc)
+      ExecutionFrame.__init__(self, loc=loc)
       CompoundTypeNode.__init__(self)
       return
 
     def __repr__(self):
-      return '<FuncBody %s>' % self.name
+      return '<funcbody %s>' % self.name
 
     def set_retval(self, evals):
       from aggregate_types import GeneratorType
@@ -31,7 +31,7 @@ class FuncType(BuiltinType, TreeReporter):
       yields = [ obj for (t,obj) in evals if t == 'y' ]
       assert returns
       if yields:
-        retvals = [ GeneratorType.create_sequence(yields) ]
+        retvals = [ GeneratorType.create_generator(CompoundTypeNode(yields)) ]
       else:
         retvals = returns
       for obj in retvals:
@@ -97,7 +97,7 @@ class FuncType(BuiltinType, TreeReporter):
     return body
 
   def __repr__(self):
-    return ('<Function %s>' % (self.name))
+    return ('<function %s>' % self.space.fullname())
 
   def get_type(self):
     return self
@@ -150,7 +150,7 @@ class FuncType(BuiltinType, TreeReporter):
     if self.kwarg:
       self.space[self.kwarg].bind(DictType.create_dict(key=StrType.get_object(), value=varkwargs))
     if self.vararg:
-      self.space[self.vararg].bind(TupleType.create_sequence(varargs))
+      self.space[self.vararg].bind(TupleType.create_sequence(CompoundTypeNode(varargs)))
     if len(self.defaults) < len(argvars):
       frame.raise_expt(TypeErrorType.occur('too few argument for %s: %d or more' % (self.name, len(argvars))))
     self.body.connect_expt(frame)
@@ -209,14 +209,14 @@ class LambdaFuncType(FuncType):
     return body
   
   def __repr__(self):
-    return ('<LambdaFunc %s>' % (self.name))
+    return ('<lambda %s>' % self.space.fullname())
 
 
-##  MethodType
+##  BoundMethodType
 ##
-class MethodType(BuiltinType):
+class BoundMethodType(BuiltinType):
 
-  TYPE_NAME = 'method'
+  TYPE_NAME = 'boundmethod'
 
   def __init__(self, arg0, func):
     self.arg0 = arg0
@@ -225,7 +225,7 @@ class MethodType(BuiltinType):
     return
 
   def __repr__(self):
-    return '<method %r(%s=%r)>' % (self.func, self.func.argnames[0], self.arg0)
+    return '<boundmethod %r(%s=%r)>' % (self.func, self.func.argnames[0], self.arg0)
   
   def get_type(self):
     return self
@@ -242,19 +242,23 @@ class ClassType(BuiltinType, TreeReporter):
   
   ##  ClassAttr
   ##
-  class ClassAttr(CompoundTypeNode):
+  class ClassAttr(MustBeDefinedNode):
 
     def __init__(self, name, klass, bases):
-      CompoundTypeNode.__init__(self)
       self.name = name
       self.klass = klass
       self.bases = bases
+      self.called = False
+      self.args = []
+      self.kwargs = {}
+      self.retval = CompoundTypeNode()
+      MustBeDefinedNode.__init__(self)
       for base in bases:
         base.connect(self, self.recv_base)
       return
 
     def __repr__(self):
-      return '%r.@%s' % (self.klass, self.name)
+      return '%r.%s' % (self.klass, self.name)
 
     def recv_base(self, src):
       for klass in src:
@@ -263,25 +267,8 @@ class ClassType(BuiltinType, TreeReporter):
         except NodeAttrError:
           pass
       return
-  
-  ##  OptionalAttr
-  ##
-  class OptionalAttr(CompoundTypeNode, ExceptionFrame):
-    
-    def __init__(self, instance, name):
-      self.attr = instance.get_attr(name)
-      self.args = []
-      self.kwargs = {}
-      self.retval = CompoundTypeNode()
-      CompoundTypeNode.__init__(self)
-      ExceptionFrame.__init__(self)
-      self.attr.connect(self)
-      return
 
-    def __repr__(self):
-      return repr(self.attr)
-
-    def call(self, frame, args, kwargs):
+    def optcall(self, frame, args, kwargs):
       # Remember the keyword arguments.
       for (kwname,kwvalue) in kwargs.iteritems():
         if kwname not in self.kwargs:
@@ -297,32 +284,26 @@ class ClassType(BuiltinType, TreeReporter):
         arg1.connect(var1)
       # Propagate the exceptions.
       self.connect_expt(frame)
+      self.called = True
+      self.update_calls()
       return self.retval
     
     def recv(self, src):
-      for obj in src:
+      CompoundTypeNode.recv(self, src)
+      self.update_calls()
+      return
+
+    def update_calls(self):
+      if not self.called: return
+      for obj in self.types:
         try:
-          # XXX self.kwargs might not be fixated.
           obj.call(self, self.args, self.kwargs).connect(self.retval)
         except NodeTypeError:
-          self.update_type([obj])
+          pass
+        self.update_types([obj])
       return
 
-  ##  InitMethodBody
-  ##
-  class InitMethodBody(OptionalAttr, ExceptionFrame):
-
-    def __init__(self, instance):
-      ClassType.OptionalAttr.__init__(self, instance, '__init__')
-      ExceptionFrame.__init__(self)
-      self.update_types([instance])
-      return
-
-    def call(self, frame, args, kwargs):
-      ClassType.OptionalAttr.call(self, frame, args, kwargs)
-      return self
-
-    def recv(self, _): # ignore return value
+    def check_undefined(self):
       return
 
   def __init__(self, parent_reporter, parent_frame, parent_space, name, bases, code, evals, loc):
@@ -333,12 +314,12 @@ class ClassType(BuiltinType, TreeReporter):
     self.bases = bases
     self.loc = loc
     self.boundmethods = {}
-    space = Namespace(parent_space, name)
+    self.space = Namespace(parent_space, name)
     if code:
-      space.register_names(code)
-      build_stmt(self, parent_frame, space, code, evals)
+      self.space.register_names(code)
+      build_stmt(self, parent_frame, self.space, code, evals)
     self.attrs = {}
-    for (name,var) in space:
+    for (name,var) in self.space:
       # Do not inherit attributes from the base class
       # if they are explicitly overriden.
       attr = self.ClassAttr(name, self, [])
@@ -352,7 +333,7 @@ class ClassType(BuiltinType, TreeReporter):
     return
 
   def __repr__(self):
-    return ('<Class %s>' % (self.name,))
+    return ('<class %s>' % self.space.fullname())
 
   def get_type(self):
     return self
@@ -377,7 +358,7 @@ class ClassType(BuiltinType, TreeReporter):
 
   def bind_func(self, func):
     if func not in self.boundmethods:
-      method = MethodType(self, func)
+      method = BoundMethodType(self, func)
       self.boundmethods[func] = method
     else:
       method = self.boundmethods[func]
@@ -385,7 +366,8 @@ class ClassType(BuiltinType, TreeReporter):
 
   def call(self, frame, args, kwargs):
     self.callers.append(frame)
-    return self.InitMethodBody(self.instance).call(frame, args, kwargs)
+    self.get_attr('__init__').optcall(frame, (self.instance,)+args, kwargs)
+    return self.instance
   
   def show(self, p):
     p('### %s(%s)' % (self.loc._module.get_loc(), self.loc.lineno))
@@ -426,7 +408,7 @@ class InstanceObject(BuiltinObject):
       return
 
     def __repr__(self):
-      return '%r.@%s' % (self.instance, self.name)
+      return '%r.%s' % (self.instance, self.name)
 
     def recv_klass(self, src):
       for obj in src:
@@ -448,9 +430,6 @@ class InstanceObject(BuiltinObject):
           obj = self.instance.bind_func(obj)
         self.update_types([obj])
       return
-
-  class InstanceOptAttr(InstanceAttr):
-    pass
     
   def __init__(self, klass):
     SimpleTypeNode.__init__(self, self)
@@ -462,7 +441,7 @@ class InstanceObject(BuiltinObject):
     return
   
   def __repr__(self):
-    return ('<Instance %s>' % (self.klass.name,))
+    return ('<instance %s>' % (self.klass))
   
   def get_type(self):
     return self.klass
@@ -481,17 +460,9 @@ class InstanceObject(BuiltinObject):
       attr = self.attrs[name]
     return attr
 
-  def get_opt_attr(self, name):
-    if name not in self.attrs:
-      attr = self.InstanceOptAttr(name, self.klass, self)
-      self.attrs[name] = attr
-    else:
-      attr = self.attrs[name]
-    return attr
-
   def bind_func(self, func):
     if func not in self.boundmethods:
-      method = MethodType(self, func)
+      method = BoundMethodType(self, func)
       self.boundmethods[func] = method
     else:
       method = self.boundmethods[func]
