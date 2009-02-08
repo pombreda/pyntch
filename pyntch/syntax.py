@@ -2,9 +2,10 @@
 
 from compiler import ast
 from typenode import TypeNode, UndefinedTypeNode, CompoundTypeNode
-from exception import ExecutionFrame, ExceptionCatcher, ExceptionMaker, TypeChecker
-from exception import NameErrorType, RuntimeErrorType
-from function import FuncType, LambdaFuncType, ClassType
+from frame import ExecutionFrame, ExceptionCatcher, ExceptionMaker
+from exception import TypeChecker, NameErrorType, RuntimeErrorType
+from klass import ClassType
+from function import FuncType, LambdaFuncType
 from expression import AttrAssign, AttrRef, SubAssign, SubRef, IterRef, SliceAssign, SliceRef, \
      FunCall, BinaryOp, CompareOp, BooleanOp, AssignOp, UnaryOp, NotOp, IfExpOp, TupleUnpack
 
@@ -94,7 +95,7 @@ def build_expr(reporter, frame, space, tree, evals):
 
   elif isinstance(tree, ast.List):
     elements = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
-    expr = ListType.create_sequence(CompoundTypeNode(elements))
+    expr = ListType.create_list(CompoundTypeNode(elements))
 
   elif isinstance(tree, ast.Dict):
     items = [ (build_expr(reporter, frame, space, k, evals),
@@ -121,9 +122,11 @@ def build_expr(reporter, frame, space, tree, evals):
   
   # ==, !=, <=, >=, <, >, in, not in, is, is not
   elif isinstance(tree, ast.Compare):
-    expr0 = build_expr(reporter, frame, space, tree.expr, evals)
-    comps = [ (op, build_expr(reporter, frame, space, node, evals)) for (op,node) in tree.ops ]
-    expr = CompareOp(frame, tree, expr0, comps)
+    left = build_expr(reporter, frame, space, tree.expr, evals)
+    for (op,node) in tree.ops:
+      right = build_expr(reporter, frame, space, node, evals)
+      expr = CompareOp(frame, tree, op, left, right)
+      left = right
 
   # +,-
   elif isinstance(tree, (ast.UnaryAdd, ast.UnarySub)):
@@ -151,7 +154,7 @@ def build_expr(reporter, frame, space, tree, evals):
   # list comprehension
   elif isinstance(tree, ast.ListComp):
     elements = [ build_expr(reporter, frame, space, tree.expr, evals) ]
-    expr = ListType.create_sequence(CompoundTypeNode(elements))
+    expr = ListType.create_list(CompoundTypeNode(elements))
     for qual in tree.quals:
       seq = build_expr(reporter, frame, space, qual.list, evals)
       build_assign(reporter, frame, space, qual.assign, IterRef(frame, qual.list, seq), evals)

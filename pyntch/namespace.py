@@ -311,6 +311,7 @@ class Namespace(object):
 class BuiltinTypesNamespace(Namespace):
   
   def __init__(self, parent):
+    import klass
     import function
     import basic_types
     import aggregate_types
@@ -345,7 +346,7 @@ class BuiltinTypesNamespace(Namespace):
     #self.register_var('FunctionType').bind(function.FuncType.get_typeobj())
     #self.register_var('LambdaType').bind(function.LambdaFuncType.get_typeobj())
     #self.register_var('GeneratorType').bind(function.IterType.get_typeobj())
-    self.register_var('InstanceType').bind(function.InstanceType.get_typeobj())
+    self.register_var('InstanceType').bind(klass.InstanceType.get_typeobj())
     #self.register_var('MethodType').bind(function.MethodType.get_typeobj())
     
     #self.register_var('ModuleType').bind(module.ModuleType.get_typeobj())

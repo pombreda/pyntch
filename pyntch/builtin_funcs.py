@@ -6,7 +6,6 @@
 from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, BuiltinType
 from exception import TypeErrorType
 from namespace import Namespace
-from function import ClassType, InstanceType
 from basic_types import TypeType, NumberType, BoolType, IntType, LongType, FloatType, \
      BaseStringType, StrType, UnicodeType, ANY, \
      BuiltinCallable, BuiltinConstCallable
@@ -95,7 +94,7 @@ class OrdFunc(BuiltinConstFunc):
 class RangeFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'range', ListType.create_sequence(IntType.get_object()), 
+    BuiltinConstFunc.__init__(self, 'range', ListType.create_list(IntType.get_object()), 
                               [IntType],
                               [IntType, IntType])
     return
@@ -124,7 +123,7 @@ class CmpFunc(BuiltinConstFunc):
 class DirFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'dir', ListType.create_sequence(StrType.get_object()), [], [ANY])
+    BuiltinConstFunc.__init__(self, 'dir', ListType.create_list(StrType.get_object()), [], [ANY])
     return
 
 
@@ -212,20 +211,27 @@ class IterFunc(BuiltinFunc):
       self.frame = frame
       self.iterobj = IterType.create_iter()
       CompoundTypeNode.__init__(self, [self.iterobj])
-      obj.connect(self)
+      obj.connect(self, self.recv_elem)
       return
     
-    def recv(self, src):
+    def recv_elem(self, src):
       for obj in src:
         try:
           obj.get_iter(self.frame).connect(self.iterobj.elemall)
         except (NodeTypeError, NodeAttrError):
           self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
-      return self.iterobj
+      return
   
   def process_args(self, frame, args, kwargs):
-    return self.IterConversion(frame, args[0])
+    v = args[0]
+    if v in self.cache:
+      iterobj = self.cache[v]
+    else:
+      iterobj = self.IterConversion(frame, v)
+      self.cache[v] = iterobj
+    return iterobj
 
   def __init__(self):
+    self.cache = {}
     BuiltinFunc.__init__(self, 'iter', [ANY])
     return

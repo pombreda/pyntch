@@ -2,7 +2,7 @@
 
 import sys, os.path
 from typenode import TypeNode, CompoundTypeNode
-from exception import ExecutionFrame, MustBeDefinedNode
+from frame import ExecutionFrame, MustBeDefinedNode
 from namespace import Namespace
 from module import Interpreter
 

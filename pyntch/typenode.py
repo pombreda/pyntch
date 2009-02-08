@@ -56,9 +56,9 @@ class TypeNode(object):
     if self.debug:
       print >>stderr, 'connect: %r -> %r' % (self, node)
     receiver = receiver or node.recv
+    if receiver in self.sendto: return False
     self.sendto.append(receiver)
-    receiver(self)
-    return
+    return receiver(self)
 
   def recv(self, src):
     raise NodeTypeError('cannot receive a value: %r' % self)
@@ -72,20 +72,18 @@ class TypeNode(object):
   def call(self, frame, args, kwargs):
     raise NodeTypeError('not callable')
   def get_seq(self, frame):
-    from exception import ExceptionCatcher, StopIterationType
+    from frame import ExceptionCatcher
+    from exception import StopIterationType
     frame1 = ExceptionCatcher(frame)
     frame1.add_handler(StopIterationType.occur(''))
     return self.get_iter(frame).get_attr('next').call(frame1, (), {})
-  
-  def create_sequence(self, elemall=None):
-    raise NodeTypeError('not sequence type')
-  def create_iter(self, elemall=None):
-    raise NodeTypeError('not sequence type')
   
   def desc1(self, _):
     raise NotImplementedError, self
   def describe(self):
     return self.desc1(set())
+  def signature(self):
+    return None
 
 
 ##  SimpleTypeNode
@@ -122,11 +120,8 @@ class CompoundTypeNode(TypeNode):
     if self in done:
       return '...'
     elif self.types:
-      s = []
       done = done.union([self])
-      for obj in self.types:
-        s.append(obj.desc1(done))
-      return '|'.join(s)
+      return '|'.join( sorted(set( obj.desc1(done) for obj in self )) )
     else:
       return '?'
                                   
@@ -136,15 +131,11 @@ class CompoundTypeNode(TypeNode):
     return
   
   def update_type(self, obj):
-    from aggregate_types import BuiltinSequenceObject
     if obj in self.types: return
-    if isinstance(obj, BuiltinSequenceObject):
-      for x in self.types:
-        if isinstance(x, BuiltinSequenceObject): return
     self.types.add(obj)
     for receiver in self.sendto:
       receiver(self)
-    return
+    return True
 
 
 ##  UndefinedTypeNode
@@ -176,7 +167,6 @@ class UndefinedTypeNode(TypeNode):
 class BuiltinType(SimpleTypeNode):
 
   TYPE_NAME = None # must be defined by subclass
-  TYPE_INSTANCE = None
   
   def __init__(self):
     self.__class__.TYPEOBJ = self
@@ -212,6 +202,22 @@ class BuiltinType(SimpleTypeNode):
     return klass.TYPEOBJ
 
 
+##  BuiltinBasicType
+##
+class BuiltinBasicType(BuiltinType):
+
+  TYPE_INSTANCE = None
+  
+  # get_object()
+  OBJECT = None
+  @classmethod
+  def get_object(klass):
+    assert klass.TYPE_INSTANCE
+    if not klass.OBJECT:
+      klass.OBJECT = klass.TYPE_INSTANCE(klass.get_typeobj())
+    return klass.OBJECT
+
+
 ##  BuiltinObject
 ##
 class BuiltinObject(SimpleTypeNode):
@@ -224,5 +230,5 @@ class BuiltinObject(SimpleTypeNode):
   
   def is_type(self, *typeobjs):
     for typeobj in typeobjs:
-      if issubclass(self.typeobj.__class__, typeobj.__class__): return True
+      if self.typeobj is typeobj or issubclass(self.typeobj.__class__, typeobj.__class__): return True
     return False

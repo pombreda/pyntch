@@ -2,11 +2,11 @@
 import sys, os.path
 stderr = sys.stderr
 from typenode import TreeReporter, BuiltinType, BuiltinObject
-from exception import ExecutionFrame
+from frame import ExecutionFrame
 from namespace import Namespace
 
 
-##  ModuleType
+##  Module
 ##
 class ModuleObject(BuiltinObject):
   
@@ -23,11 +23,11 @@ class ModuleObject(BuiltinObject):
     return self.space.register_var(name)
   
 class ModuleType(BuiltinType):
+  
   TYPE_NAME = 'module'
-  TYPE_INSTANCE = ModuleObject
 
 
-##  PythonModuleObject
+##  Python Module
 ##
 class PythonModuleObject(ModuleObject, TreeReporter, ExecutionFrame):
 
