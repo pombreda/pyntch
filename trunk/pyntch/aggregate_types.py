@@ -122,7 +122,14 @@ class BuiltinSequenceObject(BuiltinAggregateObject):
 ##  BuiltinSequenceType
 ##
 class BuiltinSequenceType(BuiltinAggregateType):
-  pass
+  
+  def process_args(self, frame, args, kwargs):
+    if kwargs:
+      frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
+      return UndefinedTypeNode()
+    if args:
+      return self.get_converted(frame, args[0])
+    return self.get_null()
 
 
 ##  List
@@ -244,14 +251,6 @@ class ListType(BuiltinSequenceType, BuiltinCallable):
     BuiltinCallable.__init__(self, 'list', [], [ANY])
     return
     
-  def process_args(self, frame, args, kwargs):
-    if kwargs:
-      frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
-      return UndefinedTypeNode()
-    if args:
-      return self.get_converted(frame, args[0])
-    return self.get_null()
-    
   def create_sequence(self, frame, node):
     listobj = ListType.create_list()
     node.connect(BuiltinSequenceObject.SequenceConverter(frame, listobj))
@@ -309,14 +308,6 @@ class TupleType(BuiltinSequenceType, BuiltinCallable):
     BuiltinSequenceType.__init__(self)
     BuiltinCallable.__init__(self, 'tuple', [], [ANY])
     return
-
-  def process_args(self, frame, args, kwargs):
-    if kwargs:
-      frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
-      return UndefinedTypeNode()
-    if args:
-      return self.get_converted(frame, args[0])
-    return self.get_null()
 
   def create_sequence(self, frame, node):
     tupleobj = TupleType.create_tuple()
@@ -446,14 +437,6 @@ class SetType(BuiltinSequenceType, BuiltinCallable):
     BuiltinSequenceType.__init__(self)
     BuiltinCallable.__init__(self, 'set', [], [ANY])
     return
-
-  def process_args(self, frame, args, kwargs):
-    if kwargs:
-      frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
-      return UndefinedTypeNode()
-    if args:
-      return self.get_converted(frame, args[0])
-    return self.get_null()
 
   def create_sequence(self, frame, node):
     setobj = SetType.create_set()
