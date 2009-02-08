@@ -4,27 +4,13 @@
 ##  as it causes circular imports!
 
 from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeAttrError, \
-     BuiltinType, BuiltinObject, UndefinedTypeNode
+     BuiltinType, BuiltinBasicType, BuiltinObject, UndefinedTypeNode
 from exception import TypeChecker, SequenceTypeChecker
 from exception import TypeErrorType, ValueErrorType, IndexErrorType, IOErrorType, EOFErrorType, \
      UnicodeDecodeErrorType, UnicodeEncodeErrorType
-from function import ClassType, InstanceType
+from klass import InstanceType
 
 ANY = TypeChecker.ANY
-
-
-##  BuiltinBasicType
-##
-class BuiltinBasicType(BuiltinType):
-
-  # get_object()
-  OBJECT = None
-  @classmethod
-  def get_object(klass):
-    assert klass.TYPE_INSTANCE
-    if not klass.OBJECT:
-      klass.OBJECT = klass.TYPE_INSTANCE(klass.get_typeobj())
-    return klass.OBJECT
 
 
 ##  BuiltinCallable
@@ -184,10 +170,17 @@ class ComplexType(NumberType):
 ##  Strings
 ##
 class BaseStringObject(BuiltinObject):
+
+  def __init__(self, typeobj):
+    self.iter = None
+    BuiltinObject.__init__(self, typeobj)
+    return
   
   def get_iter(self, frame):
     from aggregate_types import IterType
-    return IterType.create_iter(self)
+    if not self.iter:
+      self.iter = IterType.create_iter(self)
+    return self.iter
 
   def get_element(self, frame, subs, write=False):
     if write:
@@ -277,16 +270,16 @@ class BaseStringType(BuiltinBasicType, BuiltinConstCallable):
                                TupleType.create_tuple([self.get_object(), self.get_object(), self.get_object()]),
                                [BaseStringType])
     elif name == 'rsplit':
-      return BuiltinConstCallable('str.rsplit', ListType.create_sequence(self.get_object()),
+      return BuiltinConstCallable('str.rsplit', ListType.create_list(self.get_object()),
                                [], [BaseStringType, IntType])
     elif name == 'rstrip':
       return BuiltinConstCallable('str.rstrip', self.get_object(),
                                [BaseStringType])
     elif name == 'split':
-      return BuiltinConstCallable('str.split', ListType.create_sequence(self.get_object()),
+      return BuiltinConstCallable('str.split', ListType.create_list(self.get_object()),
                                [], [BaseStringType, IntType])
     elif name == 'splitlines':
-      return BuiltinConstCallable('str.splitlines', ListType.create_sequence(self.get_object()),
+      return BuiltinConstCallable('str.splitlines', ListType.create_list(self.get_object()),
                                [], [ANY])
     elif name == 'startswith':
       return BuiltinConstCallable('str.startswith', BoolType.get_object(),
@@ -332,9 +325,6 @@ class BaseStringType(BuiltinBasicType, BuiltinConstCallable):
       return UndefinedTypeNode()
     return BuiltinConstCallable.call(self, frame, args, kwargs)
 
-  def create_sequence(self, elemall=None):
-    return self.get_object()
-  
   def __init__(self):
     BuiltinBasicType.__init__(self)
     BuiltinConstCallable.__init__(self, 'basestring', None)
@@ -388,9 +378,17 @@ class UnicodeType(BaseStringType):
 ##  FileType
 ##
 class FileObject(BuiltinObject):
+
+  def __init__(self, typeobj):
+    self.iter = None
+    BuiltinObject.__init__(self, typeobj)
+    return
+  
   def get_iter(self, frame):
     from aggregate_types import IterType
-    return IterType.create_iter(StrType.get_object())
+    if not self.iter:
+      self.iter = IterType.create_iter(StrType.get_object())
+    return self.iter
   
 class FileType(BuiltinBasicType, BuiltinConstCallable):
   TYPE_NAME = 'file'
@@ -434,7 +432,7 @@ class FileType(BuiltinBasicType, BuiltinConstCallable):
                                [], [IntType],
                                [EOFErrorType.maybe('might receive an EOF.')])
     elif name == 'readlines':
-      return BuiltinConstCallable('file.readlines', ListType.create_sequence(StrType.get_object()),
+      return BuiltinConstCallable('file.readlines', ListType.create_list(StrType.get_object()),
                                [], [IntType],
                                [EOFErrorType.maybe('might receive an EOF.')])
     elif name == 'seek':

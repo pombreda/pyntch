@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError
-from exception import ExecutionFrame, MustBeDefinedNode, \
-     TypeErrorType, AttributeErrorType, ValueErrorType
+from frame import ExecutionFrame, MustBeDefinedNode
+from exception import TypeErrorType, AttributeErrorType, ValueErrorType
 
 
 ##  FunCall
@@ -96,14 +96,26 @@ class BinaryOp(MustBeDefinedNode):
     self.left = left
     self.right = right
     self.done = set()
+    self.tupleobj = self.listobj = None
     CompoundTypeNode.__init__(self)
     MustBeDefinedNode.__init__(self, parent_frame, loc)
-    left.connect(self)
-    right.connect(self)
+    left.connect(self, self.recv_left)
+    right.connect(self, self.recv_right)
     return
   
   def __repr__(self):
     return '%s(%r,%r)' % (self.op, self.left, self.right)
+
+  def recv_left(self, left):
+    for lobj in left:
+      for robj in self.right:
+        self.update_op(lobj, robj)
+    return
+  def recv_right(self, right):
+    for lobj in self.left:
+      for robj in right:
+        self.update_op(lobj, robj)
+    return
 
   VALID_TYPES = {
     ('str', 'Mul', 'int'): 'str',
@@ -111,71 +123,75 @@ class BinaryOp(MustBeDefinedNode):
     ('unicode', 'Mul', 'int'): 'unicode',
     ('int', 'Mul', 'unicode'): 'unicode',
     }
-  def recv(self, _):
+  def update_op(self, lobj, robj):
     from basic_types import NumberType, IntType, BaseStringType, BUILTIN_OBJECT
     from aggregate_types import ListType, ListObject, TupleType
-    for lobj in self.left:
-      for robj in self.right:
-        if (lobj,robj) in self.done: continue
-        self.done.add((lobj,robj))
-        # special handling for a formatting (%) operator
-        ltype = lobj.get_type()
-        rtype = robj.get_type()
-        if (lobj.is_type(BaseStringType.get_typeobj()) and
-            self.op == 'Mod'):
-          self.update_type(lobj)
-          continue
-        # for numeric operation, the one with a higher rank is chosen.
-        if (lobj.is_type(NumberType.get_typeobj()) and robj.is_type(NumberType.get_typeobj()) and
-            self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power')):
-          if ltype.get_rank() < rtype.get_rank():
-            self.update_type(robj)
-          else:
-            self.update_type(lobj)
-          continue
-        if (lobj.is_type(IntType.get_typeobj()) and robj.is_type(IntType.get_typeobj()) and
-            self.op in ('Bitand','Bitor','Bitxor')):
-          self.update_type(robj)
-          continue
-        # for string operation, only Add is supported.
-        if (lobj.is_type(BaseStringType.get_typeobj()) and robj.is_type(BaseStringType.get_typeobj()) and
-            self.op == 'Add'):
-          self.update_type(lobj)
-          continue
-        # for list operation, only Add and Mul is supported.
-        if (lobj.is_type(ListType.get_typeobj()) and robj.is_type(ListType.get_typeobj()) and
-            self.op == 'Add'):
-          self.update_type(ListType.concat(lobj, robj))
-          continue
-        if (lobj.is_type(ListType.get_typeobj()) and robj.is_type(IntType.get_typeobj()) and
-            self.op == 'Mul'):
-          self.update_type(ListType.multiply(lobj))
-          continue
-        if (lobj.is_type(IntType.get_typeobj()) and robj.is_type(ListType.get_typeobj()) and
-            self.op == 'Mul'):
-          self.update_type(ListType.multiply(robj))
-          continue
-        # for tuple operation, only Add and Mul is supported.
-        if (lobj.is_type(TupleType.get_typeobj()) and robj.is_type(TupleType.get_typeobj()) and
-            self.op == 'Add'):
-          self.update_type(TupleType.concat(lobj, robj))
-          continue
-        if (lobj.is_type(TupleType.get_typeobj()) and robj.is_type(IntType.get_typeobj()) and
-            self.op == 'Mul'):
-          self.update_type(TupleType.multiply(lobj))
-          continue
-        if (lobj.is_type(IntType.get_typeobj()) and robj.is_type(TupleType.get_typeobj()) and
-            self.op == 'Mul'):
-          self.update_type(TupleType.multiply(robj))
-          continue
-        # other operations.
-        k = (ltype.get_name(), self.op, rtype.get_name())
-        if k in self.VALID_TYPES:
-          v = BUILTIN_OBJECT[self.VALID_TYPES[k]]
-          self.update_type(v)
-          continue
-        self.raise_expt(TypeErrorType.occur(
-          'unsupported operand %s for %r and %r' % (self.op, lobj, robj)))
+    if (lobj,robj) in self.done: return
+    self.done.add((lobj,robj))
+    # special handling for a formatting (%) operator
+    ltype = lobj.get_type()
+    rtype = robj.get_type()
+    if (lobj.is_type(BaseStringType.get_typeobj()) and
+        self.op == 'Mod'):
+      lobj.connect(self)
+      return
+    # for numeric operation, the one with a higher rank is chosen.
+    if (lobj.is_type(NumberType.get_typeobj()) and robj.is_type(NumberType.get_typeobj()) and
+        self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power')):
+      if ltype.get_rank() < rtype.get_rank():
+        robj.connect(self)
+      else:
+        lobj.connect(self)
+      return
+    if (lobj.is_type(IntType.get_typeobj()) and robj.is_type(IntType.get_typeobj()) and
+        self.op in ('Bitand','Bitor','Bitxor')):
+      robj.connect(self)
+      return
+    # for string operation, only Add is supported.
+    if (lobj.is_type(BaseStringType.get_typeobj()) and robj.is_type(BaseStringType.get_typeobj()) and
+        self.op == 'Add'):
+      robj.connect(self)
+      return
+    # for list operation, only Add and Mul is supported.
+    if (self.op == 'Add' and
+        (lobj.is_type(ListType.get_typeobj()) and robj.is_type(ListType.get_typeobj()))):
+      if not self.listobj:
+        self.listobj = ListType.create_list()
+        self.listobj.connect(self)
+      lobj.connect_element(self.listobj)
+      robj.connect_element(self.listobj)
+      return
+    if self.op == 'Mul':
+      if lobj.is_type(ListType.get_typeobj()) and robj.is_type(IntType.get_typeobj()):
+        lobj.connect(self)
+        return
+      elif lobj.is_type(IntType.get_typeobj()) and robj.is_type(ListType.get_typeobj()):
+        robj.connect(self)
+        return
+    # for tuple operation, only Add and Mul is supported.
+    if (self.op == 'Add' and
+        (lobj.is_type(TupleType.get_typeobj()) and robj.is_type(TupleType.get_typeobj()))):
+      if not self.tupleobj:
+        self.tupleobj = TupleType.create_tuple()
+        self.tupleobj.connect(self)
+      lobj.connect_element(self.tupleobj)
+      robj.connect_element(self.tupleobj)
+      return
+    if self.op == 'Mul':
+      if lobj.is_type(TupleType.get_typeobj()) and robj.is_type(IntType.get_typeobj()):
+        lobj.connect(self)
+        return
+      elif lobj.is_type(IntType.get_typeobj()) and robj.is_type(TupleType.get_typeobj()):
+        robj.connect(self)
+        return
+    # other operations.
+    k = (ltype.get_name(), self.op, rtype.get_name())
+    if k in self.VALID_TYPES:
+      BUILTIN_OBJECT[self.VALID_TYPES[k]].connect(self)
+      return
+    # XXX handle optional methods
+    self.raise_expt(TypeErrorType.occur(
+      'unsupported operand %s for %r and %r' % (self.op, lobj, robj)))
     return
   
   def check_undefined(self):
@@ -188,7 +204,7 @@ class BinaryOp(MustBeDefinedNode):
 ##
 class AssignOp(BinaryOp):
 
-  BINOP = {
+  OPS = {
     '+=': 'Add',
     '-=': 'Sub',
     '*=': 'Mul',
@@ -202,7 +218,7 @@ class AssignOp(BinaryOp):
     }
   
   def __init__(self, parent_frame, loc, op, left, right):
-    BinaryOp.__init__(self, parent_frame, loc, self.BINOP[op], left, right)
+    BinaryOp.__init__(self, parent_frame, loc, self.OPS[op], left, right)
     self.connect(left)
     return
 
@@ -229,24 +245,46 @@ class UnaryOp(CompoundTypeNode, ExecutionFrame):
 ##  CompareOp
 ##
 class CompareOp(CompoundTypeNode, ExecutionFrame):
+
+  LMETHOD = {
+    '==': '__eq__',
+    '!=': '__ne__',
+    '<=': '__le__',
+    '>=': '__ge__',
+    '<': '__lt__',
+    '>': '__gt__',
+    }
   
-  def __init__(self, parent_frame, loc, expr0, comps):
+  def __init__(self, parent_frame, loc, op, left, right):
     from basic_types import BoolType
-    self.expr0 = expr0
-    self.comps = comps
+    self.op = op
+    self.left = left
+    self.right = right
+    self.done = set()
     CompoundTypeNode.__init__(self, [BoolType.get_object()])
     ExecutionFrame.__init__(self, parent_frame, loc)
-    self.expr0.connect(self)
-    for (_,expr) in self.comps:
-      expr.connect(self)
+    left.connect(self, self.recv_left)
+    right.connect(self, self.recv_right)
     return
   
   def __repr__(self):
     return 'cmp(%r %s)' % (self.expr0,
                            ', '.join( '%s %r' % (op,expr) for (op,expr) in self.comps ))
-  
-  def recv(self, _):
-    # ignore because CompareOp always returns bool.
+
+  def recv_left(self, left):
+    for lobj in left:
+      try:
+        lobj.get_attr(self.LMETHOD[self.op]).optcall(self, [self.right], {})
+      except (NodeAttrError, NodeTypeError):
+        pass
+    return
+  def recv_right(self, right):
+    for robj in self.right:
+      try:
+        #robj.get_attr(self.RMETHOD[self.op]).call(self, [self.left], {})
+        pass
+      except (NodeAttrError, NodeTypeError):
+        pass
     return
 
 
@@ -407,14 +445,13 @@ class SliceRef(CompoundTypeNode, ExecutionFrame):
     from aggregate_types import TupleType, ListType, TupleObject
     for obj in src:
       try:
-        obj.get_element(self, [self.lower, self.upper]).connect(self)
+        obj.get_element(self, [self.lower, self.upper])
+        # if an element can be retrieved from the object,
+        # it can be the result of the slice of itself.
+        obj.connect(self)
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
-
-  def get_iter(self, frame):
-    from aggregate_types import IterType
-    return IterType.create_iter(self)
 
 
 ##  SliceAssign
@@ -452,9 +489,9 @@ class TupleUnpack(CompoundTypeNode, ExecutionFrame):
   class Element(CompoundTypeNode):
     
     def __init__(self, tup, i):
-      CompoundTypeNode.__init__(self)
       self.tup = tup
       self.i = i
+      CompoundTypeNode.__init__(self)
       return
 
     def __repr__(self):

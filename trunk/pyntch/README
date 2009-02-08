@@ -4,13 +4,12 @@ README
 
 # TODO:
 #  hier class types.
-#  handle equal()
-#  slice, get_element, sliceobj
+#  optional method: __str__, __add__, __eq__, __iter__ etc.
 #  handle star, dstar.
-#  optional method: __add__, __eq__, __iter__ etc.
+#  slice, get_element, sliceobj
 #  automatic coercion for builtin functions.
 #  re-raise in except.
-#  StopIteration
+#  suppress warnings.
 #  test cases.
 
 Pyntch is a PYthoN Type CHecker.  It examines a Python source code
