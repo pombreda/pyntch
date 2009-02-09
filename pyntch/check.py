@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 import sys, os.path
-from typenode import TypeNode, CompoundTypeNode
-from frame import ExecutionFrame, MustBeDefinedNode
-from namespace import Namespace
-from module import Interpreter
+from pyntch.typenode import TypeNode, CompoundTypeNode
+from pyntch.frame import ExecutionFrame, MustBeDefinedNode
+from pyntch.namespace import Namespace
+from pyntch.module import Interpreter
 
 # main
 def main(argv):

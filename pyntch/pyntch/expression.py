@@ -279,8 +279,7 @@ class CompareOp(CompoundTypeNode, ExecutionFrame):
     return
   
   def __repr__(self):
-    return 'cmp(%r %s)' % (self.expr0,
-                           ', '.join( '%s %r' % (op,expr) for (op,expr) in self.comps ))
+    return '%s(%r,%r)' % (self.op, self.left, self.right)
 
   def recv_left(self, left):
     for lobj in left:
