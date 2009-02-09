@@ -240,6 +240,9 @@ class Namespace(object):
         self.register_names(tree.lower)
       if tree.upper:
         self.register_names(tree.upper)
+    elif isinstance(tree, ast.Sliceobj):
+      for node in tree.nodes:
+        self.register_names(node)
     elif isinstance(tree, ast.Tuple):
       for node in tree.nodes:
         self.register_names(node)

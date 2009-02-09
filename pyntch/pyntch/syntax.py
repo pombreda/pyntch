@@ -6,7 +6,7 @@ from frame import ExecutionFrame, ExceptionCatcher, ExceptionMaker
 from exception import TypeChecker, NameErrorType, RuntimeErrorType
 from klass import ClassType
 from function import FuncType, LambdaFuncType
-from expression import AttrAssign, AttrRef, SubAssign, SubRef, IterRef, SliceAssign, SliceRef, \
+from expression import AttrAssign, AttrRef, SubAssign, SubRef, IterRef, SliceAssign, SliceRef, SliceObject, \
      FunCall, BinaryOp, CompareOp, BooleanOp, AssignOp, UnaryOp, NotOp, IfExpOp, TupleUnpack
 
 
@@ -89,6 +89,10 @@ def build_expr(reporter, frame, space, tree, evals):
       upper = build_expr(reporter, frame, space, tree.upper, evals)
     expr = SliceRef(frame, tree, obj, lower, upper)
 
+  elif isinstance(tree, ast.Sliceobj):
+    elements = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
+    expr = SliceObject(frame, tree, elements)
+    
   elif isinstance(tree, ast.Tuple):
     elements = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
     expr = TupleType.create_tuple(elements)
@@ -380,6 +384,13 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     build_expr(reporter, frame, space, tree.expr, evals)
   elif isinstance(tree, ast.Subscript):
     build_expr(reporter, frame, space, tree.expr, evals)
+  elif isinstance(tree, ast.Slice):
+    assert tree.flags == 'OP_DELETE'
+    build_expr(reporter, frame, space, tree.expr, evals)
+    if tree.lower:
+      build_expr(reporter, frame, space, tree.lower, evals)
+    if tree.upper:
+      build_expr(reporter, frame, space, tree.upper, evals)
 
   elif isinstance(tree, ast.Assert):
     build_typecheck(reporter, frame, space, tree.test, tree.fail, evals)
