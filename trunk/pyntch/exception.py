@@ -132,6 +132,7 @@ class TypeChecker(CompoundTypeNode):
   def __init__(self, parent_frame, types, blame=None):
     self.parent_frame = parent_frame
     self.blame = blame
+    self.done = set()
     if types == self.ANY:
       self.validtypes = self.ANY
     else:
@@ -146,6 +147,8 @@ class TypeChecker(CompoundTypeNode):
   def recv(self, src):
     if self.validtypes == self.ANY: return
     for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
       for typeobj in self.validtypes:
         if obj.is_type(typeobj): break
       else:
@@ -158,8 +161,15 @@ class TypeChecker(CompoundTypeNode):
 ##
 class SequenceTypeChecker(TypeChecker):
   
+  def __init__(self, parent_frame, types, blame=None):
+    self.elemdone = set()
+    TypeChecker.__init__(self, parent_frame, types, blame=blame)
+    return
+  
   def recv(self, src):
     for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
       try:
         obj.get_seq(self.parent_frame).connect(self, self.recv_elemobj)
       except (NodeTypeError, NodeAttrError):
@@ -170,6 +180,8 @@ class SequenceTypeChecker(TypeChecker):
   def recv_elemobj(self, src):
     if self.validtypes == self.ANY: return
     for obj in src:
+      if obj in self.elemdone: continue
+      self.elemdone.add(obj)
       for typeobj in self.validtypes:
         if obj.is_type(typeobj): break
       else:
@@ -184,6 +196,8 @@ class KeyValueTypeChecker(TypeChecker):
   
   def __init__(self, parent_frame, keys, values, blame=None):
     self.validkeys = CompoundTypeNode()
+    self.keydone = set()
+    self.valuedone = set()
     for obj in keys:
       obj.connect(self.validkeys)
     TypeChecker.__init__(self, parent_frame, values, blame=blame)
@@ -192,6 +206,8 @@ class KeyValueTypeChecker(TypeChecker):
   def recv(self, src):
     from aggregate_types import DictObject
     for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
       if isinstance(obj, DictObject):
         obj.key.connect(self, self.recv_key)
         obj.value.connect(self, self.recv_value)
@@ -202,6 +218,8 @@ class KeyValueTypeChecker(TypeChecker):
   
   def recv_key(self, src):
     for obj in src:
+      if obj in self.keydone: continue
+      self.keydone.add(obj)
       if typeobj in self.validkeys:
         if obj.is_type(typeobj):
           self.update_type(obj)
@@ -213,6 +231,8 @@ class KeyValueTypeChecker(TypeChecker):
 
   def recv_value(self, src):
     for obj in src:
+      if obj in self.valuedone: continue
+      self.valuedone.add(obj)
       if typeobj in self.validtypes:
         if obj.is_type(typeobj):
           self.update_type(obj)

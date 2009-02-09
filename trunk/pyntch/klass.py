@@ -38,24 +38,26 @@ class ClassType(BuiltinType, TreeReporter):
   ##
   class ClassAttr(MustBeDefinedNode):
 
-    def __init__(self, name, klass, bases):
+    def __init__(self, name, klass, baseklass=None):
       self.name = name
       self.klass = klass
-      self.bases = bases
       self.called = False
       self.args = []
       self.kwargs = {}
+      self.done = set()
       self.retval = CompoundTypeNode()
       MustBeDefinedNode.__init__(self)
-      for base in bases:
-        base.connect(self, self.recv_base)
+      if baseklass:
+        baseklass.connect(self, self.recv_baseklass)
       return
 
     def __repr__(self):
       return '%r.%s' % (self.klass, self.name)
 
-    def recv_base(self, src):
+    def recv_baseklass(self, src):
       for klass in src:
+        if klass in self.done: continue
+        self.done.add(klass)
         try:
           klass.get_attr(self.name).connect(self)
         except NodeAttrError:
@@ -106,24 +108,24 @@ class ClassType(BuiltinType, TreeReporter):
     self.name = name
     self.bases = bases
     self.loc = loc
+    self.attrs = {}
     self.boundmethods = {}
+    self.baseklass = CompoundTypeNode()
+    self.frames = set()
     self.space = Namespace(parent_space, name)
     if code:
       self.space.register_names(code)
       build_stmt(self, parent_frame, self.space, code, evals)
-    self.attrs = {}
     BuiltinType.__init__(self)
     for (name,var) in self.space:
       # Do not inherit attributes from the base class
       # if they are explicitly overriden.
-      attr = self.ClassAttr(name, self, [])
+      attr = self.ClassAttr(name, self)
       var.connect(attr)
       self.attrs[name] = attr
     self.instance = InstanceObject(self)
-    self.baseklass = CompoundTypeNode()
     for base in bases:
       base.connect(self.baseklass)
-    self.frames = set()
     return
 
   def __repr__(self):
@@ -193,27 +195,17 @@ class InstanceObject(BuiltinObject):
   
   ##  InstanceAttr
   ##
-  class InstanceAttr(CompoundTypeNode):
+  class InstanceAttr(ClassType.ClassAttr):
 
-    def __init__(self, name, klass, instance):
-      self.name = name
-      self.klass = klass
+    def __init__(self, name, instance):
       self.instance = instance
       self.processed = set()
-      CompoundTypeNode.__init__(self)
-      self.klass.connect(self, self.recv_klass)
+      ClassType.ClassAttr.__init__(self, name, instance.klass, instance.klass.baseklass)
+      instance.klass.connect(self, self.recv_baseklass)
       return
 
     def __repr__(self):
       return '%r.%s' % (self.instance, self.name)
-
-    def recv_klass(self, src):
-      for obj in src:
-        try:
-          obj.get_attr(self.name).connect(self)
-        except NodeAttrError:
-          pass
-      return
 
     def recv(self, src):
       from function import FuncType, StaticMethodType, ClassMethodType 
@@ -227,6 +219,7 @@ class InstanceObject(BuiltinObject):
         elif isinstance(obj, FuncType):
           obj = self.instance.bind_func(obj)
         self.update_type(obj)
+      self.update_calls()
       return
     
   def __init__(self, klass):
@@ -252,7 +245,7 @@ class InstanceObject(BuiltinObject):
 
   def get_attr(self, name, write=False):
     if name not in self.attrs:
-      attr = self.InstanceAttr(name, self.klass, self)
+      attr = self.InstanceAttr(name, self)
       self.attrs[name] = attr
     else:
       attr = self.attrs[name]

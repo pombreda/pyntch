@@ -124,11 +124,14 @@ class IntType(NumberType, BuiltinConstCallable):
     
     def __init__(self, frame):
       self.frame = frame
+      self.done = set()
       CompoundTypeNode.__init__(self)
       return
     
     def recv(self, src):
       for obj in src:
+        if obj in self.done: continue
+        self.done.add(obj)
         if obj.is_type(BaseStringType.get_typeobj()):
           self.frame.raise_expt(ValueErrorType.maybe('might be conversion error.'))
         elif obj.is_type(NumberType.get_typeobj(), BoolType.get_typeobj()):
@@ -302,11 +305,14 @@ class BaseStringType(BuiltinBasicType, BuiltinConstCallable):
     
     def __init__(self, frame):
       self.frame = frame
+      self.done = set()
       CompoundTypeNode.__init__(self)
       return
     
     def recv(self, src):
       for obj in src:
+        if obj in self.done: continue
+        self.done.add(obj)
         if obj.is_type(InstanceType.get_typeobj()):
           value = obj.get_attr('__str__').optcall(self.frame, (), {})
           value.connect(TypeChecker(self.frame, BaseStringType.get_typeobj(), 
@@ -396,7 +402,7 @@ class FileType(BuiltinBasicType, BuiltinConstCallable):
   
   def __init__(self):
     BuiltinBasicType.__init__(self)
-    BuiltinConstCallable.__init__(self, 'file', self,
+    BuiltinConstCallable.__init__(self, 'file', FileType.get_object(),
                                   [StrType], [StrType, IntType],
                                   [IOErrorType.maybe('might not able to open a file.')])
     return
