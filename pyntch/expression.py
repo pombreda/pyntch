@@ -13,6 +13,7 @@ class FunCall(CompoundTypeNode, ExecutionFrame):
     self.func = func
     self.args = args
     self.kwargs = kwargs
+    self.done = set()
     CompoundTypeNode.__init__(self)
     ExecutionFrame.__init__(self, parent_frame, loc)
     func.connect(self, self.recv_func)
@@ -25,6 +26,8 @@ class FunCall(CompoundTypeNode, ExecutionFrame):
 
   def recv_func(self, src):
     for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
       try:
         obj.call(self, self.args, self.kwargs).connect(self)
       except NodeTypeError:
@@ -39,6 +42,7 @@ class AttrRef(MustBeDefinedNode):
   def __init__(self, parent_frame, loc, target, attrname):
     self.target = target
     self.attrname = attrname
+    self.done = set()
     MustBeDefinedNode.__init__(self, parent_frame, loc)
     target.connect(self, self.recv_target)
     return
@@ -48,6 +52,8 @@ class AttrRef(MustBeDefinedNode):
 
   def recv_target(self, src):
     for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
       try:
         obj.get_attr(self.attrname).connect(self)
       except NodeAttrError:
@@ -69,6 +75,7 @@ class AttrAssign(CompoundTypeNode, ExecutionFrame):
     self.target = target
     self.attrname = attrname
     self.value = value
+    self.done = set()
     CompoundTypeNode.__init__(self)
     ExecutionFrame.__init__(self, parent_frame, loc)
     target.connect(self, self.recv_target)
@@ -79,6 +86,8 @@ class AttrAssign(CompoundTypeNode, ExecutionFrame):
 
   def recv_target(self, src):
     for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
       try:
         self.value.connect(obj.get_attr(self.attrname, write=True))
       except (NodeAttrError, NodeTypeError):
@@ -253,6 +262,8 @@ class CompareOp(CompoundTypeNode, ExecutionFrame):
     '>=': '__ge__',
     '<': '__lt__',
     '>': '__gt__',
+    'in': '__contains__',
+    'not in': '__contains__',
     }
   
   def __init__(self, parent_frame, loc, op, left, right):
@@ -275,7 +286,7 @@ class CompareOp(CompoundTypeNode, ExecutionFrame):
     for lobj in left:
       try:
         lobj.get_attr(self.LMETHOD[self.op]).optcall(self, [self.right], {})
-      except (NodeAttrError, NodeTypeError):
+      except (NodeAttrError, NodeTypeError, KeyError):
         pass
     return
   def recv_right(self, right):
@@ -283,7 +294,7 @@ class CompareOp(CompoundTypeNode, ExecutionFrame):
       try:
         #robj.get_attr(self.RMETHOD[self.op]).call(self, [self.left], {})
         pass
-      except (NodeAttrError, NodeTypeError):
+      except (NodeAttrError, NodeTypeError, KeyError):
         pass
     return
 
@@ -353,6 +364,7 @@ class SubRef(CompoundTypeNode, ExecutionFrame):
   def __init__(self, parent_frame, loc, target, subs):
     self.target = target
     self.subs = subs
+    self.done = set()
     CompoundTypeNode.__init__(self)
     ExecutionFrame.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
@@ -363,6 +375,8 @@ class SubRef(CompoundTypeNode, ExecutionFrame):
 
   def recv_target(self, src):
     for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
       try:
         obj.get_element(self, self.subs).connect(self)
       except NodeTypeError:
@@ -378,6 +392,7 @@ class SubAssign(CompoundTypeNode, ExecutionFrame):
     self.target = target
     self.subs = subs
     self.value = value
+    self.done = set()
     CompoundTypeNode.__init__(self)
     ExecutionFrame.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
@@ -388,6 +403,8 @@ class SubAssign(CompoundTypeNode, ExecutionFrame):
 
   def recv_target(self, src):
     for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
       try:
         self.value.connect(obj.get_element(self, self.subs, write=True))
       except NodeTypeError:
@@ -401,6 +418,7 @@ class IterRef(CompoundTypeNode, ExecutionFrame):
   
   def __init__(self, parent_frame, loc, target):
     self.target = target
+    self.done = set()
     CompoundTypeNode.__init__(self)
     ExecutionFrame.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
@@ -411,6 +429,8 @@ class IterRef(CompoundTypeNode, ExecutionFrame):
 
   def recv_target(self, src):
     for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
       try:
         obj.get_seq(self).connect(self)
       except (NodeTypeError, NodeAttrError):
@@ -426,6 +446,7 @@ class SliceRef(CompoundTypeNode, ExecutionFrame):
     self.target = target
     self.lower = lower
     self.upper = upper
+    self.done = set()
     CompoundTypeNode.__init__(self)
     ExecutionFrame.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
@@ -444,6 +465,8 @@ class SliceRef(CompoundTypeNode, ExecutionFrame):
   def recv_target(self, src):
     from aggregate_types import TupleType, ListType, TupleObject
     for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
       try:
         obj.get_element(self, [self.lower, self.upper])
         # if an element can be retrieved from the object,
@@ -463,6 +486,7 @@ class SliceAssign(CompoundTypeNode, ExecutionFrame):
     self.lower = lower
     self.upper = upper
     self.value = value
+    self.done = set()
     CompoundTypeNode.__init__(self)
     ExecutionFrame.__init__(self, parent_frame, loc)
     self.target.connect(self, self.recv_target)
@@ -473,6 +497,8 @@ class SliceAssign(CompoundTypeNode, ExecutionFrame):
 
   def recv_target(self, src):
     for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
       try:
         self.value.get_seq(self).connect(obj.get_element(self, [self.lower, self.upper], write=True))
       except (NodeTypeError, NodeAttrError):
@@ -501,6 +527,7 @@ class TupleUnpack(CompoundTypeNode, ExecutionFrame):
   def __init__(self, parent_frame, loc, tupobj, nelements):
     self.tupobj = tupobj
     self.elements = [ self.Element(self, i) for i in xrange(nelements) ]
+    self.done = set()
     CompoundTypeNode.__init__(self)
     ExecutionFrame.__init__(self, parent_frame, loc)
     self.tupobj.connect(self, self.recv_tupobj)
@@ -516,6 +543,8 @@ class TupleUnpack(CompoundTypeNode, ExecutionFrame):
     from aggregate_types import TupleType
     assert src is self.tupobj
     for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
       if obj.is_type(TupleType.get_typeobj()) and obj.elements != None:
         if len(obj.elements) != len(self.elements):
           self.raise_expt(ValueErrorType.occur('tuple unpackable: len(%r) != %r' % (obj, len(self.elements))))

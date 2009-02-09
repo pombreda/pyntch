@@ -210,12 +210,15 @@ class IterFunc(BuiltinFunc):
     def __init__(self, frame, obj):
       self.frame = frame
       self.iterobj = IterType.create_iter()
+      self.done = set()
       CompoundTypeNode.__init__(self, [self.iterobj])
       obj.connect(self, self.recv_elem)
       return
     
     def recv_elem(self, src):
       for obj in src:
+        if obj in self.done: continue
+        self.done.add(obj)
         try:
           obj.get_iter(self.frame).connect(self.iterobj.elemall)
         except (NodeTypeError, NodeAttrError):

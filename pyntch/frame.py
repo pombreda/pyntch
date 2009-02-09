@@ -42,6 +42,7 @@ class ExecutionFrame(object):
     
     def __init__(self, frame):
       self.frame = frame
+      self.done = set()
       CompoundTypeNode.__init__(self)
       return
 
@@ -50,6 +51,8 @@ class ExecutionFrame(object):
     
     def recv(self, src):
       for obj in src:
+        if obj in self.done: continue
+        self.done.add(obj)
         assert isinstance(obj, TracebackObject), obj
         if not obj.loc: obj.loc = self.frame.loc
         self.update_type(obj)
@@ -96,12 +99,15 @@ class ExceptionCatcher(ExecutionFrame):
     def __init__(self, catcher):
       self.catcher = catcher
       self.handlers = {}
+      self.done = set()
       CompoundTypeNode.__init__(self)
       return
     
     def recv(self, src):
       if self.catcher.catchall: return
       for obj in src:
+        if obj in self.done: continue
+        self.done.add(obj)
         assert isinstance(obj, TracebackObject), obj
         for expt in obj.expt:
           try:
@@ -121,9 +127,9 @@ class ExceptionCatcher(ExecutionFrame):
       return
 
   def __init__(self, parent):
-    self.done = set()
     self.annotator = self.ExceptionFilter(self)
     self.vars = {}
+    self.done = set()
     self.catchall = False
     return
   
@@ -146,6 +152,8 @@ class ExceptionCatcher(ExecutionFrame):
   def recv_handler_expt(self, src):
     from aggregate_types import TupleType
     for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
       if obj.is_type(TupleType.get_typeobj()):
         self.annotator.catch(obj.elemall, self.vars[src])
       else:
@@ -162,6 +170,7 @@ class ExceptionMaker(CompoundTypeNode, ExecutionFrame):
   def __init__(self, parent, exctype, excargs):
     self.exctype = exctype
     self.excargs = excargs
+    self.done = set()
     CompoundTypeNode.__init__(self)
     ExecutionFrame.__init__(self, parent=parent)
     exctype.connect(self, self.recv_type)
@@ -173,6 +182,8 @@ class ExceptionMaker(CompoundTypeNode, ExecutionFrame):
   def recv_type(self, src):
     from klass import ClassType
     for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
       # Instantiate an object only if it is a class object.
       # Otherwise, just return the object given.
       if isinstance(obj, ClassType):
