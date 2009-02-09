@@ -441,10 +441,11 @@ class IterRef(CompoundTypeNode, ExecutionFrame):
 ##
 class SliceRef(CompoundTypeNode, ExecutionFrame):
   
-  def __init__(self, parent_frame, loc, target, lower, upper):
+  def __init__(self, parent_frame, loc, target, lower, upper, step=None):
     self.target = target
     self.lower = lower
     self.upper = upper
+    self.step = step
     self.done = set()
     CompoundTypeNode.__init__(self)
     ExecutionFrame.__init__(self, parent_frame, loc)
@@ -502,6 +503,15 @@ class SliceAssign(CompoundTypeNode, ExecutionFrame):
         self.value.get_seq(self).connect(obj.get_element(self, [self.lower, self.upper], write=True))
       except (NodeTypeError, NodeAttrError):
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
+    return
+
+
+class SliceObject(CompoundTypeNode, ExecutionFrame):
+  
+  def __init__(self, parent_frame, loc, nodes):
+    self.nodes = nodes
+    CompoundTypeNode.__init__(self)
+    ExecutionFrame.__init__(self, parent_frame, loc)
     return
 
 
