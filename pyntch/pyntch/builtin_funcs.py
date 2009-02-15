@@ -209,9 +209,8 @@ class IterFunc(BuiltinFunc):
     
     def __init__(self, frame, obj):
       self.frame = frame
-      self.iterobj = IterType.create_iter()
       self.done = set()
-      CompoundTypeNode.__init__(self, [self.iterobj])
+      CompoundTypeNode.__init__(self)
       obj.connect(self, self.recv_elem)
       return
     
@@ -220,7 +219,7 @@ class IterFunc(BuiltinFunc):
         if obj in self.done: continue
         self.done.add(obj)
         try:
-          obj.get_iter(self.frame).connect(self.iterobj.elemall)
+          obj.get_iter(self.frame).connect(self)
         except (NodeTypeError, NodeAttrError):
           self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
       return

@@ -7,13 +7,24 @@ class A(object):
     return
   
   def __repr__(self):
-    return '<A:%r>' % self.x
+    return '<%r>' % self.x
+  
+  def __str__(self):
+    return 123
   
   def __eq__(self, a):
-    print '__eq__', self, a
     return self.x == a.x
 
-a = A(1)
-b = A(1)
+  def __add__(self, obj):
+    return 123
+
+  def __iter__(self):
+    return iter([1])
+  
+
+a = A('a')
+b = A('a')
 print a
-print a == b
+c = (a == b)
+d = (a + b)
+e = list(a)

@@ -8,3 +8,5 @@ def bar():
     foo(1,'a')
   except ValueError:
     pass
+
+bar()

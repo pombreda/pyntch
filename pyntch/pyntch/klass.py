@@ -102,27 +102,14 @@ class ClassType(BuiltinType, TreeReporter):
     def check_undefined(self):
       return
 
-  def __init__(self, parent_reporter, parent_frame, parent_space, name, bases, code, evals, loc):
-    TreeReporter.__init__(self, parent_reporter, name)
-    from syntax import build_stmt
+  def __init__(self, name, bases):
     self.name = name
     self.bases = bases
-    self.loc = loc
     self.attrs = {}
     self.boundmethods = {}
     self.baseklass = CompoundTypeNode()
     self.frames = set()
-    self.space = Namespace(parent_space, name)
-    if code:
-      self.space.register_names(code)
-      build_stmt(self, parent_frame, self.space, code, evals)
     BuiltinType.__init__(self)
-    for (name,var) in self.space:
-      # Do not inherit attributes from the base class
-      # if they are explicitly overriden.
-      attr = self.ClassAttr(name, self)
-      var.connect(attr)
-      self.attrs[name] = attr
     self.instance = InstanceObject(self)
     for base in bases:
       base.connect(self.baseklass)
@@ -130,9 +117,6 @@ class ClassType(BuiltinType, TreeReporter):
 
   def __repr__(self):
     return ('<class %s>' % self.fullname())
-
-  def fullname(self):
-    return self.space.fullname()
   
   def get_type(self):
     return self
@@ -167,6 +151,28 @@ class ClassType(BuiltinType, TreeReporter):
     self.frames.add(frame)
     self.get_attr('__init__').optcall(frame, (self.instance,)+args, kwargs)
     return self.instance
+  
+class PythonClassType(ClassType, TreeReporter):
+  
+  def __init__(self, parent_reporter, parent_frame, parent_space, name, bases, code, evals, loc):
+    TreeReporter.__init__(self, parent_reporter, name)
+    ClassType.__init__(self, name, bases)
+    from syntax import build_stmt
+    self.loc = loc
+    self.space = Namespace(parent_space, name)
+    if code:
+      self.space.register_names(code)
+      build_stmt(self, parent_frame, self.space, code, evals)
+    for (name,var) in self.space:
+      # Do not inherit attributes from the base class
+      # if they are explicitly overriden.
+      attr = self.ClassAttr(name, self)
+      var.connect(attr)
+      self.attrs[name] = attr
+    return
+
+  def fullname(self):
+    return self.space.fullname()
   
   def show(self, p):
     p('### %s(%s)' % (self.loc._module.get_loc(), self.loc.lineno))
@@ -221,12 +227,13 @@ class InstanceObject(BuiltinObject):
         self.update_type(obj)
       self.update_calls()
       return
-    
+
+  #
   def __init__(self, klass):
     self.klass = klass
     self.attrs = {}
     self.boundmethods = {}
-    SimpleTypeNode.__init__(self, self)
+    BuiltinObject.__init__(self, klass)
     for (name, value) in klass.attrs.iteritems():
       value.connect(self.get_attr(name))
     return
@@ -237,12 +244,6 @@ class InstanceObject(BuiltinObject):
   def get_type(self):
     return self.klass
 
-  def is_type(self, *typeobjs):
-    for typeobj in typeobjs:
-      if isinstance(typeobj, ClassType):
-        return self.klass.is_subclass(typeobj)
-    return BuiltinObject.is_type(self, *typeobjs)
-
   def get_attr(self, name, write=False):
     if name not in self.attrs:
       attr = self.InstanceAttr(name, self)
@@ -251,6 +252,9 @@ class InstanceObject(BuiltinObject):
       attr = self.attrs[name]
     return attr
 
+  def get_iter(self, frame):
+    return self.get_attr('__iter__').optcall(frame, [], {})
+  
   def bind_func(self, func):
     if func not in self.boundmethods:
       method = BoundMethodType(self, func)

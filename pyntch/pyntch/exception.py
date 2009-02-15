@@ -2,9 +2,9 @@
 import sys
 stderr = sys.stderr
 
-from compiler import ast
 from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, \
      BuiltinType, BuiltinObject
+from klass import ClassType, InstanceObject
 
 
 ##  ExceptionType
@@ -14,33 +14,27 @@ from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeTypeError, 
 ##  throughout the entire program so we define it here for a
 ##  convenience.
 ##
-class ExceptionObject(BuiltinObject):
+class ExceptionObject(InstanceObject):
 
-  def __init__(self, typeobj, message, args=None):
-    self.typeobj = typeobj
+  def __init__(self, klass, message=None):
     self.message = message
-    self.args = args
-    SimpleTypeNode.__init__(self, typeobj)
+    InstanceObject.__init__(self, klass)
     return
 
   def __repr__(self):
-    return '<%s: %s>' % (self.get_type().get_name(), self.message)
-
-  def get_attr(self, name, write=False):
-    from basic_types import StrType
-    if name == 'args':
-      return self.args # XXX None is returned.
-    if name == 'message':
-      return StrType.get_object()
-    raise NodeAttrError(name)
+    return '<%s: %s>' % (self.klass.get_name(), self.message)
 
 
 ##  ExceptionType
 ##
-class ExceptionType(BuiltinType):
+class ExceptionType(ClassType):
 
   TYPE_NAME = 'Exception'
   OBJECTS = {}
+
+  def __init__(self):
+    ClassType.__init__(self, self.TYPE_NAME, [])
+    return
 
   @classmethod
   def occur(klass, message):

@@ -262,7 +262,7 @@ class Namespace(object):
       self.register_names(tree.expr)
       for (_,node) in tree.ops:
         self.register_names(node)
-    elif isinstance(tree, (ast.UnaryAdd, ast.UnarySub)):
+    elif isinstance(tree, (ast.UnaryAdd, ast.UnarySub, ast.Invert)):
       self.register_names(tree.expr)
     elif isinstance(tree, (ast.And, ast.Or,
                            ast.Bitand, ast.Bitor, ast.Bitxor)):

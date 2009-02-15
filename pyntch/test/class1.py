@@ -1,7 +1,8 @@
 #!/usr/bin/env python
+
 class A(object):
-  
   a = 1
+  #b = 2
   
   def __init__(self, x):
     self.x = x
@@ -15,4 +16,4 @@ class A(object):
 
 p = A(123)
 q = p.foo('456')
-r = p.zzz
+r = p.zzz # AttributeError

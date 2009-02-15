@@ -101,12 +101,13 @@ class AttrAssign(CompoundTypeNode, ExecutionFrame):
 class BinaryOp(MustBeDefinedNode):
   
   def __init__(self, parent_frame, loc, op, left, right):
+    assert op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power',
+                  'Bitand','Bitor','Bitxor','RightShift','LeftShift')
     self.op = op
     self.left = left
     self.right = right
     self.done = set()
     self.tupleobj = self.listobj = None
-    CompoundTypeNode.__init__(self)
     MustBeDefinedNode.__init__(self, parent_frame, loc)
     left.connect(self, self.recv_left)
     right.connect(self, self.recv_right)
@@ -120,21 +121,54 @@ class BinaryOp(MustBeDefinedNode):
       for robj in self.right:
         self.update_op(lobj, robj)
     return
+  
   def recv_right(self, right):
     for lobj in self.left:
       for robj in right:
         self.update_op(lobj, robj)
     return
 
+  LMETHOD = {
+    'Add': '__add__',
+    'Sub': '__sub__',
+    'Mul': '__mul__',
+    'Div': '__div__',
+    'Mod': '__mod__',
+    'FloorDiv': '__floordiv__',
+    'Power': '__pow__',
+    'Bitand': '__and__',
+    'Bitor': '__or__',
+    'Bitxor': '__xor__',
+    'RightShift': '__rshift__',
+    'LeftShift': '__lshift__',
+    }
+
+  RMETHOD = {
+    'Add': '__radd__',
+    'Sub': '__rsub__',
+    'Mul': '__rmul__',
+    'Div': '__rdiv__',
+    'Mod': '__rmod__',
+    'FloorDiv': '__rfloordiv__',
+    'Power': '__rpow__',
+    'Bitand': '__rand__',
+    'Bitor': '__ror__',
+    'Bitxor': '__rxor__',
+    'RightShift': '__rrshift__',
+    'LeftShift': '__rlshift__',
+    }
+  
   VALID_TYPES = {
     ('str', 'Mul', 'int'): 'str',
     ('int', 'Mul', 'str'): 'str',
     ('unicode', 'Mul', 'int'): 'unicode',
     ('int', 'Mul', 'unicode'): 'unicode',
     }
+
   def update_op(self, lobj, robj):
     from basic_types import NumberType, IntType, BaseStringType, BUILTIN_OBJECT
     from aggregate_types import ListType, ListObject, TupleType
+    from klass import InstanceObject
     if (lobj,robj) in self.done: return
     self.done.add((lobj,robj))
     # special handling for a formatting (%) operator
@@ -146,7 +180,7 @@ class BinaryOp(MustBeDefinedNode):
       return
     # for numeric operation, the one with a higher rank is chosen.
     if (lobj.is_type(NumberType.get_typeobj()) and robj.is_type(NumberType.get_typeobj()) and
-        self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power')):
+        self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power','LeftShift','RightShift')):
       if ltype.get_rank() < rtype.get_rank():
         robj.connect(self)
       else:
@@ -198,14 +232,23 @@ class BinaryOp(MustBeDefinedNode):
     if k in self.VALID_TYPES:
       BUILTIN_OBJECT[self.VALID_TYPES[k]].connect(self)
       return
-    # XXX handle optional methods
-    self.raise_expt(TypeErrorType.occur(
-      'unsupported operand %s for %r and %r' % (self.op, lobj, robj)))
+    # Handle optional methods.
+    if isinstance(lobj, InstanceObject):
+      try:
+        lobj.get_attr(self.LMETHOD[self.op]).optcall(self, [robj], {}).connect(self)
+      except (NodeAttrError, NodeTypeError):
+        pass
+    if isinstance(robj, InstanceObject):
+      try:
+        robj.get_attr(self.RMETHOD[self.op]).optcall(self, [lobj], {}).connect(self)
+      except (NodeAttrError, NodeTypeError):
+        pass
     return
   
   def check_undefined(self):
     if not self.types:
-      self.raise_expt(TypeErrorType.occur('unsupported operand %s for %r and %r' % (self.op, self.left, self.right)))
+      self.raise_expt(TypeErrorType.occur('unsupported operand %s for %s and %s' %
+                                          (self.op, self.left.describe(), self.right.describe())))
     return
 
 
@@ -224,6 +267,8 @@ class AssignOp(BinaryOp):
     '&=': 'Bitand',
     '|=': 'Bitor',
     '^=': 'Bitxor',
+    '>>=': 'RightShift',
+    '<<=': 'LeftShift',
     }
   
   def __init__(self, parent_frame, loc, op, left, right):
@@ -234,22 +279,40 @@ class AssignOp(BinaryOp):
 
 ##  UnaryOp
 ##
-class UnaryOp(CompoundTypeNode, ExecutionFrame):
+class UnaryOp(MustBeDefinedNode):
+
+  METHOD = {
+    'UnaryAdd': '__pos__',
+    'UnarySub': '__neg__',
+    'Invert': '__invert__',
+    }
   
   def __init__(self, parent_frame, loc, op, value):
     self.value = value
-    if op == 'UnaryAdd':
-      self.op = '+'
-    else:
-      self.op = '-'
-    CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent_frame, loc)
-    self.value.connect(self) # XXX handle optional methods
+    self.op = op
+    self.done = set()
+    MustBeDefinedNode.__init__(self, parent_frame, loc)
+    value.connect(self, self.recv_value)
     return
   
   def __repr__(self):
-    return '%s%r' % (self.op, self.value)
+    return '%s(%r)' % (self.op, self.value)
   
+  def recv_value(self, src):
+    from basic_types import NumberType
+    from klass import InstanceObject
+    for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
+      if obj.is_type(NumberType.get_typeobj()):
+        obj.connect(self)
+      elif isinstance(obj, InstanceObject):
+        try:
+          obj.get_attr(self.METHOD[self.op]).optcall(self, [], {}).connect(self)
+        except (NodeAttrError, NodeTypeError):
+          pass
+    return
+
 
 ##  CompareOp
 ##
@@ -275,26 +338,21 @@ class CompareOp(CompoundTypeNode, ExecutionFrame):
     CompoundTypeNode.__init__(self, [BoolType.get_object()])
     ExecutionFrame.__init__(self, parent_frame, loc)
     left.connect(self, self.recv_left)
-    right.connect(self, self.recv_right)
     return
   
   def __repr__(self):
     return '%s(%r,%r)' % (self.op, self.left, self.right)
 
   def recv_left(self, left):
+    from klass import InstanceObject
     for lobj in left:
-      try:
-        lobj.get_attr(self.LMETHOD[self.op]).optcall(self, [self.right], {})
-      except (NodeAttrError, NodeTypeError, KeyError):
-        pass
-    return
-  def recv_right(self, right):
-    for robj in self.right:
-      try:
-        #robj.get_attr(self.RMETHOD[self.op]).call(self, [self.left], {})
-        pass
-      except (NodeAttrError, NodeTypeError, KeyError):
-        pass
+      if lobj in self.done: continue
+      self.done.add(lobj)
+      if isinstance(lobj, InstanceObject):
+        try:
+          lobj.get_attr(self.LMETHOD[self.op]).optcall(self, [self.right], {})
+        except (NodeAttrError, NodeTypeError):
+          pass
     return
 
 
