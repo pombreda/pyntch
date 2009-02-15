@@ -48,8 +48,6 @@ class PythonModuleObject(ModuleObject, TreeReporter, ExecutionFrame):
     build_stmt(self, self, self.space, tree, evals, isfuncdef=True)
     return
 
-  def get_name(self):
-    return self.name
   def get_path(self):
     return self.path
   get_loc = get_path

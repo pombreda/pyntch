@@ -4,7 +4,7 @@ from compiler import ast
 from typenode import TypeNode, UndefinedTypeNode, CompoundTypeNode
 from frame import ExecutionFrame, ExceptionCatcher, ExceptionMaker
 from exception import TypeChecker, NameErrorType, RuntimeErrorType
-from klass import ClassType
+from klass import PythonClassType
 from function import FuncType, LambdaFuncType
 from expression import AttrAssign, AttrRef, SubAssign, SubRef, IterRef, SliceAssign, SliceRef, SliceObject, \
      FunCall, BinaryOp, CompareOp, BooleanOp, AssignOp, UnaryOp, NotOp, IfExpOp, TupleUnpack
@@ -35,7 +35,7 @@ def build_assign(reporter, frame, space, n, v, evals):
       upper = build_expr(reporter, frame, space, n.upper, evals)
     SliceAssign(frame, n, obj, lower, upper, v)
   else:
-    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (n, n._module.get_name(), n.lineno))
+    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (n, n._module.get_loc(), n.lineno))
   return
 
 
@@ -132,8 +132,8 @@ def build_expr(reporter, frame, space, tree, evals):
       expr = CompareOp(frame, tree, op, left, right)
       left = right
 
-  # +,-
-  elif isinstance(tree, (ast.UnaryAdd, ast.UnarySub)):
+  # +,-,~
+  elif isinstance(tree, (ast.UnaryAdd, ast.UnarySub, ast.Invert)):
     op = tree.__class__.__name__
     value = build_expr(reporter, frame, space, tree.expr, evals)
     expr = UnaryOp(frame, tree, op, value)
@@ -255,7 +255,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, ast.Class):
     name = tree.name
     bases = [ build_expr(reporter, frame, space, base, evals) for base in tree.bases ]
-    klass = ClassType(reporter, frame, space, name, bases, tree.code, evals, tree)
+    klass = PythonClassType(reporter, frame, space, name, bases, tree.code, evals, tree)
     space[name].bind(klass)
 
   # assign
@@ -356,7 +356,8 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, (ast.Print, ast.Printnl)):
     for node in tree.nodes:
       value = build_expr(reporter, frame, space, node, evals)
-      value.connect(StrType.StrConvChecker(frame))
+      locframe = ExecutionFrame(frame, node)
+      value.connect(StrType.StrConvChecker(locframe))
 
   # discard
   elif isinstance(tree, ast.Discard):

@@ -8,7 +8,7 @@ from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeAttrError, 
 from exception import TypeChecker, SequenceTypeChecker
 from exception import TypeErrorType, ValueErrorType, IndexErrorType, IOErrorType, EOFErrorType, \
      UnicodeDecodeErrorType, UnicodeEncodeErrorType
-from klass import InstanceType
+from klass import InstanceObject
 
 ANY = TypeChecker.ANY
 
@@ -148,7 +148,7 @@ class IntType(NumberType, BuiltinConstCallable):
 
   def __init__(self):
     BuiltinBasicType.__init__(self)
-    BuiltinConstCallable.__init__(self, 'int', IntType.get_object(), [], [ANY, IntType])
+    BuiltinConstCallable.__init__(self, 'int', self.get_object(), [], [ANY, IntType])
     return
   
 class LongObject(BuiltinObject): pass
@@ -313,7 +313,7 @@ class BaseStringType(BuiltinBasicType, BuiltinConstCallable):
       for obj in src:
         if obj in self.done: continue
         self.done.add(obj)
-        if obj.is_type(InstanceType.get_typeobj()):
+        if isinstance(obj, InstanceObject):
           value = obj.get_attr('__str__').optcall(self.frame, (), {})
           value.connect(TypeChecker(self.frame, BaseStringType.get_typeobj(), 
                                     'the return value of __str__ method'))
@@ -350,7 +350,7 @@ class StrType(BaseStringType):
     
   def __init__(self):
     BuiltinBasicType.__init__(self)
-    BuiltinConstCallable.__init__(self, 'str', self, [], [ANY])
+    BuiltinConstCallable.__init__(self, 'str', self.get_object(), [], [ANY])
     return
 
 class UnicodeObject(BaseStringObject): pass
@@ -377,7 +377,7 @@ class UnicodeType(BaseStringType):
 
   def __init__(self):
     BuiltinBasicType.__init__(self)
-    BuiltinConstCallable.__init__(self, 'unicode', self, [], [ANY])
+    BuiltinConstCallable.__init__(self, 'unicode', self.get_object(), [], [ANY])
     return
   
 
@@ -402,7 +402,7 @@ class FileType(BuiltinBasicType, BuiltinConstCallable):
   
   def __init__(self):
     BuiltinBasicType.__init__(self)
-    BuiltinConstCallable.__init__(self, 'file', FileType.get_object(),
+    BuiltinConstCallable.__init__(self, 'file', self.get_object(),
                                   [StrType], [StrType, IntType],
                                   [IOErrorType.maybe('might not able to open a file.')])
     return
@@ -473,7 +473,7 @@ class ObjectType(BuiltinBasicType, BuiltinConstCallable):
   
   def __init__(self):
     BuiltinBasicType.__init__(self)
-    BuiltinConstCallable.__init__(self, 'object', ObjectType.get_object())
+    BuiltinConstCallable.__init__(self, 'object', self.get_object())
     return
 
 

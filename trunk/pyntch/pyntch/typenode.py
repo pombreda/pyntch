@@ -78,6 +78,8 @@ class TypeNode(object):
     frame1.add_handler(StopIterationType.occur(''))
     return self.get_iter(frame).get_attr('next').call(frame1, (), {})
   
+  def get_name(self):
+    raise NotImplementedError, self
   def desc1(self, _):
     raise NotImplementedError, self
   def describe(self):

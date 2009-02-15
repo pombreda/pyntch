@@ -4,9 +4,10 @@ def foo(x):
   class A:
     a = x
     def __init__(self):
-      self.x = x
+      self.x = str(x)
       return
   b = A()
+  print (A.a, b.x)
   return b
 
-print foo(123)
+foo(123)
