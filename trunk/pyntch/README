@@ -4,7 +4,6 @@ README
 
 # TODO:
 #  hier class types.
-#  optional method: __str__, __add__, __eq__, __iter__ etc.
 #  handle star, dstar.
 #  slice, get_element, sliceobj
 #  automatic coercion for builtin functions.

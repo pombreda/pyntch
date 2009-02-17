@@ -6,6 +6,39 @@ from exception import TypeChecker, \
 from basic_types import BuiltinCallable, BuiltinConstCallable, BoolType, IntType, StrType, NoneType, ANY
 
 
+class ElementGetter(CompoundTypeNode):
+  
+  def __init__(self, src, frame):
+    self.frame = frame
+    CompoundTypeNode.__init__(self)
+    for obj in src:
+      try:
+        obj.get_iter(frame).connect(self, self.recv_iter)
+      except (NodeTypeError, NodeAttrError):
+        self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
+    return
+
+  def recv_iter(self, src):
+    for obj in src:
+      try:
+        obj.get_attr('next').connect(self, self.recv_next)
+      except (NodeTypeError, NodeAttrError):
+        self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
+    return
+
+  def recv_next(self, src):
+    from frame import ExceptionCatcher
+    from exception import StopIterationType
+    frame1 = ExceptionCatcher(self.frame)
+    frame1.add_handler(StopIterationType.occur(''))
+    for obj in src:
+      try:
+        obj.call(frame1, (), {}).connect(self)
+      except (NodeTypeError, NodeAttrError):
+        self.frame.raise_expt(TypeErrorType.occur('%r is not callable: %r' % (src, obj)))
+    return
+  
+
 ##  BuiltinAggregateObject
 ##
 class BuiltinAggregateObject(BuiltinObject):
@@ -26,6 +59,7 @@ class BuiltinAggregateObject(BuiltinObject):
 
   def signature(self):
     return self.get_type()
+
 
 ##  BuiltinAggregateType
 ##
@@ -69,7 +103,7 @@ class BuiltinSequenceObject(BuiltinAggregateObject):
     def recv(self, src):
       for obj in src:
         try:
-          obj.get_seq(self.frame).connect(self.target.elemall)
+          ElementGetter(obj, self.frame).connect(self.target.elemall)
         except (NodeTypeError, NodeAttrError):
           self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
       return
@@ -339,19 +373,13 @@ class SetObject(BuiltinSequenceObject):
       
       def recv1(self, src):
         for obj in src:
-          try:
-            obj.get_seq(self.frame).connect(self.types1)
-          except (NodeTypeError, NodeAttrError):
-            self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
+          ElementGetter(obj, self.frame).connect(self.types1)
         self.update_intersection()
         return
       
       def recv2(self, src):
         for obj in src:
-          try:
-            obj.get_seq(self.frame).connect(self.types2)
-          except (NodeTypeError, NodeAttrError):
-            self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
+          ElementGetter(obj, self.frame).connect(self.types2)
         self.update_intersection()
         return
         
@@ -559,29 +587,23 @@ class DictObject(BuiltinAggregateObject):
     
     def recv(self, src):
       for obj in src:
-        try:
-          obj.get_seq(self.frame).connect(self, self.recv_pair)
-        except (NodeTypeError, NodeAttrError):
-          self.frame.raise_expt(TypeErrorType.occur('cannot convert to dict: %s' % obj))
+        ElementGetter(obj, self.frame).connect(self, self.recv_pair)
       return
   
     def recv_pair(self, src):
       for obj in src:
-        try:
-          if obj.is_type(TupleType.get_typeobj()) and obj.elements:
-            if len(obj.elements) == 2:
-              (k,v) = obj.elements
-              k.connect(self.target.key)
-              v.connect(self.target.value)
-            else:
-              self.frame.raise_expt(TypeErrorType.occur('cannot convert to dict: tuple length is not 2: %s' % obj))
-            continue
-          elem = obj.get_seq(self.frame)
-          elem.connect(self.target.key)
-          elem.connect(self.target.value)
-          self.frame.raise_expt(TypeErrorType.maybe('might not be able to convert to dict: %s' % obj))
-        except (NodeTypeError, NodeAttrError):
-          self.frame.raise_expt(TypeErrorType.occur('cannot convert to dict: %s' % obj))
+        if obj.is_type(TupleType.get_typeobj()) and obj.elements:
+          if len(obj.elements) == 2:
+            (k,v) = obj.elements
+            k.connect(self.target.key)
+            v.connect(self.target.value)
+          else:
+            self.frame.raise_expt(TypeErrorType.occur('cannot convert to dict: tuple length is not 2: %s' % obj))
+          continue
+        elem = ElementGetter(obj, self.frame)
+        elem.connect(self.target.key)
+        elem.connect(self.target.value)
+        self.frame.raise_expt(TypeErrorType.maybe('might not be able to convert to dict: %s' % obj))
       return
     
   # fromkeys
@@ -595,10 +617,7 @@ class DictObject(BuiltinAggregateObject):
     
     def recv(self, src):
       for obj in src:
-        try:
-          obj.get_seq(self.frame).connect(self.target.key)
-        except (NodeTypeError, NodeAttrError):
-          self.frame.raise_expt(TypeErrorType.occur('cannot convert to dict: %s' % obj))
+        ElementGetter(obj, self.frame).connect(self.target.key)
       return
 
   # dict.fromkeys
