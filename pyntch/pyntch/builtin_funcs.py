@@ -4,12 +4,13 @@
 ##  as it causes circular imports!
 
 from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, BuiltinType
+from exception import TypeChecker, SequenceTypeChecker
 from exception import TypeErrorType
 from namespace import Namespace
 from basic_types import TypeType, NumberType, BoolType, IntType, LongType, FloatType, \
      BaseStringType, StrType, UnicodeType, ANY, \
      BuiltinCallable, BuiltinConstCallable
-from aggregate_types import ListType, TupleType, IterType
+from aggregate_types import ListType, TupleType, IterType, ElementGetter
 
 
 ##  BuiltinFunc
@@ -237,3 +238,82 @@ class IterFunc(BuiltinFunc):
     self.cache = {}
     BuiltinFunc.__init__(self, 'iter', [ANY])
     return
+
+
+##  AbsFunc
+##
+class AbsFunc(BuiltinFunc):
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'abs', [NumberType])
+    return
+
+  def process_args(self, frame, args, kwargs):
+    if kwargs:
+      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
+    args[0].connect(TypeChecker(frame, [NumberType.get_typeobj()], 'arg0'))
+    return args[0]
+
+
+##  DivmodFunc
+##
+class DivmodFunc(BuiltinFunc):
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'divmod', [NumberType, NumberType])
+    return
+
+  def process_args(self, frame, args, kwargs):
+    if kwargs:
+      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
+    args[0].connect(TypeChecker(frame, [NumberType.get_typeobj()], 'arg0'))
+    args[1].connect(TypeChecker(frame, [NumberType.get_typeobj()], 'arg1'))
+    obj = CompoundTypeNode(args)
+    return TupleType.create_tuple([obj, obj])
+
+
+##  PowFunc
+##
+class PowFunc(BuiltinFunc):
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'pow', [NumberType, NumberType], [NumberType])
+    return
+
+  def process_args(self, frame, args, kwargs):
+    if kwargs:
+      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
+    args[0].connect(TypeChecker(frame, [NumberType.get_typeobj()], 'arg0'))
+    args[1].connect(TypeChecker(frame, [NumberType.get_typeobj()], 'arg1'))
+    if 3 <= len(args):
+      args[2].connect(TypeChecker(frame, [NumberType.get_typeobj()], 'arg2'))
+    return CompoundTypeNode(args)
+
+
+##  AllFunc, AnyFunc
+##
+class AllFunc(BuiltinFunc):
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'all', [ANY])
+    return
+
+  def process_args(self, frame, args, kwargs):
+    if kwargs:
+      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
+    ElementGetter(args[0], frame)
+    return BoolType.get_object()
+
+class AnyFunc(BuiltinFunc):
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'any', [ANY])
+    return
+
+  def process_args(self, frame, args, kwargs):
+    if kwargs:
+      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
+    ElementGetter(args[0], frame)
+    return BoolType.get_object()
+
+

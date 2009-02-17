@@ -108,6 +108,7 @@ class BoolType(BuiltinBasicType):
   TYPE_INSTANCE = BoolObject
 
 class NumberType(BuiltinBasicType):
+  TYPE_NAME = 'number'
   RANK = 0
   # get_rank()
   @classmethod
@@ -253,8 +254,8 @@ class BaseStringType(BuiltinBasicType, BuiltinConstCallable):
                                [BaseStringType])
     elif name == 'partition':
       return BuiltinConstCallable('str.partiion',
-                               TupleType.create_tuple([self.get_object(), self.get_object(), self.get_object()]),
-                               [BaseStringType])
+                                  TupleType.create_tuple([self.get_object(), self.get_object(), self.get_object()]),
+                                  [BaseStringType])
     elif name == 'replace':
       return BuiltinConstCallable('str.replace', self.get_object(),
                                [BaseStringType, BaseStringType], [IntType])
