@@ -58,8 +58,7 @@ class PythonModuleObject(ModuleObject, TreeReporter, ExecutionFrame):
     for (name,v) in sorted(self.space):
       if name in blocks: continue
       p('  %s = %s' % (name, v.describe()))
-    for expt in self.annotator:
-      p('  raises %r' % expt)
+    ExecutionFrame.show(self, p)
     return
   
 

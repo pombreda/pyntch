@@ -30,7 +30,7 @@ def main(argv):
     print '===', fname, '==='
     MustBeDefinedNode.reset()
     if fname.endswith('.py'):
-      module = Interpreter.load_file(fname, '__main__')
+      module = Interpreter.load_file(fname, fname[:-3])
     else:
       module = Interpreter.load_module(fname)
     MustBeDefinedNode.check()

@@ -11,15 +11,16 @@ stderr = sys.stderr
 ##
 class TracebackObject(TypeNode):
 
-  def __init__(self, expt, loc=None):
+  def __init__(self, expt):
     self.expt = expt
-    self.loc = loc
+    self.frame = None
     TypeNode.__init__(self, [self])
     return
 
   def __repr__(self):
-    if self.loc:
-      return '%s at %s(%s)' % (self.expt, self.loc._module.get_loc(), self.loc.lineno)
+    loc = self.frame.loc
+    if loc:
+      return '%s at %s(%s)' % (self.expt, loc._module.get_loc(), loc.lineno)
     else:
       return '%s at ???' % (self.expt)
 
@@ -54,17 +55,24 @@ class ExecutionFrame(object):
         if obj in self.done: continue
         self.done.add(obj)
         assert isinstance(obj, TracebackObject), obj
-        if not obj.loc: obj.loc = self.frame.loc
+        if not obj.frame: obj.frame = self.frame
         self.update_type(obj)
       return
 
   def __init__(self, parent=None, loc=None):
+    self.parent = parent
     self.loc = loc
     self.done = set()
     self.annotator = self.ExceptionAnnotator(self)
     if parent:
       self.connect_expt(parent)
     return
+
+  def getloc(self):
+    if self.loc:
+      return (self.loc._module, self.loc.lineno)
+    else:
+      return None
 
   def connect_expt(self, frame):
     assert isinstance(frame, ExecutionFrame)
@@ -85,8 +93,21 @@ class ExecutionFrame(object):
     return
 
   def show(self, p):
+    expts_here = []
+    expts_there = []
     for expt in self.annotator:
+      frame = expt.frame
+      while frame:
+        if frame == self:
+          expts_here.append(expt)
+          break
+        frame = frame.parent
+      else:
+        expts_there.append(expt)
+    for expt in sorted(expts_here, key=lambda expt:expt.frame.getloc()):
       p('  raises %r' % expt)
+    for expt in sorted(expts_there, key=lambda expt:expt.frame.getloc()):
+      p('  [raises %r]' % expt)
     return
 
 
