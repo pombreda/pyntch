@@ -161,11 +161,12 @@ class SequenceTypeChecker(TypeChecker):
     return
   
   def recv(self, src):
+    from aggregate_types import ElementGetter
     for obj in src:
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        obj.get_seq(self.parent_frame).connect(self, self.recv_elemobj)
+        ElementGetter(obj, self.parent_frame).connect(self, self.recv_elemobj)
       except (NodeTypeError, NodeAttrError):
         if self.blame:
           self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be iterable' % (self.blame, obj)))

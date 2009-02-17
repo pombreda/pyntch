@@ -28,3 +28,4 @@ print a
 c = (a == b)
 d = (a + b)
 e = list(a)
+print e

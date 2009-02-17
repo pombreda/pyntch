@@ -71,12 +71,6 @@ class TypeNode(object):
     raise NodeTypeError('not iterator')
   def call(self, frame, args, kwargs):
     raise NodeTypeError('not callable')
-  def get_seq(self, frame):
-    from frame import ExceptionCatcher
-    from exception import StopIterationType
-    frame1 = ExceptionCatcher(frame)
-    frame1.add_handler(StopIterationType.occur(''))
-    return self.get_iter(frame).get_attr('next').call(frame1, (), {})
   
   def get_name(self):
     raise NotImplementedError, self

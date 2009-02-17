@@ -351,7 +351,7 @@ class CompareOp(CompoundTypeNode, ExecutionFrame):
       if isinstance(lobj, InstanceObject):
         try:
           lobj.get_attr(self.LMETHOD[self.op]).optcall(self, [self.right], {})
-        except (NodeAttrError, NodeTypeError):
+        except (KeyError, NodeAttrError, NodeTypeError):
           pass
     return
 
@@ -485,13 +485,11 @@ class IterRef(CompoundTypeNode, ExecutionFrame):
     return 'iter(%r)' % (self.target,)
 
   def recv_target(self, src):
+    from aggregate_types import ElementGetter
     for obj in src:
       if obj in self.done: continue
       self.done.add(obj)
-      try:
-        obj.get_seq(self).connect(self)
-      except (NodeTypeError, NodeAttrError):
-        self.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
+      ElementGetter(obj, self).connect(self)
     return
 
 
@@ -540,13 +538,14 @@ class SliceRef(CompoundTypeNode, ExecutionFrame):
 class SliceAssign(CompoundTypeNode, ExecutionFrame):
   
   def __init__(self, parent_frame, loc, target, lower, upper, value):
+    from aggregate_types import ElementGetter
     self.target = target
     self.lower = lower
     self.upper = upper
-    self.value = value
     self.done = set()
     CompoundTypeNode.__init__(self)
     ExecutionFrame.__init__(self, parent_frame, loc)
+    self.elemall = ElementGetter(value, self)
     self.target.connect(self, self.recv_target)
     return
 
@@ -558,7 +557,7 @@ class SliceAssign(CompoundTypeNode, ExecutionFrame):
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        self.value.get_seq(self).connect(obj.get_element(self, [self.lower, self.upper], write=True))
+        self.elemall.connect(obj.get_element(self, [self.lower, self.upper], write=True))
       except (NodeTypeError, NodeAttrError):
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
@@ -607,7 +606,7 @@ class TupleUnpack(CompoundTypeNode, ExecutionFrame):
     return self.elements[i]
 
   def recv_tupobj(self, src):
-    from aggregate_types import TupleType
+    from aggregate_types import TupleType, ElementGetter
     assert src is self.tupobj
     for obj in src:
       if obj in self.done: continue
@@ -620,7 +619,7 @@ class TupleUnpack(CompoundTypeNode, ExecutionFrame):
             src.connect(dest)
       else:
         try:
-          elemall = obj.get_seq(self)
+          elemall = ElementGetter(obj, self)
           for dest in self.elements:
             elemall.connect(dest)
         except (NodeTypeError, NodeAttrError):
