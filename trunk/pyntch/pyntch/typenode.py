@@ -1,6 +1,9 @@
 #!/usr/bin/env python
+##
+##  typenode.py
+##
+
 import sys
-stderr = sys.stderr
 
 
 ##  TreeReporter
@@ -45,7 +48,7 @@ class TypeNode(object):
     self.sendto = []
     TypeNode.N += 1
     if TypeNode.N % 1000 == 0:
-      print >>stderr, 'nodes:', TypeNode.N
+      print >>sys.stderr, 'nodes:', TypeNode.N
     return
 
   def __iter__(self):
@@ -54,7 +57,7 @@ class TypeNode(object):
   def connect(self, node, receiver=None):
     #assert isinstance(node, CompoundTypeNode), node
     if self.debug:
-      print >>stderr, 'connect: %r -> %r' % (self, node)
+      print >>sys.stderr, 'connect: %r -> %r' % (self, node)
     receiver = receiver or node.recv
     if receiver in self.sendto: return False
     self.sendto.append(receiver)
@@ -158,9 +161,25 @@ class UndefinedTypeNode(TypeNode):
     return self
 
 
+##  BuiltinObject
+##
+class BuiltinObject(SimpleTypeNode):
+
+  def get_type(self):
+    return self.typeobj
+  
+  def get_attr(self, name, write=False):
+    return self.get_type().get_attr(name, write=write)
+  
+  def is_type(self, *typeobjs):
+    for typeobj in typeobjs:
+      if self.typeobj is typeobj or issubclass(self.typeobj.__class__, typeobj.__class__): return True
+    return False
+
+
 ##  BuiltinType
 ##
-class BuiltinType(SimpleTypeNode):
+class BuiltinType(BuiltinObject):
 
   TYPE_NAME = None # must be defined by subclass
   
@@ -197,6 +216,16 @@ class BuiltinType(SimpleTypeNode):
       klass.TYPEOBJ = klass()
     return klass.TYPEOBJ
 
+  class InitMethod(BuiltinObject):
+    def call(self, frame, args, kwargs):
+      from basic_types import NoneType
+      return NoneType.get_object()
+
+  def get_attr(self, name, write=False):
+    if name == '__init__':
+      return self.InitMethod(self)
+    raise NodeAttrError(name)
+
 
 ##  BuiltinBasicType
 ##
@@ -212,19 +241,3 @@ class BuiltinBasicType(BuiltinType):
     if not klass.OBJECT:
       klass.OBJECT = klass.TYPE_INSTANCE(klass.get_typeobj())
     return klass.OBJECT
-
-
-##  BuiltinObject
-##
-class BuiltinObject(SimpleTypeNode):
-
-  def get_type(self):
-    return self.typeobj
-  
-  def get_attr(self, name, write=False):
-    return self.get_type().get_attr(name, write=write)
-  
-  def is_type(self, *typeobjs):
-    for typeobj in typeobjs:
-      if self.typeobj is typeobj or issubclass(self.typeobj.__class__, typeobj.__class__): return True
-    return False

@@ -2,7 +2,7 @@
 import sys
 stderr = sys.stderr
 
-from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, \
+from typenode import TypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, \
      BuiltinType, BuiltinObject
 from klass import ClassType, InstanceObject
 
