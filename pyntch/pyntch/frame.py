@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys
-from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeTypeError
+from typenode import TypeNode, CompoundTypeNode, NodeTypeError
 stderr = sys.stderr
 
 

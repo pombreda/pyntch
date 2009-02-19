@@ -1,11 +1,13 @@
 #!/usr/bin/env python
-from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, \
+from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, \
      BuiltinType, BuiltinObject
 from exception import TypeChecker, \
      TypeErrorType, IndexErrorType, ValueErrorType, KeyErrorType, StopIterationType
-from basic_types import BuiltinCallable, BuiltinConstCallable, BoolType, IntType, StrType, NoneType, ANY
+from basic_types import BuiltinCallable, BuiltinConstMethod, BoolType, IntType, StrType, NoneType, ANY
 
 
+##  ElementGetter
+##
 class ElementGetter(CompoundTypeNode):
   
   def __init__(self, src, frame):
@@ -63,11 +65,13 @@ class BuiltinAggregateObject(BuiltinObject):
 
 ##  BuiltinAggregateType
 ##
-class BuiltinAggregateType(BuiltinType):
+class BuiltinAggregateType(BuiltinCallable, BuiltinType):
 
   def __init__(self):
     self.cache = {}
     self.nullobj = None
+    BuiltinType.__init__(self)
+    BuiltinCallable.__init__(self, self.TYPE_NAME, [], [ANY])
     return
 
   def get_converted(self, frame, node):
@@ -83,6 +87,9 @@ class BuiltinAggregateType(BuiltinType):
       self.nullobj = self.create_null()
     return self.nullobj
   
+  def create_sequence(self, frame, node):
+    raise NotImplementedError
+
 
 ##  BuiltinSequenceObject
 ##
@@ -109,11 +116,11 @@ class BuiltinSequenceObject(BuiltinAggregateObject):
       return
 
   # SequenceExtender
-  class SequenceExtender(BuiltinConstCallable):
+  class SequenceExtender(BuiltinConstMethod):
     
-    def __init__(self, name, target, retype=NoneType.get_object(), args=None, optargs=None):
+    def __init__(self, name, target, retobj=NoneType.get_object(), args=None, optargs=None):
       self.target = target
-      BuiltinConstCallable.__init__(self, name, retype, args=args, optargs=optargs)
+      BuiltinConstMethod.__init__(self, name, retobj, args=args, optargs=optargs)
       return
     
     def __repr__(self):
@@ -123,11 +130,11 @@ class BuiltinSequenceObject(BuiltinAggregateObject):
       return BuiltinSequenceObject.SequenceConverter(frame, self.target)
 
   # SequenceAppender
-  class SequenceAppender(BuiltinConstCallable):
+  class SequenceAppender(BuiltinConstMethod):
     
-    def __init__(self, name, target, retype=NoneType.get_object(), args=None, optargs=None):
+    def __init__(self, name, target, retobj=NoneType.get_object(), args=None, optargs=None):
       self.target = target
-      BuiltinConstCallable.__init__(self, name, retype, args=args, optargs=optargs)
+      BuiltinConstMethod.__init__(self, name, retobj, args=args, optargs=optargs)
       return
     
     def __repr__(self):
@@ -175,11 +182,11 @@ class ListObject(BuiltinSequenceObject):
     
     def accept_arg(self, frame, i):
       if i == 0:
-        return BuiltinConstCallable.accept_arg(self, frame, i)
+        return BuiltinConstMethod.accept_arg(self, frame, i)
       return BuiltinSequenceObject.SequenceAppender.accept_arg(self, frame, i)
 
   # SortMethod
-  class SortMethod(BuiltinConstCallable):
+  class SortMethod(BuiltinConstMethod):
     
     class FuncChecker(CompoundTypeNode):
       
@@ -216,7 +223,7 @@ class ListObject(BuiltinSequenceObject):
 
     def __init__(self, name, target):
       self.target = target
-      BuiltinConstCallable.__init__(self, name, NoneType.get_object(), [], [ANY,ANY,ANY])
+      BuiltinConstMethod.__init__(self, name, NoneType.get_object(), [], [ANY,ANY,ANY])
       return
     
     def process_args(self, frame, args, kwargs):
@@ -249,22 +256,22 @@ class ListObject(BuiltinSequenceObject):
     if name == 'append':
       return self.SequenceAppender('list.append', self, args=[ANY])
     elif name == 'count':
-      return BuiltinConstCallable('list.count', IntType.get_object(), [ANY])
+      return BuiltinConstMethod('list.count', IntType.get_object(), [ANY])
     elif name == 'extend':
       return self.SequenceExtender('list.extend', self, args=[ANY])
     elif name == 'index':
-      return BuiltinConstCallable('list.index', IntType.get_object(), [ANY], [IntType, IntType],
+      return BuiltinConstMethod('list.index', IntType.get_object(), [ANY], [IntType, IntType],
                                   expts=[ValueErrorType.maybe('might not able to find the element.')])
     elif name == 'insert':
       return self.InsertMethod('list.insert', self, [IntType, ANY])
     elif name == 'pop':
-      return BuiltinConstCallable('list.pop', self.elemall, [], [IntType],
+      return BuiltinConstMethod('list.pop', self.elemall, [], [IntType],
                                   expts=[ValueErrorType.maybe('might be empty list or out of range.')])
     elif name == 'remove':
-      return BuiltinConstCallable('list.remove', NoneType.get_object(), [ANY],
+      return BuiltinConstMethod('list.remove', NoneType.get_object(), [ANY],
                                   expts=[ValueErrorType.maybe('might not able to remove the element.')])
     elif name == 'reverse':
-      return BuiltinConstCallable('list.remove', NoneType.get_object())
+      return BuiltinConstMethod('list.remove', NoneType.get_object())
     elif name == 'sort':
       return self.SortMethod('list.sort', self)
     raise NodeAttrError(name)
@@ -272,7 +279,7 @@ class ListObject(BuiltinSequenceObject):
 
 ##  ListType
 ##
-class ListType(BuiltinSequenceType, BuiltinCallable):
+class ListType(BuiltinSequenceType):
   
   TYPE_NAME = 'list'
   
@@ -280,11 +287,6 @@ class ListType(BuiltinSequenceType, BuiltinCallable):
   def create_list(klass, elemall=None):
     return ListObject(klass.get_typeobj(), elemall=elemall)
 
-  def __init__(self):
-    BuiltinSequenceType.__init__(self)
-    BuiltinCallable.__init__(self, 'list', [], [ANY])
-    return
-    
   def create_sequence(self, frame, node):
     listobj = ListType.create_list()
     node.connect(BuiltinSequenceObject.SequenceConverter(frame, listobj))
@@ -330,18 +332,13 @@ class TupleObject(BuiltinSequenceObject):
 
 ##  TupleType
 ##
-class TupleType(BuiltinSequenceType, BuiltinCallable):
+class TupleType(BuiltinSequenceType):
   
   TYPE_NAME = 'tuple'
     
   @classmethod
   def create_tuple(klass, elements=None, elemall=None):
     return TupleObject(klass.get_typeobj(), elements=elements, elemall=elemall)
-
-  def __init__(self):
-    BuiltinSequenceType.__init__(self)
-    BuiltinCallable.__init__(self, 'tuple', [], [ANY])
-    return
 
   def create_sequence(self, frame, node):
     tupleobj = TupleType.create_tuple()
@@ -357,7 +354,7 @@ class TupleType(BuiltinSequenceType, BuiltinCallable):
 class SetObject(BuiltinSequenceObject):
 
   # Intersection
-  class Intersection(BuiltinConstCallable):
+  class Intersection(BuiltinConstMethod):
     
     class TypeMixer(CompoundTypeNode):
       
@@ -393,7 +390,7 @@ class SetObject(BuiltinSequenceObject):
       
     def __init__(self, name, src1):
       self.src1 = src1
-      BuiltinConstCallable.__init__(self, name, SetType.create_set(), [ANY])
+      BuiltinConstMethod.__init__(self, name, SetType.create_set(), [ANY])
       return
     
     def __repr__(self):
@@ -401,9 +398,9 @@ class SetObject(BuiltinSequenceObject):
     
     def process_args(self, frame, args, kwargs):
       if kwargs or len(args) != 1:
-        return BuiltinConstCallable.process_args(self, frame, args, kwargs)
-      self.TypeMixer(frame, self.retype, self.src1, args[0])
-      return self.retype
+        return BuiltinConstMethod.process_args(self, frame, args, kwargs)
+      self.TypeMixer(frame, self.retobj, self.src1, args[0])
+      return self.retobj
 
   def desc1(self, done):
     return '([%s])' % self.elemall.desc1(done)
@@ -415,28 +412,28 @@ class SetObject(BuiltinSequenceObject):
     if name == 'add':
       return self.SequenceAppender('set.add', self, args=[ANY])
     elif name == 'clear':
-      return BuiltinConstCallable('set.clear', NoneType.get_object())
+      return BuiltinConstMethod('set.clear', NoneType.get_object())
     elif name == 'copy':
-      return BuiltinConstCallable('set.copy', self.copy())
+      return BuiltinConstMethod('set.copy', self.copy())
     elif name == 'difference':
-      return BuiltinConstCallable('set.difference', self.copy(), [[ANY]])
+      return BuiltinConstMethod('set.difference', self.copy(), [[ANY]])
     elif name == 'difference_update':
-      return BuiltinConstCallable('set.difference_update', NoneType.get_object(), [[ANY]])
+      return BuiltinConstMethod('set.difference_update', NoneType.get_object(), [[ANY]])
     elif name == 'discard':
-      return BuiltinConstCallable('set.discard', NoneType.get_object(), [ANY])
+      return BuiltinConstMethod('set.discard', NoneType.get_object(), [ANY])
     elif name == 'intersection':
       return SetObject.Intersection('set.intersection', self)
     elif name == 'intersection_update':
-      return BuiltinConstCallable('set.intersection_update', NoneType.get_object(), [[ANY]])
+      return BuiltinConstMethod('set.intersection_update', NoneType.get_object(), [[ANY]])
     elif name == 'issubset':
-      return BuiltinConstCallable('set.issubset', BoolType.get_object(), [[ANY]])
+      return BuiltinConstMethod('set.issubset', BoolType.get_object(), [[ANY]])
     elif name == 'issuperset':
-      return BuiltinConstCallable('set.issuperset', BoolType.get_object(), [[ANY]])
+      return BuiltinConstMethod('set.issuperset', BoolType.get_object(), [[ANY]])
     elif name == 'pop':
-      return BuiltinConstCallable('set.pop', NoneType.get_object(), 
+      return BuiltinConstMethod('set.pop', NoneType.get_object(), 
                                   expts=[KeyErrorType.maybe('might not able to pop from an empty set.')])
     elif name == 'remove':
-      return BuiltinConstCallable('set.remove', NoneType.get_object(), [ANY],
+      return BuiltinConstMethod('set.remove', NoneType.get_object(), [ANY],
                                   expts=[KeyErrorType.maybe('might not have the value.')])
     elif name == 'symmetric_difference':
       setobj = self.copy()
@@ -453,18 +450,13 @@ class SetObject(BuiltinSequenceObject):
 
 ##  SetType
 ##
-class SetType(BuiltinSequenceType, BuiltinCallable):
+class SetType(BuiltinSequenceType):
 
   TYPE_NAME = 'set'
 
   @classmethod
   def create_set(klass, elemall=None):
     return SetObject(klass.get_typeobj(), elemall=elemall)
-
-  def __init__(self):
-    BuiltinSequenceType.__init__(self)
-    BuiltinCallable.__init__(self, 'set', [], [ANY])
-    return
 
   def create_sequence(self, frame, node):
     setobj = SetType.create_set()
@@ -490,14 +482,14 @@ class IterObject(BuiltinSequenceObject):
 
   def create_attr(self, name):
     if name == 'next':
-      return BuiltinConstCallable('iter.next', self.elemall,
+      return BuiltinConstMethod('iter.next', self.elemall,
                                   expts=[StopIterationType.maybe('might raise StopIteration')])
     raise NodeAttrError(name)
   
 
 ##  IterType
 ##
-class IterType(BuiltinSequenceType):
+class IterType(BuiltinType):
 
   TYPE_NAME = 'iterator'
 
@@ -518,11 +510,11 @@ class GeneratorSlot(CompoundTypeNode):
 class GeneratorObject(IterObject):
 
   # Send
-  class Send(BuiltinConstCallable):
+  class Send(BuiltinConstMethod):
     
-    def __init__(self, name, target, retype=NoneType.get_object(), args=None, expts=None):
+    def __init__(self, name, target, retobj=NoneType.get_object(), args=None, expts=None):
       self.target = target
-      BuiltinConstCallable.__init__(self, name, retype, args=args, expts=expts)
+      BuiltinConstMethod.__init__(self, name, retobj, args=args, expts=expts)
       return
     
     def accept_arg(self, frame, _):
@@ -548,7 +540,7 @@ class GeneratorObject(IterObject):
                        expts=[StopIterationType.maybe('might raise StopIteration')])
     if name == 'throw':
       # XXX do nothing for now
-      return BuiltinConstCallable('generator.throw', NoneType.get_object(), [ANY], [ANY, ANY])
+      return BuiltinConstMethod('generator.throw', NoneType.get_object(), [ANY], [ANY, ANY])
     if name == 'close':
       return self.Send('generator.close', self, NoneType.get_object(), [ANY])
     return IterObject.create_attr(self, name)
@@ -621,12 +613,12 @@ class DictObject(BuiltinAggregateObject):
       return
 
   # dict.fromkeys
-  class FromKeys(BuiltinConstCallable):
+  class FromKeys(BuiltinConstMethod):
     
     def __init__(self, _, name):
       self.cache = {}
       self.dictobj = DictType.create_dict()
-      BuiltinConstCallable.__init__(self, name, self.dictobj, [ANY], [ANY])
+      BuiltinConstMethod.__init__(self, name, self.dictobj, [ANY], [ANY])
       return
     
     def process_args(self, frame, args, kwargs):
@@ -642,48 +634,48 @@ class DictObject(BuiltinAggregateObject):
       return self.dictobj
     
   # dict.get
-  class Get(BuiltinConstCallable):
+  class Get(BuiltinConstMethod):
     
     def __init__(self, dictobj, name):
       self.dictobj = dictobj
       self.found = CompoundTypeNode([dictobj.value])
-      BuiltinConstCallable.__init__(self, name, self.found, [ANY], [ANY])
+      BuiltinConstMethod.__init__(self, name, self.found, [ANY], [ANY])
       return
     
     def process_args(self, frame, args, kwargs):
       if len(args) == 1:
         self.found.update_type(NoneType.get_object())
-      return BuiltinConstCallable.process_args(self, frame, args, kwargs)
+      return BuiltinConstMethod.process_args(self, frame, args, kwargs)
     
     def accept_arg(self, frame, i):
       if i == 0: return None
       return self.found
 
   # dict.pop
-  class Pop(BuiltinConstCallable):
+  class Pop(BuiltinConstMethod):
     
     def __init__(self, dictobj, name):
       self.dictobj = dictobj
       self.found = CompoundTypeNode([dictobj.value])
-      BuiltinConstCallable.__init__(self, name, self.found, [ANY], [ANY])
+      BuiltinConstMethod.__init__(self, name, self.found, [ANY], [ANY])
       return
     
     def process_args(self, frame, args, kwargs):
       if len(args) == 1:
         frame.raise_expt(KeyErrorType.maybe('might not have the key: %r' % args[0]))
-      return BuiltinConstCallable.process_args(self, frame, args, kwargs)
+      return BuiltinConstMethod.process_args(self, frame, args, kwargs)
     
     def accept_arg(self, frame, i):
       if i == 0: return None
       return self.found
 
   # dict.setdefault
-  class SetDefault(BuiltinConstCallable):
+  class SetDefault(BuiltinConstMethod):
     
     def __init__(self, dictobj, name):
       self.dictobj = dictobj
       self.found = CompoundTypeNode([dictobj.value])
-      BuiltinConstCallable.__init__(self, name, self.found, [ANY], [ANY])
+      BuiltinConstMethod.__init__(self, name, self.found, [ANY], [ANY])
       return
     
     def __repr__(self):
@@ -692,7 +684,7 @@ class DictObject(BuiltinAggregateObject):
     def process_args(self, frame, args, kwargs):
       if len(args) == 1:
         self.found.update_type(NoneType.get_object())
-      return BuiltinConstCallable.process_args(self, frame, args, kwargs)
+      return BuiltinConstMethod.process_args(self, frame, args, kwargs)
     
     def accept_arg(self, frame, i):
       if i == 0:
@@ -701,12 +693,12 @@ class DictObject(BuiltinAggregateObject):
         return self.found
 
   # dict.update
-  class Update(BuiltinConstCallable):
+  class Update(BuiltinConstMethod):
     
     def __init__(self, dictobj, name):
       self.cache = {}
       self.dictobj = dictobj
-      BuiltinConstCallable.__init__(self, name, NoneType.get_object(), [ANY])
+      BuiltinConstMethod.__init__(self, name, NoneType.get_object(), [ANY])
       return
     
     def process_args(self, frame, args, kwargs):
@@ -743,37 +735,37 @@ class DictObject(BuiltinAggregateObject):
 
   def create_attr(self, name):
     if name == 'clear':
-      return BuiltinConstCallable('dict.clear', NoneType.get_object())
+      return BuiltinConstMethod('dict.clear', NoneType.get_object())
     elif name == 'copy':
-      return BuiltinConstCallable('dict.copy', self.copy())
+      return BuiltinConstMethod('dict.copy', self.copy())
     elif name == 'fromkeys':
       return DictObject.FromKeys(self, 'dict.fromkeys')
     elif name == 'get':
       return DictObject.Get(self, 'dict.get')
     elif name == 'has_key':
-      return BuiltinConstCallable('dict.has_key', BoolType.get_object(), [ANY])
+      return BuiltinConstMethod('dict.has_key', BoolType.get_object(), [ANY])
     elif name == 'keys':
-      return BuiltinConstCallable('dict.keys',
+      return BuiltinConstMethod('dict.keys',
                                   ListType.create_list(self.key))
     elif name == 'values':
-      return BuiltinConstCallable('dict.values',
+      return BuiltinConstMethod('dict.values',
                                   ListType.create_list(self.value))
     elif name == 'items':
-      return BuiltinConstCallable('dict.items',
+      return BuiltinConstMethod('dict.items',
                                   ListType.create_list(TupleType.create_tuple([self.key, self.value])))
     elif name == 'iterkeys':
-      return BuiltinConstCallable('dict.iterkeys',
+      return BuiltinConstMethod('dict.iterkeys',
                                   IterType.create_iter(self.key))
     elif name == 'itervalues':
-      return BuiltinConstCallable('dict.itervalues',
+      return BuiltinConstMethod('dict.itervalues',
                                   IterType.create_iter(self.value))
     elif name == 'iteritems':
-      return BuiltinConstCallable('dict.iteritems',
+      return BuiltinConstMethod('dict.iteritems',
                                   IterType.create_iter(TupleType.create_tuple([self.key, self.value])))
     elif name == 'pop':
       return DictObject.Pop(self, 'dict.pop')
     elif name == 'popitem':
-      return BuiltinConstCallable('dict.popitem', TupleType.create_tuple([self.key, self.value]),
+      return BuiltinConstMethod('dict.popitem', TupleType.create_tuple([self.key, self.value]),
                                   expts=[KeyErrorType.maybe('might not able to pop from an empty dict.')])
     elif name == 'setdefault':
       return DictObject.SetDefault(self, 'dict.setdefault')
@@ -797,7 +789,7 @@ class DictObject(BuiltinAggregateObject):
 
 ##  DictType
 ##
-class DictType(BuiltinAggregateType, BuiltinCallable):
+class DictType(BuiltinAggregateType):
   
   TYPE_NAME = 'dict'
 
@@ -805,11 +797,6 @@ class DictType(BuiltinAggregateType, BuiltinCallable):
   def create_dict(klass, items=None, key=None, value=None):
     return DictObject(klass.get_typeobj(), items=items, key=key, value=value)
 
-  def __init__(self):
-    BuiltinAggregateType.__init__(self)
-    BuiltinCallable.__init__(self, 'dict', [], [ANY])
-    return
-    
   def process_args(self, frame, args, kwargs):
     if kwargs:
       node = tuple(kwargs.values())

@@ -3,14 +3,16 @@
 ##  This module should not be imported as toplevel,
 ##  as it causes circular imports!
 
-from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, BuiltinType
+from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, BuiltinType
+from frame import MustBeDefinedNode
 from exception import TypeChecker, SequenceTypeChecker
 from exception import TypeErrorType
 from namespace import Namespace
+from klass import InstanceObject
 from basic_types import TypeType, NumberType, BoolType, IntType, LongType, FloatType, \
      BaseStringType, StrType, UnicodeType, ANY, \
      BuiltinCallable, BuiltinConstCallable
-from aggregate_types import ListType, TupleType, IterType, ElementGetter
+from aggregate_types import ListType, TupleType, DictType, IterType, ElementGetter
 
 
 ##  BuiltinFunc
@@ -31,9 +33,9 @@ class BuiltinConstFunc(BuiltinConstCallable, BuiltinType):
 
   TYPE_NAME = 'builtinfunc'
 
-  def __init__(self, name, retype, args=None, optargs=None, expts=None):
-    BuiltinConstCallable.__init__(self, name, retype, args=args, optargs=optargs, expts=expts)
+  def __init__(self, name, retobj, args=None, optargs=None, expts=None):
     BuiltinType.__init__(self)
+    BuiltinConstCallable.__init__(self, name, retobj, args=args, optargs=optargs, expts=expts)
     return
   
   def __repr__(self):
@@ -52,11 +54,39 @@ class ReprFunc(BuiltinConstFunc):
 
 ##  LenFunc
 ##
-class LenFunc(BuiltinConstFunc):
+class LenFunc(BuiltinFunc):
 
+  class LengthChecker(MustBeDefinedNode):
+    
+    def __init__(self, frame, target):
+      MustBeDefinedNode.__init__(self, frame)
+      self.done = set()
+      self.target = target
+      self.target.connect(self, self.recv_target)
+      return
+
+    def recv_target(self, src):
+      for obj in src:
+        if obj in self.done: continue
+        self.done.add(obj)
+        if obj.is_type(ListType.get_typeobj(), TupleType.get_typeobj(), DictType.get_typeobj()):
+          obj.connect(self)
+        elif isinstance(obj, InstanceObject):
+          value = obj.get_attr('__len__').optcall(self, (), {})
+          value.connect(self)
+      return
+
+    def check_undefined(self):
+      if not self.types:
+        self.raise_expt(TypeErrorType.occur('__len__ not defined: %r' % (self.target)))
+      return
+
+  def process_args(self, frame, args, kwargs):
+    self.LengthChecker(frame, args[0])
+    return IntType.get_object()
+  
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'len', IntType.get_object(),
-                              [ANY])
+    BuiltinFunc.__init__(self, 'len', [ANY])
     return
 
 

@@ -3,7 +3,7 @@
 ##  This module should not be imported as toplevel,
 ##  as it causes circular imports!
 
-from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeAttrError, \
+from typenode import TypeNode, CompoundTypeNode, NodeAttrError, \
      BuiltinType, BuiltinBasicType, BuiltinObject, UndefinedTypeNode
 from exception import TypeChecker, SequenceTypeChecker
 from exception import TypeErrorType, ValueErrorType, IndexErrorType, IOErrorType, EOFErrorType, \
@@ -15,7 +15,10 @@ ANY = TypeChecker.ANY
 
 ##  BuiltinCallable
 ##
-class BuiltinCallable(SimpleTypeNode):
+##  A helper class to augment builtin objects (mostly type objects)
+##  for behaving like a function.
+##
+class BuiltinCallable(object):
 
   def __init__(self, name, args=None, optargs=None, expts=None):
     args = (args or [])
@@ -24,18 +27,8 @@ class BuiltinCallable(SimpleTypeNode):
     self.minargs = len(args)
     self.args = args+optargs
     self.expts = (expts or [])
-    SimpleTypeNode.__init__(self, self)
     return
-
-  def __repr__(self):
-    return '<callable %s>' % self.name
   
-  def connect_expt(self, frame):
-    return
-
-  def process_args(self, frame, args, kwargs):
-    raise NotImplementedError
-
   def call(self, frame, args, kwargs):
     if len(args) < self.minargs:
       frame.raise_expt(TypeErrorType.occur(
@@ -47,13 +40,16 @@ class BuiltinCallable(SimpleTypeNode):
       return UndefinedTypeNode()
     return self.process_args(frame, args, kwargs)
 
+  def process_args(self, frame, args, kwargs):
+    raise NotImplementedError
+
 
 ##  BuiltinConstCallable
 ##
 class BuiltinConstCallable(BuiltinCallable):
   
-  def __init__(self, name, retype, args=None, optargs=None, expts=None):
-    self.retype = retype
+  def __init__(self, name, retobj, args=None, optargs=None, expts=None):
+    self.retobj = retobj
     BuiltinCallable.__init__(self, name, args=args, optargs=optargs, expts=expts)
     return
 
@@ -81,16 +77,33 @@ class BuiltinConstCallable(BuiltinCallable):
         arg1.connect(rcpt)
     for expt in self.expts:
       frame.raise_expt(expt)
-    return self.retype
+    return self.retobj
+
+
+##  BuiltinConstMethod
+##
+class BuiltinMethodType(BuiltinType):
+  TYPE_NAME = 'builtin_method'
+  
+class BuiltinConstMethod(BuiltinConstCallable, BuiltinObject):
+
+  def __init__(self, name, retobj, args=None, optargs=None, expts=None):
+    BuiltinObject.__init__(self, BuiltinMethodType.get_typeobj())
+    BuiltinConstCallable.__init__(self, name, retobj, args=args, optargs=optargs, expts=expts)
+    return
+
+  def __repr__(self):
+    return '<callable %s>' % self.name
 
 
 ##  TypeType
 ##
-class TypeType(BuiltinBasicType, BuiltinConstCallable):
+class TypeType(BuiltinType, BuiltinConstCallable):
   TYPE_NAME = 'type'
 
   def __init__(self):
-    BuiltinBasicType.__init__(self)
+    BuiltinType.__init__(self)
+    # type() funciton returns itself.
     BuiltinConstCallable.__init__(self, 'type', self, [ANY])
     return
 
@@ -199,107 +212,107 @@ class BaseStringType(BuiltinBasicType, BuiltinConstCallable):
   def get_attr(self, name, write=False):
     from aggregate_types import TupleType, ListType
     if name == 'capitalize':
-      return BuiltinConstCallable('str.capitalize', self.get_object())
+      return BuiltinConstMethod('str.capitalize', self.get_object())
     elif name == 'center':
-      return BuiltinConstCallable('str.center', self.get_object(),
-                               [IntType], [BaseStringType])
+      return BuiltinConstMethod('str.center', self.get_object(),
+                                [IntType], [BaseStringType])
     elif name == 'count':
-      return BuiltinConstCallable('str.count', IntType.get_object(),
-                               [BaseStringType], [IntType, IntType])
+      return BuiltinConstMethod('str.count', IntType.get_object(),
+                                [BaseStringType], [IntType, IntType])
     elif name == 'decode':
-      return BuiltinConstCallable('str.decode', UnicodeType.get_object(),
-                               [], [BaseStringType, BaseStringType],
-                               [UnicodeDecodeErrorType.maybe('might not able to decode.')])
+      return BuiltinConstMethod('str.decode', UnicodeType.get_object(),
+                                [], [BaseStringType, BaseStringType],
+                                [UnicodeDecodeErrorType.maybe('might not able to decode.')])
     elif name == 'encode':
-      return BuiltinConstCallable('str.encode', StrType.get_object(),
-                               [], [BaseStringType, BaseStringType],
-                               [UnicodeDecodeErrorType.maybe('might not able to encode.')])
+      return BuiltinConstMethod('str.encode', StrType.get_object(),
+                                [], [BaseStringType, BaseStringType],
+                                [UnicodeDecodeErrorType.maybe('might not able to encode.')])
     elif name == 'endswith':
-      return BuiltinConstCallable('str.endswith', BoolType.get_object(),
-                               [BaseStringType], [IntType, IntType])
+      return BuiltinConstMethod('str.endswith', BoolType.get_object(),
+                                [BaseStringType], [IntType, IntType])
     elif name == 'expandtabs':
-      return BuiltinConstCallable('str.expandtabs', self.get_object(),
-                               [], [IntType])
+      return BuiltinConstMethod('str.expandtabs', self.get_object(),
+                                [], [IntType])
     elif name == 'find':
-      return BuiltinConstCallable('str.find', IntType.get_object(),
-                               [BaseStringType], [IntType, IntType])
+      return BuiltinConstMethod('str.find', IntType.get_object(),
+                                [BaseStringType], [IntType, IntType])
     elif name == 'index':
-      return BuiltinConstCallable('str.index', IntType.get_object(),
-                               [BaseStringType], [IntType, IntType],
-                               [ValueErrorType.maybe('might not able to find the substring.')])
+      return BuiltinConstMethod('str.index', IntType.get_object(),
+                                [BaseStringType], [IntType, IntType],
+                                [ValueErrorType.maybe('might not able to find the substring.')])
     elif name == 'isalnum':
-      return BuiltinConstCallable('str.isalnum', BoolType.get_object())
+      return BuiltinConstMethod('str.isalnum', BoolType.get_object())
     elif name == 'isalpha':
-      return BuiltinConstCallable('str.isalpha', BoolType.get_object())
+      return BuiltinConstMethod('str.isalpha', BoolType.get_object())
     elif name == 'isdigit':
-      return BuiltinConstCallable('str.isdigit', BoolType.get_object())
+      return BuiltinConstMethod('str.isdigit', BoolType.get_object())
     elif name == 'islower':
-      return BuiltinConstCallable('str.islower', BoolType.get_object())
+      return BuiltinConstMethod('str.islower', BoolType.get_object())
     elif name == 'isspace':
-      return BuiltinConstCallable('str.isspace', BoolType.get_object())
+      return BuiltinConstMethod('str.isspace', BoolType.get_object())
     elif name == 'istitle':
-      return BuiltinConstCallable('str.istitle', BoolType.get_object())
+      return BuiltinConstMethod('str.istitle', BoolType.get_object())
     elif name == 'isupper':
-      return BuiltinConstCallable('str.isupper', BoolType.get_object())
+      return BuiltinConstMethod('str.isupper', BoolType.get_object())
     elif name == 'join':
-      return BuiltinConstCallable('str.join', self.get_object(),
-                               [[BaseStringType]])
+      return BuiltinConstMethod('str.join', self.get_object(),
+                                [[BaseStringType]])
     elif name == 'ljust':
-      return BuiltinConstCallable('str.ljust', self.get_object(),
-                               [IntType], [BaseStringType])
+      return BuiltinConstMethod('str.ljust', self.get_object(),
+                                [IntType], [BaseStringType])
     elif name == 'lower':
-      return BuiltinConstCallable('str.lower', self.get_object())
+      return BuiltinConstMethod('str.lower', self.get_object())
     elif name == 'lstrip':
-      return BuiltinConstCallable('str.lstrip', self.get_object(),
-                               [BaseStringType])
+      return BuiltinConstMethod('str.lstrip', self.get_object(),
+                                [BaseStringType])
     elif name == 'partition':
-      return BuiltinConstCallable('str.partiion',
-                                  TupleType.create_tuple([self.get_object(), self.get_object(), self.get_object()]),
-                                  [BaseStringType])
+      return BuiltinConstMethod('str.partiion',
+                                TupleType.create_tuple([self.get_object(), self.get_object(), self.get_object()]),
+                                [BaseStringType])
     elif name == 'replace':
-      return BuiltinConstCallable('str.replace', self.get_object(),
-                               [BaseStringType, BaseStringType], [IntType])
+      return BuiltinConstMethod('str.replace', self.get_object(),
+                                [BaseStringType, BaseStringType], [IntType])
     elif name == 'rfind':
-      return BuiltinConstCallable('str.rfind', IntType.get_object(),
-                               [BaseStringType], [IntType, IntType])
+      return BuiltinConstMethod('str.rfind', IntType.get_object(),
+                                [BaseStringType], [IntType, IntType])
     elif name == 'rindex':
-      return BuiltinConstCallable('str.rindex', IntType.get_object(),
-                               [BaseStringType], [IntType, IntType],
-                               [ValueErrorType.maybe('might not able to find the substring.')])
+      return BuiltinConstMethod('str.rindex', IntType.get_object(),
+                                [BaseStringType], [IntType, IntType],
+                                [ValueErrorType.maybe('might not able to find the substring.')])
     elif name == 'rjust':
-      return BuiltinConstCallable('str.rjust', self.get_object(),
-                               [IntType], [BaseStringType])
+      return BuiltinConstMethod('str.rjust', self.get_object(),
+                           [IntType], [BaseStringType])
     elif name == 'rpartition':
-      return BuiltinConstCallable('str.rpartiion',
-                               TupleType.create_tuple([self.get_object(), self.get_object(), self.get_object()]),
-                               [BaseStringType])
+      return BuiltinConstMethod('str.rpartiion',
+                           TupleType.create_tuple([self.get_object(), self.get_object(), self.get_object()]),
+                           [BaseStringType])
     elif name == 'rsplit':
-      return BuiltinConstCallable('str.rsplit', ListType.create_list(self.get_object()),
-                               [], [BaseStringType, IntType])
+      return BuiltinConstMethod('str.rsplit', ListType.create_list(self.get_object()),
+                           [], [BaseStringType, IntType])
     elif name == 'rstrip':
-      return BuiltinConstCallable('str.rstrip', self.get_object(),
-                               [BaseStringType])
+      return BuiltinConstMethod('str.rstrip', self.get_object(),
+                           [BaseStringType])
     elif name == 'split':
-      return BuiltinConstCallable('str.split', ListType.create_list(self.get_object()),
-                               [], [BaseStringType, IntType])
+      return BuiltinConstMethod('str.split', ListType.create_list(self.get_object()),
+                           [], [BaseStringType, IntType])
     elif name == 'splitlines':
-      return BuiltinConstCallable('str.splitlines', ListType.create_list(self.get_object()),
-                               [], [ANY])
+      return BuiltinConstMethod('str.splitlines', ListType.create_list(self.get_object()),
+                           [], [ANY])
     elif name == 'startswith':
-      return BuiltinConstCallable('str.startswith', BoolType.get_object(),
-                              [BaseStringType], [IntType, IntType])
+      return BuiltinConstMethod('str.startswith', BoolType.get_object(),
+                           [BaseStringType], [IntType, IntType])
     elif name == 'strip':
-      return BuiltinConstCallable('str.strip', self.get_object(),
-                               [BaseStringType])
+      return BuiltinConstMethod('str.strip', self.get_object(),
+                           [BaseStringType])
     elif name == 'swapcase':
-      return BuiltinConstCallable('str.swapcase', self.get_object())
+      return BuiltinConstMethod('str.swapcase', self.get_object())
     elif name == 'title':
-      return BuiltinConstCallable('str.title', self.get_object())
+      return BuiltinConstMethod('str.title', self.get_object())
     elif name == 'upper':
-      return BuiltinConstCallable('str.upper', self.get_object())
+      return BuiltinConstMethod('str.upper', self.get_object())
     elif name == 'zfill':
-      return BuiltinConstCallable('str.zfill', self.get_object(),
-                               [IntType])
+      return BuiltinConstMethod('str.zfill', self.get_object(),
+                           [IntType])
     raise NodeAttrError(name)
 
   class StrConvChecker(CompoundTypeNode):
@@ -344,9 +357,9 @@ class StrType(BaseStringType):
   
   def get_attr(self, name, write=False):
     if name == 'translate':
-      return BuiltinConstCallable('str.translate', self.get_object(),
-                               [BaseStringType], [BaseStringType],
-                               [ValueErrorType.maybe('table might not be 256 chars long.')])
+      return BuiltinConstMethod('str.translate', self.get_object(),
+                           [BaseStringType], [BaseStringType],
+                           [ValueErrorType.maybe('table might not be 256 chars long.')])
     return BaseStringType.get_attr(self, name, write=write)
     
   def __init__(self):
@@ -359,7 +372,7 @@ class UnicodeType(BaseStringType):
   TYPE_NAME = 'unicode'
   TYPE_INSTANCE = UnicodeObject
 
-  class TranslateFunc(BuiltinConstCallable):
+  class TranslateFunc(BuiltinConstMethod):
     def accept_arg(self, frame, i):
       return KeyValueTypeChecker(frame,
                                  [IntType.get_typeobj()],
@@ -368,9 +381,9 @@ class UnicodeType(BaseStringType):
 
   def get_attr(self, name, write=False):
     if name == 'isdecimal':
-      return BuiltinConstCallable('unicode.isdecimal', BoolType.get_object())
+      return BuiltinConstMethod('unicode.isdecimal', BoolType.get_object())
     elif name == 'isnumeric':
-      return BuiltinConstCallable('unicode.isnumeric', BoolType.get_object())
+      return BuiltinConstMethod('unicode.isnumeric', BoolType.get_object())
     elif name == 'translate':
       return self.TranslateFunc('unicode.translate', self.get_object(),
                                 [ANY])
@@ -411,17 +424,17 @@ class FileType(BuiltinBasicType, BuiltinConstCallable):
   def get_attr(self, name, write=False):
     from aggregate_types import ListType
     if name == 'close':
-      return BuiltinConstCallable('file.close', NoneType.get_object())
+      return BuiltinConstMethod('file.close', NoneType.get_object())
     elif name == 'closed':
       return BoolType.get_object()
     elif name == 'encoding':
       return StrType.get_object()
     elif name == 'fileno':
-      return BuiltinConstCallable('file.fileno', IntType.get_object())
+      return BuiltinConstMethod('file.fileno', IntType.get_object())
     elif name == 'flush':
-      return BuiltinConstCallable('file.flush', NoneType.get_object())
+      return BuiltinConstMethod('file.flush', NoneType.get_object())
     elif name == 'isatty':
-      return BuiltinConstCallable('file.isatty', BoolType.get_object())
+      return BuiltinConstMethod('file.isatty', BoolType.get_object())
     elif name == 'mode':
       return StrType.get_object()
     elif name == 'name':
@@ -429,37 +442,37 @@ class FileType(BuiltinBasicType, BuiltinConstCallable):
     elif name == 'newlines':
       return NoneType.get_object()
     elif name == 'next':
-      return BuiltinConstCallable('file.next', StrType.get_object())
+      return BuiltinConstMethod('file.next', StrType.get_object())
     elif name == 'read':
-      return BuiltinConstCallable('file.read', StrType.get_object(),
-                               [], [IntType],
-                               [EOFErrorType.maybe('might receive an EOF.')])
+      return BuiltinConstMethod('file.read', StrType.get_object(),
+                           [], [IntType],
+                           [EOFErrorType.maybe('might receive an EOF.')])
     elif name == 'readline':
-      return BuiltinConstCallable('file.readline', StrType.get_object(),
-                               [], [IntType],
-                               [EOFErrorType.maybe('might receive an EOF.')])
+      return BuiltinConstMethod('file.readline', StrType.get_object(),
+                           [], [IntType],
+                           [EOFErrorType.maybe('might receive an EOF.')])
     elif name == 'readlines':
-      return BuiltinConstCallable('file.readlines', ListType.create_list(StrType.get_object()),
-                               [], [IntType],
-                               [EOFErrorType.maybe('might receive an EOF.')])
+      return BuiltinConstMethod('file.readlines', ListType.create_list(StrType.get_object()),
+                           [], [IntType],
+                           [EOFErrorType.maybe('might receive an EOF.')])
     elif name == 'seek':
-      return BuiltinConstCallable('file.seek', NoneType.get_object(),
-                               [IntType], [IntType],
-                               [EOFErrorType.maybe('might receive an EOF.')])
+      return BuiltinConstMethod('file.seek', NoneType.get_object(),
+                           [IntType], [IntType],
+                           [EOFErrorType.maybe('might receive an EOF.')])
     elif name == 'softspace':
       return IntType.get_object()
     elif name == 'tell':
-      return BuiltinConstCallable('file.tell', IntType.get_object(),
-                               expts=[IOErrorType.maybe('might be an illegal seek.')])
+      return BuiltinConstMethod('file.tell', IntType.get_object(),
+                           expts=[IOErrorType.maybe('might be an illegal seek.')])
     elif name == 'truncate':
-      return BuiltinConstCallable('file.truncate', NoneType.get_object(),
-                               [], [IntType])
+      return BuiltinConstMethod('file.truncate', NoneType.get_object(),
+                           [], [IntType])
     elif name == 'write':
-      return BuiltinConstCallable('file.write', NoneType.get_object(),
-                               [BaseStringType])
+      return BuiltinConstMethod('file.write', NoneType.get_object(),
+                           [BaseStringType])
     elif name == 'writelines':
-      return BuiltinConstCallable('file.writestrings', NoneType.get_object(),
-                               [[BaseStringType]])
+      return BuiltinConstMethod('file.writestrings', NoneType.get_object(),
+                           [[BaseStringType]])
     elif name == 'xreadlines':
       return self
     raise NodeAttrError(name)
@@ -476,7 +489,6 @@ class ObjectType(BuiltinBasicType, BuiltinConstCallable):
     BuiltinBasicType.__init__(self)
     BuiltinConstCallable.__init__(self, 'object', self.get_object())
     return
-
 
 BUILTIN_OBJECT = dict(
   (cls.get_name(), cls.get_object()) for cls in

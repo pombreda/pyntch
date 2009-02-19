@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from typenode import TreeReporter, SimpleTypeNode, CompoundTypeNode, \
+from typenode import TreeReporter, CompoundTypeNode, \
      NodeTypeError, NodeAttrError, BuiltinType, BuiltinObject
 from namespace import Namespace, Variable
 from frame import ExecutionFrame, MustBeDefinedNode

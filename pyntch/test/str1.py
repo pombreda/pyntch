@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-s = 'abc'
+s = str(123)
 s_capitalize1 = s.capitalize()
 s_capitalize2 = s.capitalize('a')
 s_center1 = s.center()
