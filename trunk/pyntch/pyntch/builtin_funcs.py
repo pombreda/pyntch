@@ -28,6 +28,7 @@ class BuiltinFunc(BuiltinCallable, BuiltinType):
   def __repr__(self):
     return '<builtin %s>' % self.name
 
+
 ##  BuiltinConstFunc
 class BuiltinConstFunc(BuiltinConstCallable, BuiltinType):
 
@@ -47,8 +48,7 @@ class BuiltinConstFunc(BuiltinConstCallable, BuiltinType):
 class ReprFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'repr', StrType.get_object(),
-                              [ANY])
+    BuiltinConstFunc.__init__(self, 'repr', StrType.get_object(), [ANY])
     return
 
 
@@ -304,28 +304,45 @@ class PowFunc(BuiltinFunc):
 
 ##  AllFunc, AnyFunc
 ##
-class AllFunc(BuiltinFunc):
+class AllFunc(BuiltinConstFunc):
+
+  def __init__(self, name='all'):
+    BuiltinConstFunc.__init__(self, name, BoolType.get_object(), [ANY])
+    return
+
+  def accept_arg(self, frame, i, arg1):
+    from expression import IterElement
+    IterElement(frame, arg1)
+    return 
+
+class AnyFunc(AllFunc):
 
   def __init__(self):
-    BuiltinFunc.__init__(self, 'all', [ANY])
+    AllFunc.__init__(self, 'any')
+    return
+
+
+##  MinFunc, MaxFunc
+##
+class MinFunc(BuiltinFunc):
+
+  def __init__(self, name='min'):
+    BuiltinFunc.__init__(self, name, [ANY])
     return
 
   def process_args(self, frame, args, kwargs):
     from expression import IterElement
-    if kwargs:
-      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
-    IterElement(frame, args[0])
-    return BoolType.get_object()
-
-class AnyFunc(BuiltinFunc):
+    # XXX take 'key' kwarg
+    retobj = CompoundTypeNode()
+    if len(args) == 1:
+      IterElement(frame, args[0]).connect(retobj)
+    else:
+      for arg1 in args:
+        arg1.connect(retobj)
+    return retobj
+  
+class MaxFunc(MinFunc):
 
   def __init__(self):
-    BuiltinFunc.__init__(self, 'any', [ANY])
+    MinFunc.__init__(self, 'max')
     return
-
-  def process_args(self, frame, args, kwargs):
-    from expression import IterElement
-    if kwargs:
-      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
-    IterElement(frame, args[0])
-    return BoolType.get_object()

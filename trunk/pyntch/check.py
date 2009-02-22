@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys
+import sys, os.path
 from pyntch.typenode import TypeNode, CompoundTypeNode
 from pyntch.frame import ExecutionFrame, MustBeDefinedNode
 from pyntch.namespace import Namespace
@@ -26,15 +26,17 @@ def main(argv):
   #Namespace.debug = debug
   #Interpreter.debug = debug
   Interpreter.initialize(modpath)
-  for fname in args:
-    print '===', fname, '==='
+  for name in args:
+    print '===', name, '==='
     MustBeDefinedNode.reset()
-    if fname.endswith('.py'):
-      module = Interpreter.load_file(fname, fname[:-3])
+    if name.endswith('.py'):
+      path = name
+      (name,_) = os.path.splitext(os.path.basename(name))
+      module = Interpreter.load_file(path, name)
     else:
-      module = Interpreter.load_module(fname)
+      module = Interpreter.load_module(name)
     MustBeDefinedNode.check()
-    module.showrec(sys.stdout)
+    module.showall(sys.stdout)
   print TypeNode.N
   return 0
 

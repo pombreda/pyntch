@@ -314,10 +314,7 @@ class Namespace(object):
 class BuiltinTypesNamespace(Namespace):
   
   def __init__(self, parent):
-    import klass
-    import function
-    import basic_types
-    import aggregate_types
+    import klass, function, basic_types, aggregate_types, builtin_funcs, module
     Namespace.__init__(self, parent, 'types')
     # types
     self.register_var('type').bind(basic_types.TypeType.get_typeobj())
@@ -343,16 +340,15 @@ class BuiltinTypesNamespace(Namespace):
     #self.register_var('reversed').bind(basic_types.ReversedType.get_typeobj())
     #self.register_var('frozenset').bind(basic_types.FrozenSetType.get_typeobj())
     
+    self.register_var('InstanceType').bind(klass.InstanceType.get_typeobj())
+    self.register_var('ModuleType').bind(module.ModuleType.get_typeobj())
     #self.register_var('BuiltinFunctionType').bind(builtin_funcs.BuiltinFunc.get_typeobj())
     #self.register_var('BuiltinMethodType').bind(builtin_funcs.BuiltinFunc.get_typeobj())
-    #self.register_var('ClassType').bind(function.ClassType.get_typeobj())
+    #self.register_var('ClassType').bind(klass.ClassType.get_typeobj())
     #self.register_var('FunctionType').bind(function.FuncType.get_typeobj())
     #self.register_var('LambdaType').bind(function.LambdaFuncType.get_typeobj())
     #self.register_var('GeneratorType').bind(function.IterType.get_typeobj())
-    self.register_var('InstanceType').bind(klass.InstanceType.get_typeobj())
     #self.register_var('MethodType').bind(function.MethodType.get_typeobj())
-    
-    #self.register_var('ModuleType').bind(module.ModuleType.get_typeobj())
     
     #self.register_var('buffer').bind(basic_types.BufferType.get_typeobj())
     #self.register_var('property').bind(basic_types.PropertyType.get_typeobj())
@@ -407,16 +403,8 @@ class BuiltinNamespace(Namespace):
     import basic_types
     import builtin_funcs
     Namespace.__init__(self, parent, '__builtin__')
-    #self.register_var('apply').bind(builtin_funcs.ApplyFunc())
-    #self.register_var('enumerate').bind(builtin_funcs.EnumerateFunc())
-    #self.register_var('filter').bind(builtin_funcs.FilterFunc())
-    #self.register_var('reduce').bind(builtin_funcs.ReduceFunc())
-    #self.register_var('map').bind(builtin_funcs.MapFunc())
-    #self.register_var('max').bind(builtin_funcs.MaxFunc())
-    #self.register_var('min').bind(builtin_funcs.MinFunc())
-    #self.register_var('sum').bind(builtin_funcs.SumFunc())
-    #self.register_var('zip').bind(builtin_funcs.ZipFunc())
     self.register_var('abs').bind(builtin_funcs.AbsFunc())
+    #self.register_var('apply').bind(builtin_funcs.ApplyFunc())
     self.register_var('all').bind(builtin_funcs.AllFunc())
     self.register_var('any').bind(builtin_funcs.AnyFunc())
     self.register_var('callable').bind(builtin_funcs.CallableFunc())
@@ -424,6 +412,8 @@ class BuiltinNamespace(Namespace):
     self.register_var('cmp').bind(builtin_funcs.CmpFunc())
     self.register_var('dir').bind(builtin_funcs.DirFunc())
     self.register_var('divmod').bind(builtin_funcs.DivmodFunc())
+    #self.register_var('enumerate').bind(builtin_funcs.EnumerateFunc())
+    #self.register_var('filter').bind(builtin_funcs.FilterFunc())
     self.register_var('hash').bind(builtin_funcs.HashFunc())
     self.register_var('hex').bind(builtin_funcs.HexFunc())
     self.register_var('id').bind(builtin_funcs.IdFunc())
@@ -431,14 +421,20 @@ class BuiltinNamespace(Namespace):
     self.register_var('issubclass').bind(builtin_funcs.IsSubclassFunc())
     self.register_var('iter').bind(builtin_funcs.IterFunc())
     self.register_var('len').bind(builtin_funcs.LenFunc())
+    #self.register_var('map').bind(builtin_funcs.MapFunc())
+    self.register_var('max').bind(builtin_funcs.MaxFunc())
+    self.register_var('min').bind(builtin_funcs.MinFunc())
     self.register_var('oct').bind(builtin_funcs.OctFunc())
     self.register_var('ord').bind(builtin_funcs.OrdFunc())
     self.register_var('pow').bind(builtin_funcs.PowFunc())
     self.register_var('range').bind(builtin_funcs.RangeFunc())
     self.register_var('raw_input').bind(builtin_funcs.RawInputFunc())
+    #self.register_var('reduce').bind(builtin_funcs.ReduceFunc())
     self.register_var('repr').bind(builtin_funcs.ReprFunc())
     self.register_var('round').bind(builtin_funcs.RoundFunc())
+    #self.register_var('sum').bind(builtin_funcs.SumFunc())
     self.register_var('unichr').bind(builtin_funcs.UnichrFunc())
+    #self.register_var('zip').bind(builtin_funcs.ZipFunc())
 
     # coerce, intern
     # vars,eval,locals,globals,compile,getattr,hasattr,setattr,delattr,reload,__import__,execfile,input
