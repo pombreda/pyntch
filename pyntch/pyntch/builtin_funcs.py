@@ -12,7 +12,7 @@ from klass import InstanceObject
 from basic_types import TypeType, NumberType, BoolType, IntType, LongType, FloatType, \
      BaseStringType, StrType, UnicodeType, ANY, \
      BuiltinCallable, BuiltinConstCallable
-from aggregate_types import ListType, TupleType, DictType, IterType, ElementGetter
+from aggregate_types import ListType, TupleType, DictType, IterType
 
 
 ##  BuiltinFunc
@@ -59,21 +59,21 @@ class LenFunc(BuiltinFunc):
   class LengthChecker(MustBeDefinedNode):
     
     def __init__(self, frame, target):
-      MustBeDefinedNode.__init__(self, frame)
       self.done = set()
       self.target = target
-      self.target.connect(self, self.recv_target)
+      MustBeDefinedNode.__init__(self, frame)
+      self.target.connect(self.recv_target)
       return
 
     def recv_target(self, src):
+      from expression import MethodCall
       for obj in src:
         if obj in self.done: continue
         self.done.add(obj)
         if obj.is_type(ListType.get_typeobj(), TupleType.get_typeobj(), DictType.get_typeobj()):
           obj.connect(self)
         elif isinstance(obj, InstanceObject):
-          value = obj.get_attr('__len__').optcall(self, (), {})
-          value.connect(self)
+          MethodCall(self, obj, '__len__', (), {}).connect(self)
       return
 
     def check_undefined(self):
@@ -236,31 +236,13 @@ class RoundFunc(BuiltinConstFunc):
 ##
 class IterFunc(BuiltinFunc):
 
-  class IterConversion(CompoundTypeNode):
-    
-    def __init__(self, frame, obj):
-      self.frame = frame
-      self.done = set()
-      CompoundTypeNode.__init__(self)
-      obj.connect(self, self.recv_elem)
-      return
-    
-    def recv_elem(self, src):
-      for obj in src:
-        if obj in self.done: continue
-        self.done.add(obj)
-        try:
-          obj.get_iter(self.frame).connect(self)
-        except (NodeTypeError, NodeAttrError):
-          self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
-      return
-  
   def process_args(self, frame, args, kwargs):
+    from expression import IterRef
     v = args[0]
     if v in self.cache:
       iterobj = self.cache[v]
     else:
-      iterobj = self.IterConversion(frame, v)
+      iterobj = IterRef(frame, v)
       self.cache[v] = iterobj
     return iterobj
 
@@ -329,9 +311,10 @@ class AllFunc(BuiltinFunc):
     return
 
   def process_args(self, frame, args, kwargs):
+    from expression import IterElement
     if kwargs:
       frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
-    ElementGetter(args[0], frame)
+    IterElement(frame, args[0])
     return BoolType.get_object()
 
 class AnyFunc(BuiltinFunc):
@@ -341,9 +324,8 @@ class AnyFunc(BuiltinFunc):
     return
 
   def process_args(self, frame, args, kwargs):
+    from expression import IterElement
     if kwargs:
       frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
-    ElementGetter(args[0], frame)
+    IterElement(frame, args[0])
     return BoolType.get_object()
-
-

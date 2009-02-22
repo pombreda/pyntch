@@ -17,11 +17,10 @@ class FuncType(BuiltinType, TreeReporter):
   ##
   class FuncBody(CompoundTypeNode, ExecutionFrame):
 
-    def __init__(self, frame, name, loc):
+    def __init__(self, name):
       self.name = name
-      ExecutionFrame.__init__(self, loc=loc)
+      ExecutionFrame.__init__(self)
       CompoundTypeNode.__init__(self)
-      self.associate_frame(frame)
       return
 
     def __repr__(self):
@@ -41,7 +40,7 @@ class FuncType(BuiltinType, TreeReporter):
       return
 
   def __init__(self, parent_reporter, parent_frame, parent_space,
-               name, argnames, defaults, varargs, kwargs, code, loc):
+               name, argnames, defaults, varargs, kwargs, code, tree):
     TreeReporter.__init__(self, parent_reporter, name)
     from expression import TupleUnpack
     def maprec(func, x):
@@ -52,7 +51,7 @@ class FuncType(BuiltinType, TreeReporter):
     self.name = name
     # prepare local variables that hold passed arguments.
     self.space = Namespace(parent_space, name)
-    self.loc = loc
+    self.loc = (tree._module, tree.lineno)
     # handle "**kwd".
     self.kwarg = None
     if kwargs:
@@ -75,7 +74,8 @@ class FuncType(BuiltinType, TreeReporter):
       assert not isinstance(var1, list), var1
       assert not isinstance(arg1, list), arg1
       if isinstance(var1, tuple):
-        tup = TupleUnpack(parent_frame, code, arg1, len(var1))
+        tup = TupleUnpack(parent_frame, arg1, len(var1))
+        tup.setloc(code)
         for (i,v) in enumerate(var1):
           assign(v, tup.get_nth(i))
       else:
@@ -91,7 +91,7 @@ class FuncType(BuiltinType, TreeReporter):
 
   def build_body(self, name, tree):
     from syntax import build_stmt
-    body = self.FuncBody(self, name, tree)
+    body = self.FuncBody(name)
     evals = []
     self.space.register_names(tree)
     build_stmt(self, body, self.space, tree, evals, isfuncdef=True)
@@ -136,7 +136,7 @@ class FuncType(BuiltinType, TreeReporter):
       assert not isinstance(var1, list), var1
       assert not isinstance(arg1, list), arg1
       if isinstance(var1, tuple):
-        tup = TupleUnpack(frame, None, arg1, len(var1))
+        tup = TupleUnpack(frame, arg1, len(var1))
         for (i,v) in enumerate(var1):
           assign(v, tup.get_nth(i))
       else:
@@ -162,10 +162,11 @@ class FuncType(BuiltinType, TreeReporter):
     return self.body
 
   def show(self, p):
-    p('### %s(%s)' % (self.loc._module.get_loc(), self.loc.lineno))
+    (module,lineno) = self.loc
+    p('### %s(%s)' % (module.get_loc(), lineno))
     for frame in self.frames:
-      if frame.loc:
-        p('# called at %s(%s)' % (frame.loc._module.get_loc(), frame.loc.lineno))
+      (module,lineno) = frame.getloc()
+      p('# called at %s(%s)' % (module.get_loc(), lineno))
     names = set()
     def recjoin(sep, seq):
       for x in seq:
@@ -199,15 +200,15 @@ class ClassMethodType(FuncType): pass
 class LambdaFuncType(FuncType):
   
   def __init__(self, parent_reporter, parent_frame, parent_space,
-               argnames, defaults, varargs, kwargs, code, loc):
+               argnames, defaults, varargs, kwargs, code, tree):
     name = '__lambda_%x' % id(code)
     FuncType.__init__(self, parent_reporter, parent_frame, parent_space,
-                      name, argnames, defaults, varargs, kwargs, code, loc)
+                      name, argnames, defaults, varargs, kwargs, code, tree)
     return
 
   def build_body(self, name, tree):
     from syntax import build_expr
-    body = self.FuncBody(self, name, tree)
+    body = self.FuncBody(name)
     evals = []
     evals.append(('r', build_expr(self, body, self.space, tree, evals)))
     body.set_retval(evals)

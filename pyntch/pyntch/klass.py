@@ -3,7 +3,6 @@
 from typenode import TreeReporter, CompoundTypeNode, \
      NodeTypeError, NodeAttrError, BuiltinType, BuiltinObject
 from namespace import Namespace
-from frame import MustBeDefinedNode
 
 
 ##  BoundMethodType
@@ -36,19 +35,15 @@ class ClassType(BuiltinType, TreeReporter):
   
   ##  ClassAttr
   ##
-  class ClassAttr(MustBeDefinedNode):
+  class ClassAttr(CompoundTypeNode):
 
     def __init__(self, name, klass, baseklass=None):
       self.name = name
       self.klass = klass
-      self.called = False
-      self.args = []
-      self.kwargs = {}
       self.done = set()
-      self.retval = CompoundTypeNode()
-      MustBeDefinedNode.__init__(self)
+      CompoundTypeNode.__init__(self)
       if baseklass:
-        baseklass.connect(self, self.recv_baseklass)
+        baseklass.connect(self.recv_baseklass)
       return
 
     def __repr__(self):
@@ -62,41 +57,6 @@ class ClassType(BuiltinType, TreeReporter):
           klass.get_attr(self.name).connect(self)
         except NodeAttrError:
           pass
-      return
-
-    def optcall(self, frame, args, kwargs):
-      # Remember the keyword arguments.
-      for (kwname,kwvalue) in kwargs.iteritems():
-        if kwname not in self.kwargs:
-          var = CompoundTypeNode()
-          self.kwargs[kwname] = var
-        else:
-          var = self.kwargs[kwname]
-        kwvalue.connect(var)
-      # Remember other arguments.
-      while len(self.args) < len(args):
-        self.args.append(CompoundTypeNode())
-      for (var1,arg1) in zip(self.args, args):
-        arg1.connect(var1)
-      # Propagate the exceptions.
-      self.connect_expt(frame)
-      self.called = True
-      self.update_calls()
-      return self.retval
-    
-    def recv(self, src):
-      CompoundTypeNode.recv(self, src)
-      self.update_calls()
-      return
-
-    def update_calls(self):
-      if not self.called: return
-      for obj in self.types:
-        try:
-          obj.call(self, self.args, self.kwargs).connect(self.retval)
-        except NodeTypeError:
-          pass
-        self.update_type(obj)
       return
 
     def check_undefined(self):
@@ -148,17 +108,18 @@ class ClassType(BuiltinType, TreeReporter):
     return method
 
   def call(self, frame, args, kwargs):
+    from expression import MethodCall
     self.frames.add(frame)
-    self.get_attr('__init__').optcall(frame, (self.instance,)+args, kwargs)
+    MethodCall(frame, self, '__init__', (self.instance,)+args, kwargs)
     return self.instance
   
 class PythonClassType(ClassType, TreeReporter):
   
-  def __init__(self, parent_reporter, parent_frame, parent_space, name, bases, code, evals, loc):
+  def __init__(self, parent_reporter, parent_frame, parent_space, name, bases, code, evals, tree):
     TreeReporter.__init__(self, parent_reporter, name)
     ClassType.__init__(self, name, bases)
     from syntax import build_stmt
-    self.loc = loc
+    self.loc = (tree._module, tree.lineno)
     self.space = Namespace(parent_space, name)
     if code:
       self.space.register_names(code)
@@ -175,10 +136,11 @@ class PythonClassType(ClassType, TreeReporter):
     return self.space.fullname()
   
   def show(self, p):
-    p('### %s(%s)' % (self.loc._module.get_loc(), self.loc.lineno))
+    (module,lineno) = self.loc
+    p('### %s(%s)' % (module.get_loc(), lineno))
     for frame in self.frames:
-      if frame.loc:
-        p('# instantiated at %s(%d)' % (frame.loc._module.get_loc(), frame.loc.lineno))
+      (module,lineno) = frame.getloc()
+      p('# instantiated at %s(%d)' % (module.get_loc(), lineno))
     if self.bases:
       p('class %s(%s):' % (self.name, ', '.join( base.fullname() for base in self.baseklass.types )))
     else:
@@ -207,7 +169,7 @@ class InstanceObject(BuiltinObject):
       self.instance = instance
       self.processed = set()
       ClassType.ClassAttr.__init__(self, name, instance.klass, instance.klass.baseklass)
-      instance.klass.connect(self, self.recv_baseklass)
+      instance.klass.connect(self.recv_baseklass)
       return
 
     def __repr__(self):
@@ -225,7 +187,6 @@ class InstanceObject(BuiltinObject):
         elif isinstance(obj, FuncType):
           obj = self.instance.bind_func(obj)
         self.update_type(obj)
-      self.update_calls()
       return
 
   #
@@ -253,7 +214,14 @@ class InstanceObject(BuiltinObject):
     return attr
 
   def get_iter(self, frame):
-    return self.get_attr('__iter__').optcall(frame, [], {})
+    from expression import MethodCall
+    return MethodCall(frame, self, '__iter__', [], {})
+
+  def get_element(self, frame, subs, write=False):
+    if write:
+      return MethodCall(frame, self, '__setelem__', subs, {})
+    else:
+      return MethodCall(frame, self, '__getelem__', subs, {})
   
   def bind_func(self, func):
     if func not in self.boundmethods:
