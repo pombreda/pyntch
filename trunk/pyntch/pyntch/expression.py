@@ -510,7 +510,8 @@ class CompareOp(CompoundTypeNode, ExecutionFrame):
     self.done = set()
     CompoundTypeNode.__init__(self, [BoolType.get_object()])
     ExecutionFrame.__init__(self, parent_frame)
-    self.left.connect(self.recv_left)
+    if op not in ('is', 'is not'):
+      self.left.connect(self.recv_left)
     return
   
   def __repr__(self):

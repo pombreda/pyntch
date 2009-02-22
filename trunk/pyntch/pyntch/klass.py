@@ -218,6 +218,7 @@ class InstanceObject(BuiltinObject):
     return MethodCall(frame, self, '__iter__', [], {})
 
   def get_element(self, frame, subs, write=False):
+    from expression import MethodCall
     if write:
       return MethodCall(frame, self, '__setelem__', subs, {})
     else:

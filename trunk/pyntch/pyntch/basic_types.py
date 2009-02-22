@@ -53,31 +53,31 @@ class BuiltinConstCallable(BuiltinCallable):
     BuiltinCallable.__init__(self, name, args=args, optargs=optargs, expts=expts)
     return
 
-  def accept_arg(self, frame, i):
-    s = 'arg%d' % i
-    spec = self.args[i]
-    if isinstance(spec, list):
-      if spec == [ANY]:
-        return SequenceTypeChecker(frame, ANY, s)
-      else:
-        return SequenceTypeChecker(frame, [ x.get_typeobj() for x in spec ], s)
-    if isinstance(spec, tuple):
-      return TypeChecker(frame, [ x.get_typeobj() for x in spec ], s)
-    if spec == ANY:
-      return TypeChecker(frame, ANY, s)
-    return TypeChecker(frame, [spec.get_typeobj()], s)
-
   def process_args(self, frame, args, kwargs):
     if kwargs:
       frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
     for (i,arg1) in enumerate(args):
       assert isinstance(arg1, TypeNode)
-      rcpt = self.accept_arg(frame, i)
-      if rcpt:
-        arg1.connect(rcpt)
+      self.accept_arg(frame, i, arg1)
     for expt in self.expts:
       frame.raise_expt(expt)
     return self.retobj
+
+  def accept_arg(self, frame, i, arg1):
+    s = 'arg%d' % i
+    spec = self.args[i]
+    if isinstance(spec, list):
+      if spec == [ANY]:
+        arg1.connect(SequenceTypeChecker(frame, ANY, s))
+      else:
+        arg1.connect(SequenceTypeChecker(frame, [ x.get_typeobj() for x in spec ], s))
+    elif isinstance(spec, tuple):
+      arg1.connect(TypeChecker(frame, [ x.get_typeobj() for x in spec ], s))
+    elif spec == ANY:
+      arg1.connect(TypeChecker(frame, ANY, s))
+    else:
+      arg1.connect(TypeChecker(frame, [spec.get_typeobj()], s))
+    return
 
 
 ##  BuiltinConstMethod
@@ -154,11 +154,12 @@ class IntType(NumberType, BuiltinConstCallable):
           self.frame.raise_expt(TypeErrorType.occur('cannot convert to integer: %s' % obj))
       return
 
-  def accept_arg(self, frame, i):
+  def accept_arg(self, frame, i, arg1):
     if i == 0:
-      return IntType.IntConvChecker(frame)
+      arg1.connect(IntType.IntConvChecker(frame))
     else:
-      return BuiltinConstCallable.accept_arg(self, frame, i)
+      BuiltinConstCallable.accept_arg(self, frame, i, arg1)
+    return
 
   def __init__(self):
     BuiltinBasicType.__init__(self)
@@ -337,8 +338,9 @@ class BaseStringType(BuiltinBasicType, BuiltinConstCallable):
                                     'the return value of __repr__ method'))
       return
 
-  def accept_arg(self, frame, _):
-    return BaseStringType.StrConvChecker(frame)
+  def accept_arg(self, frame, i, arg1):
+    arg1.connect(self.StrConvChecker(frame))
+    return
 
   def call(self, frame, args, kwargs):
     if self.TYPE_NAME == 'basestring':
@@ -374,11 +376,12 @@ class UnicodeType(BaseStringType):
   TYPE_INSTANCE = UnicodeObject
 
   class TranslateFunc(BuiltinConstMethod):
-    def accept_arg(self, frame, i):
-      return KeyValueTypeChecker(frame,
-                                 [IntType.get_typeobj()],
-                                 [IntType.get_typeobj(), UnicodeType.get_typeobj(), NoneType.get_typeobj()],
-                                 'arg%d' % i)
+    def accept_arg(self, frame, i, arg1):
+      arg1.connect(KeyValueTypeChecker(frame,
+                                       [IntType.get_typeobj()],
+                                       [IntType.get_typeobj(), UnicodeType.get_typeobj(), NoneType.get_typeobj()],
+                                       'arg%d' % i))
+      return
 
   def get_attr(self, name, write=False):
     if name == 'isdecimal':
