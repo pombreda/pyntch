@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
-from typenode import TreeReporter, CompoundTypeNode, \
+from typenode import CompoundTypeNode, \
      NodeTypeError, NodeAttrError, BuiltinType, BuiltinObject
 from namespace import Namespace
+from module import TreeReporter
 
 
 ##  BoundMethodType
@@ -82,14 +83,11 @@ class ClassType(BuiltinType, TreeReporter):
     return self
 
   def is_subclass(self, klassobj):
-    if self is klassobj:
-      return True
-    else:
-      for klass in self.baseklass:
-        if isinstance(klass, ClassType):
-          if klass.is_subclass(klassobj):
-            return True
-      return False
+    if self is klassobj: return True
+    for klass in self.baseklass:
+      if isinstance(klass, ClassType):
+        if klass.is_subclass(klassobj): return True
+    return False
 
   def get_attr(self, name, write=False):
     if name not in self.attrs:
@@ -125,7 +123,7 @@ class PythonClassType(ClassType, TreeReporter):
       self.space.register_names(code)
       build_stmt(self, parent_frame, self.space, code, evals)
     for (name,var) in self.space:
-      # Do not inherit attributes from the base class
+      # Do not consider the values of attributes inherited from the base class
       # if they are explicitly overriden.
       attr = self.ClassAttr(name, self)
       var.connect(attr)
@@ -135,23 +133,23 @@ class PythonClassType(ClassType, TreeReporter):
   def fullname(self):
     return self.space.fullname()
   
-  def show(self, p):
+  def show(self, out):
     (module,lineno) = self.loc
-    p('### %s(%s)' % (module.get_loc(), lineno))
+    out.write('### %s(%s)' % (module.get_loc(), lineno))
     for frame in self.frames:
       (module,lineno) = frame.getloc()
-      p('# instantiated at %s(%d)' % (module.get_loc(), lineno))
+      out.write('# instantiated at %s(%d)' % (module.get_loc(), lineno))
     if self.bases:
-      p('class %s(%s):' % (self.name, ', '.join( base.fullname() for base in self.baseklass.types )))
+      out.write('class %s(%s):' % (self.name, ', '.join( base.fullname() for base in self.baseklass.types )))
     else:
-      p('class %s:' % self.name)
+      out.write('class %s:' % self.name)
     blocks = set( name for (name,_) in self.children )
     for (name, attr) in sorted(self.attrs.iteritems()):
       if name in blocks or not attr.types: continue
-      p('  class.%s = %s' % (name, attr.describe()))
+      out.write('  class.%s = %s' % (name, attr.describe()))
     for (name, attr) in sorted(self.instance.attrs.iteritems()):
       if name in blocks or not attr.types: continue
-      p('  instance.%s = %s' % (name, attr.describe()))
+      out.write('  instance.%s = %s' % (name, attr.describe()))
     return
 
 
@@ -204,6 +202,11 @@ class InstanceObject(BuiltinObject):
   
   def get_type(self):
     return self.klass
+
+  def is_type(self, *typeobjs):
+    for typeobj in typeobjs:
+      if self.klass.is_subclass(typeobj): return True
+    return False
 
   def get_attr(self, name, write=False):
     if name not in self.attrs:

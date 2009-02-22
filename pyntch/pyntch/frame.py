@@ -76,7 +76,7 @@ class ExecutionFrame(object):
   def associate_frame(self, frame):
     return
 
-  def show(self, p):
+  def show(self, out):
     expts_here = []
     expts_there = []
     for expt in self.buffer:
@@ -89,9 +89,9 @@ class ExecutionFrame(object):
       else:
         expts_there.append(expt)
     for expt in sorted(expts_here, key=lambda expt:expt.frame.getloc()):
-      p('  raises %r' % expt)
+      out.write('  raises %r' % expt)
     for expt in sorted(expts_there, key=lambda expt:expt.frame.getloc()):
-      p('  [raises %r]' % expt)
+      out.write('  [raises %r]' % expt)
     return
 
 

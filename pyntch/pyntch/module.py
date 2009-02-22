@@ -1,11 +1,57 @@
 #!/usr/bin/env python
 import sys, os.path
 stderr = sys.stderr
-from typenode import TreeReporter, BuiltinType, BuiltinObject
+from typenode import BuiltinType, BuiltinObject
 from frame import ExecutionFrame
 from namespace import Namespace
 
 
+##  IndentedStream
+##
+class IndentedStream(object):
+  
+  def __init__(self, fp, width=2):
+    self.fp = fp
+    self.width = width
+    self.i = 0
+    return
+
+  def write(self, s):
+    self.fp.write(' '*(self.width*self.i)+s+'\n')
+    return
+
+  def indent(self, d):
+    self.i += d
+    return
+
+  
+##  TreeReporter
+##
+class TreeReporter(object):
+
+  def __init__(self, parent=None, name=None):
+    self.children = []
+    if parent:
+      parent.register(name, self)
+    return
+
+  def register(self, name, child):
+    self.children.append((name, child))
+    return
+
+  def show(self, out):
+    return
+
+  def showrec(self, out):
+    self.show(out)
+    out.write('')
+    out.indent(+1)
+    for (name,reporter) in self.children:
+      reporter.showrec(out)
+    out.indent(-1)
+    return
+  
+  
 ##  Module
 ##
 class ModuleObject(BuiltinObject):
@@ -21,6 +67,11 @@ class ModuleObject(BuiltinObject):
 
   def get_attr(self, name, write=False):
     return self.space.register_var(name)
+
+  def showall(self, fp, width=2):
+    self.showrec(IndentedStream(fp, width=width))
+    return
+  
   
 class ModuleType(BuiltinType):
   
@@ -52,13 +103,13 @@ class PythonModuleObject(ModuleObject, TreeReporter, ExecutionFrame):
     return self.path
   get_loc = get_path
 
-  def show(self, p):
-    p('[%s]' % self.name)
+  def show(self, out):
+    out.write('[%s]' % self.name)
     blocks = set( name for (name,_) in self.children )
     for (name,v) in sorted(self.space):
       if name in blocks: continue
-      p('  %s = %s' % (name, v.describe()))
-    ExecutionFrame.show(self, p)
+      out.write('  %s = %s' % (name, v.describe()))
+    ExecutionFrame.show(self, out)
     return
   
 

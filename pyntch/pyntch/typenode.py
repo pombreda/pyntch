@@ -6,32 +6,6 @@
 import sys
 
 
-##  TreeReporter
-##
-class TreeReporter(object):
-
-  def __init__(self, parent=None, name=None):
-    self.children = []
-    if parent:
-      parent.register(name, self)
-    return
-
-  def register(self, name, child):
-    self.children.append((name, child))
-    return
-
-  def show(self, p):
-    return
-
-  def showrec(self, out, i=0):
-    h = '  '*i
-    self.show(lambda s: out.write(h+s+'\n'))
-    out.write('\n')
-    for (name,reporter) in self.children:
-      reporter.showrec(out, i+1)
-    return
-  
-  
 ##  TypeNode
 ##
 class NodeError(Exception): pass

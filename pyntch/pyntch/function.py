@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
-from typenode import TreeReporter, CompoundTypeNode, \
+from typenode import CompoundTypeNode, \
      NodeTypeError, NodeAttrError, BuiltinType, BuiltinObject
 from namespace import Namespace, Variable
 from frame import ExecutionFrame, MustBeDefinedNode
 from exception import TypeErrorType
+from module import TreeReporter
 
 
 ##  FuncType
@@ -161,12 +162,12 @@ class FuncType(BuiltinType, TreeReporter):
     self.body.connect_expt(frame)
     return self.body
 
-  def show(self, p):
+  def show(self, out):
     (module,lineno) = self.loc
-    p('### %s(%s)' % (module.get_loc(), lineno))
+    out.write('### %s(%s)' % (module.get_loc(), lineno))
     for frame in self.frames:
       (module,lineno) = frame.getloc()
-      p('# called at %s(%s)' % (module.get_loc(), lineno))
+      out.write('# called at %s(%s)' % (module.get_loc(), lineno))
     names = set()
     def recjoin(sep, seq):
       for x in seq:
@@ -181,13 +182,13 @@ class FuncType(BuiltinType, TreeReporter):
       r.append('*'+self.vararg)
     if self.kwarg:
       r.append('**'+self.kwarg)
-    p('def %s(%s):' % (self.name, ', '.join(r)) )
+    out.write('def %s(%s):' % (self.name, ', '.join(r)) )
     names.update( name for (name,_) in self.children )
     for (k,v) in sorted(self.space):
       if k not in names:
-        p('  %s = %s' % (k, v.describe()))
-    p('  return %s' % self.body.describe())
-    self.body.show(p)
+        out.write('  %s = %s' % (k, v.describe()))
+    out.write('  return %s' % self.body.describe())
+    self.body.show(out)
     return
 
 
