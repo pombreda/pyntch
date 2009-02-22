@@ -7,28 +7,6 @@ from basic_types import BuiltinCallable, BuiltinConstMethod, BoolType, IntType, 
 from expression import IterElement
 
 
-##  SequenceConverter
-##
-class SequenceConverter(CompoundTypeNode):
-
-  def __init__(self, frame, target):
-    self.frame = frame
-    self.target = target
-    self.done = set()
-    CompoundTypeNode.__init__(self)
-    return
-
-  def __repr__(self):
-    return 'convert(%r)' % self.target
-
-  def recv(self, src):
-    for obj in src:
-      if obj in self.done: continue
-      self.done.add(obj)
-      IterElement(self.frame, obj).connect(self.target.elemall)
-    return
-
-
 ##  BuiltinAggregateObject
 ##
 class BuiltinAggregateObject(BuiltinObject):
@@ -94,8 +72,9 @@ class BuiltinSequenceObject(BuiltinAggregateObject):
     def __repr__(self):
       return '%r.extend' % self.target
     
-    def accept_arg(self, frame, _):
-      return SequenceConverter(frame, self.target)
+    def accept_arg(self, frame, i, arg1):
+      IterElement(frame, arg1).connect(self.target.elemall)
+      return
 
   # SequenceAppender
   class SequenceAppender(BuiltinConstMethod):
@@ -108,8 +87,9 @@ class BuiltinSequenceObject(BuiltinAggregateObject):
     def __repr__(self):
       return '%r.append' % self.target
     
-    def accept_arg(self, frame, _):
-      return self.target.elemall
+    def accept_arg(self, frame, i, arg1):
+      arg1.connect(self.target.elemall)
+      return
 
   # BuiltinSequenceObject
   def __init__(self, typeobj, elemall=None):
@@ -148,10 +128,12 @@ class ListObject(BuiltinSequenceObject):
   # InsertMethod
   class InsertMethod(BuiltinSequenceObject.SequenceAppender):
     
-    def accept_arg(self, frame, i):
+    def accept_arg(self, frame, i, arg1):
       if i == 0:
-        return BuiltinConstMethod.accept_arg(self, frame, i)
-      return BuiltinSequenceObject.SequenceAppender.accept_arg(self, frame, i)
+        BuiltinConstMethod.accept_arg(self, frame, i, arg1)
+      else:
+        BuiltinSequenceObject.SequenceAppender.accept_arg(self, frame, i, arg1)
+      return
 
   # SortMethod
   class SortMethod(BuiltinConstMethod):
@@ -257,7 +239,7 @@ class ListType(BuiltinSequenceType):
 
   def create_sequence(self, frame, node):
     listobj = ListType.create_list()
-    node.connect(SequenceConverter(frame, listobj))
+    IterElement(frame, node).connect(listobj.elemall)
     return listobj
 
   def create_null(self):
@@ -310,7 +292,7 @@ class TupleType(BuiltinSequenceType):
 
   def create_sequence(self, frame, node):
     tupleobj = TupleType.create_tuple()
-    node.connect(SequenceConverter(frame, tupleobj))
+    IterElement(frame, node).connect(tupleobj.elemall)
     return tupleobj
   
   def create_null(self):
@@ -428,7 +410,7 @@ class SetType(BuiltinSequenceType):
 
   def create_sequence(self, frame, node):
     setobj = SetType.create_set()
-    node.connect(SequenceConverter(frame, setobj))
+    IterElement(frame, node).connect(setobj.elemall)
     return setobj
 
   def create_null(self):
@@ -485,8 +467,9 @@ class GeneratorObject(IterObject):
       BuiltinConstMethod.__init__(self, name, retobj, args=args, expts=expts)
       return
     
-    def accept_arg(self, frame, _):
-      return self.target.sent
+    def accept_arg(self, frame, i, arg1):
+      arg1.connect(self.target.sent)
+      return
 
   # GeneratorObject
   def __init__(self, typeobj, elemall=None, elements=None):
@@ -615,9 +598,10 @@ class DictObject(BuiltinAggregateObject):
         self.found.update_type(NoneType.get_object())
       return BuiltinConstMethod.process_args(self, frame, args, kwargs)
     
-    def accept_arg(self, frame, i):
-      if i == 0: return None
-      return self.found
+    def accept_arg(self, frame, i, arg1):
+      if i != 0:
+        arg1.connect(self.found)
+      return
 
   # dict.pop
   class Pop(BuiltinConstMethod):
@@ -633,9 +617,10 @@ class DictObject(BuiltinAggregateObject):
         frame.raise_expt(KeyErrorType.maybe('might not have the key: %r' % args[0]))
       return BuiltinConstMethod.process_args(self, frame, args, kwargs)
     
-    def accept_arg(self, frame, i):
-      if i == 0: return None
-      return self.found
+    def accept_arg(self, frame, i, arg1):
+      if i != 0:
+        arg1.connect(self.found)
+      return
 
   # dict.setdefault
   class SetDefault(BuiltinConstMethod):
@@ -654,11 +639,12 @@ class DictObject(BuiltinAggregateObject):
         self.found.update_type(NoneType.get_object())
       return BuiltinConstMethod.process_args(self, frame, args, kwargs)
     
-    def accept_arg(self, frame, i):
+    def accept_arg(self, frame, i, arg1):
       if i == 0:
-        return self.dictobj.value
+        arg1.connect(self.dictobj.value)
       else:
-        return self.found
+        arg1.connect(self.found)
+      return
 
   # dict.update
   class Update(BuiltinConstMethod):
