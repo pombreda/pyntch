@@ -6,8 +6,21 @@ from frame import ExecutionFrame, ExceptionCatcher, ExceptionMaker
 from exception import TypeChecker, NameErrorType, RuntimeErrorType
 from klass import PythonClassType
 from function import FuncType, LambdaFuncType
-from expression import AttrAssign, AttrRef, SubAssign, SubRef, IterRef, SliceAssign, SliceRef, SliceObject, \
-     FunCall, BinaryOp, CompareOp, BooleanOp, AssignOp, UnaryOp, NotOp, IfExpOp, TupleUnpack
+from expression import AttrRef, SubRef, SliceRef, \
+     AttrAssign, SubAssign, SliceAssign, \
+     FunCall, BinaryOp, UnaryOp, AssignOp, CompareOp, BooleanOp, NotOp, IfExpOp, \
+     IterElement, TupleUnpack
+
+
+##  SliceObject
+##
+class SliceObject(CompoundTypeNode, ExecutionFrame):
+  
+  def __init__(self, parent_frame, nodes):
+    self.nodes = nodes
+    CompoundTypeNode.__init__(self)
+    ExecutionFrame.__init__(self, parent_frame)
+    return
 
 
 ##  build_assign(reporter, frame, namespace, node1, node2, evals)
@@ -16,16 +29,17 @@ def build_assign(reporter, frame, space, n, v, evals):
   if isinstance(n, ast.AssName) or isinstance(n, ast.Name):
     space[n.name].bind(v)
   elif isinstance(n, ast.AssTuple):
-    tup = TupleUnpack(frame, n, v, len(n.nodes))
+    tup = TupleUnpack(frame, v, len(n.nodes))
+    tup.setloc(n)
     for (i,c) in enumerate(n.nodes):
       build_assign(reporter, frame, space, c, tup.get_nth(i), evals)
   elif isinstance(n, (ast.AssAttr, ast.Getattr)):
     obj = build_expr(reporter, frame, space, n.expr, evals)
-    AttrAssign(frame, n, obj, n.attrname, v)
+    AttrAssign(frame, obj, n.attrname, v).setloc(n)
   elif isinstance(n, ast.Subscript):
     obj = build_expr(reporter, frame, space, n.expr, evals)
     subs = [ build_expr(reporter, frame, space, expr, evals) for expr in n.subs ]
-    SubAssign(frame, n, obj, subs, v)
+    SubAssign(frame, obj, subs, v).setloc(n)
   elif isinstance(n, ast.Slice):
     obj = build_expr(reporter, frame, space, n.expr, evals)
     lower = upper = None
@@ -33,7 +47,7 @@ def build_assign(reporter, frame, space, n, v, evals):
       lower = build_expr(reporter, frame, space, n.lower, evals)
     if n.upper:
       upper = build_expr(reporter, frame, space, n.upper, evals)
-    SliceAssign(frame, n, obj, lower, upper, v)
+    SliceAssign(frame, obj, lower, upper, v).setloc(n)
   else:
     raise SyntaxError('unsupported syntax: %r (%s:%r)' % (n, n._module.get_loc(), n.lineno))
   return
@@ -69,16 +83,19 @@ def build_expr(reporter, frame, space, tree, evals):
       build_expr(reporter, frame, space, tree.star_args, evals)
     if tree.dstar_args:
       build_expr(reporter, frame, space, tree.dstar_args, evals)
-    expr = FunCall(frame, tree, func, args, kwargs)
+    expr = FunCall(frame, func, args, kwargs)
+    expr.setloc(tree)
 
   elif isinstance(tree, ast.Getattr):
     obj = build_expr(reporter, frame, space, tree.expr, evals)
-    expr = AttrRef(frame, tree, obj, tree.attrname)
+    expr = AttrRef(frame, obj, tree.attrname)
+    expr.setloc(tree)
 
   elif isinstance(tree, ast.Subscript):
     obj = build_expr(reporter, frame, space, tree.expr, evals)
     subs = [ build_expr(reporter, frame, space, sub, evals) for sub in tree.subs ]
-    expr = SubRef(frame, tree, obj, subs)
+    expr = SubRef(frame, obj, subs)
+    expr.setloc(tree)
 
   elif isinstance(tree, ast.Slice):
     obj = build_expr(reporter, frame, space, tree.expr, evals)
@@ -87,11 +104,13 @@ def build_expr(reporter, frame, space, tree, evals):
       lower = build_expr(reporter, frame, space, tree.lower, evals)
     if tree.upper:
       upper = build_expr(reporter, frame, space, tree.upper, evals)
-    expr = SliceRef(frame, tree, obj, lower, upper)
+    expr = SliceRef(frame, obj, lower, upper)
+    expr.setloc(tree)
 
   elif isinstance(tree, ast.Sliceobj):
     elements = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
-    expr = SliceObject(frame, tree, elements)
+    expr = SliceObject(frame, elements)
+    expr.setloc(tree)
     
   elif isinstance(tree, ast.Tuple):
     elements = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
@@ -114,7 +133,8 @@ def build_expr(reporter, frame, space, tree, evals):
     op = tree.__class__.__name__
     left = build_expr(reporter, frame, space, tree.left, evals)
     right = build_expr(reporter, frame, space, tree.right, evals)
-    expr = BinaryOp(frame, tree, op, left, right)
+    expr = BinaryOp(frame, op, left, right)
+    expr.setloc(tree)
     
   # &, |, ^
   elif isinstance(tree, (ast.Bitand, ast.Bitor, ast.Bitxor)):
@@ -122,32 +142,37 @@ def build_expr(reporter, frame, space, tree, evals):
     nodes = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
     expr = nodes.pop(0)
     for right in nodes:
-      expr = BinaryOp(frame, tree, op, expr, right)
+      expr = BinaryOp(frame, op, expr, right)
+      expr.setloc(tree)
   
   # ==, !=, <=, >=, <, >, in, not in, is, is not
   elif isinstance(tree, ast.Compare):
     left = build_expr(reporter, frame, space, tree.expr, evals)
     for (op,node) in tree.ops:
       right = build_expr(reporter, frame, space, node, evals)
-      expr = CompareOp(frame, tree, op, left, right)
+      expr = CompareOp(frame, op, left, right)
+      expr.setloc(tree)
       left = right
 
   # +,-,~
   elif isinstance(tree, (ast.UnaryAdd, ast.UnarySub, ast.Invert)):
     op = tree.__class__.__name__
     value = build_expr(reporter, frame, space, tree.expr, evals)
-    expr = UnaryOp(frame, tree, op, value)
+    expr = UnaryOp(frame, op, value)
+    expr.setloc(tree)
 
   # and, or
   elif isinstance(tree, (ast.And, ast.Or)):
     op = tree.__class__.__name__
     nodes = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
-    expr = BooleanOp(frame, tree, op, nodes)
+    expr = BooleanOp(frame, op, nodes)
+    expr.setloc(tree)
 
   # not
   elif isinstance(tree, ast.Not):
     value = build_expr(reporter, frame, space, tree.expr, evals)
-    expr = NotOp(frame, tree, value)
+    expr = NotOp(frame, value)
+    expr.setloc(tree)
 
   # lambda
   elif isinstance(tree, ast.Lambda):
@@ -161,7 +186,9 @@ def build_expr(reporter, frame, space, tree, evals):
     expr = ListType.create_list(CompoundTypeNode(elements))
     for qual in tree.quals:
       seq = build_expr(reporter, frame, space, qual.list, evals)
-      build_assign(reporter, frame, space, qual.assign, IterRef(frame, qual.list, seq), evals)
+      elem = IterElement(frame, seq)
+      elem.setloc(qual.list)
+      build_assign(reporter, frame, space, qual.assign, elem, evals)
       for qif in qual.ifs:
         build_expr(reporter, frame, space, qif.test, evals)
 
@@ -172,7 +199,9 @@ def build_expr(reporter, frame, space, tree, evals):
     expr = IterType.create_iter(CompoundTypeNode(elements))
     for qual in gen.quals:
       seq = build_expr(reporter, frame, space, qual.iter, evals)
-      build_assign(reporter, frame, space, qual.assign, IterRef(frame, qual.iter, seq), evals)
+      elem = IterElement(frame, seq)
+      elem.setloc(qual.iter)
+      build_assign(reporter, frame, space, qual.assign, elem, evals)
       for qif in qual.ifs:
         build_expr(reporter, frame, space, qif.test, evals)
 
@@ -188,7 +217,8 @@ def build_expr(reporter, frame, space, tree, evals):
     test = build_expr(reporter, frame, space, tree.test, evals)
     then = build_expr(reporter, frame, space, tree.then, evals)
     else_ = build_expr(reporter, frame, space, tree.else_, evals)
-    expr = IfExpOp(frame, tree, test, then, else_)
+    expr = IfExpOp(frame, test, then, else_)
+    expr.setloc(tree)
 
   elif isinstance(tree, ast.Backquote):
     ExecutionFrame(frame, tree).raise_expt(RuntimeErrorType.occur('backquote is not supported.'))
@@ -248,7 +278,8 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     if tree.decorators:
       for node in tree.decorators:
         decor = build_expr(reporter, frame, space, node, evals)
-        func = FunCall(frame, tree, decor, (func,))
+        func = FunCall(frame, decor, (func,), {})
+        func.setloc(tree)
     space[name].bind(func)
 
   # class
@@ -271,7 +302,8 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
       ExecutionFrame(frame, tree).raise_expt(NameErrorType.occur('cannot assign to an undefined variable.'))
     else:
       right = build_expr(reporter, frame, space, tree.expr, evals)
-      value = AssignOp(frame, tree, tree.op, left, right)
+      value = AssignOp(frame, tree.op, left, right)
+      value.setloc(tree)
       build_assign(reporter, frame, space, tree.node, value, evals)
 
   # return
@@ -306,7 +338,9 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   # for
   elif isinstance(tree, ast.For):
     seq = build_expr(reporter, frame, space, tree.list, evals)
-    build_assign(reporter, frame, space, tree.assign, IterRef(frame, tree.list, seq), evals)
+    elem = IterElement(frame, seq)
+    elem.setloc(tree.list)
+    build_assign(reporter, frame, space, tree.assign, elem, evals)
     build_stmt(reporter, frame, space, tree.body, evals)
     if tree.else_:
       build_stmt(reporter, frame, space, tree.else_, evals)

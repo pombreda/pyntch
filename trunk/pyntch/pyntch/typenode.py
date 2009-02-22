@@ -54,11 +54,11 @@ class TypeNode(object):
   def __iter__(self):
     return iter(list(self.types))
 
-  def connect(self, node, receiver=None):
-    #assert isinstance(node, CompoundTypeNode), node
+  def connect(self, receiver):
+    if isinstance(receiver, CompoundTypeNode):
+      receiver = receiver.recv
     if self.debug:
-      print >>sys.stderr, 'connect: %r -> %r' % (self, node)
-    receiver = receiver or node.recv
+      print >>sys.stderr, 'connect: %r -> %r' % (self, receiver)
     if receiver in self.sendto: return False
     self.sendto.append(receiver)
     return receiver(self)

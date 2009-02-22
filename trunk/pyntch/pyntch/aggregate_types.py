@@ -4,42 +4,30 @@ from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, \
 from exception import TypeChecker, \
      TypeErrorType, IndexErrorType, ValueErrorType, KeyErrorType, StopIterationType
 from basic_types import BuiltinCallable, BuiltinConstMethod, BoolType, IntType, StrType, NoneType, ANY
+from expression import IterElement
 
 
-##  ElementGetter
+##  SequenceConverter
 ##
-class ElementGetter(CompoundTypeNode):
-  
-  def __init__(self, src, frame):
+class SequenceConverter(CompoundTypeNode):
+
+  def __init__(self, frame, target):
     self.frame = frame
+    self.target = target
+    self.done = set()
     CompoundTypeNode.__init__(self)
-    for obj in src:
-      try:
-        obj.get_iter(frame).connect(self, self.recv_iter)
-      except (NodeTypeError, NodeAttrError):
-        self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
     return
 
-  def recv_iter(self, src):
+  def __repr__(self):
+    return 'convert(%r)' % self.target
+
+  def recv(self, src):
     for obj in src:
-      try:
-        obj.get_attr('next').connect(self, self.recv_next)
-      except (NodeTypeError, NodeAttrError):
-        self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
+      if obj in self.done: continue
+      self.done.add(obj)
+      IterElement(self.frame, obj).connect(self.target.elemall)
     return
 
-  def recv_next(self, src):
-    from frame import ExceptionCatcher
-    from exception import StopIterationType
-    frame1 = ExceptionCatcher(self.frame)
-    frame1.add_handler(StopIterationType.occur(''))
-    for obj in src:
-      try:
-        obj.call(frame1, (), {}).connect(self)
-      except (NodeTypeError, NodeAttrError):
-        self.frame.raise_expt(TypeErrorType.occur('%r is not callable: %r' % (src, obj)))
-    return
-  
 
 ##  BuiltinAggregateObject
 ##
@@ -95,26 +83,6 @@ class BuiltinAggregateType(BuiltinCallable, BuiltinType):
 ##
 class BuiltinSequenceObject(BuiltinAggregateObject):
 
-  # SequenceConverter
-  class SequenceConverter(CompoundTypeNode):
-    
-    def __init__(self, frame, target):
-      self.frame = frame
-      self.target = target
-      CompoundTypeNode.__init__(self)
-      return
-    
-    def __repr__(self):
-      return 'convert(%r)' % self.target
-    
-    def recv(self, src):
-      for obj in src:
-        try:
-          ElementGetter(obj, self.frame).connect(self.target.elemall)
-        except (NodeTypeError, NodeAttrError):
-          self.frame.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
-      return
-
   # SequenceExtender
   class SequenceExtender(BuiltinConstMethod):
     
@@ -127,7 +95,7 @@ class BuiltinSequenceObject(BuiltinAggregateObject):
       return '%r.extend' % self.target
     
     def accept_arg(self, frame, _):
-      return BuiltinSequenceObject.SequenceConverter(frame, self.target)
+      return SequenceConverter(frame, self.target)
 
   # SequenceAppender
   class SequenceAppender(BuiltinConstMethod):
@@ -196,11 +164,11 @@ class ListObject(BuiltinSequenceObject):
         self.key = CompoundTypeNode()
         CompoundTypeNode.__init__(self)
         if fkey:
-          fkey.connect(self, self.recv_fkey)
+          fkey.connect(self.recv_fkey)
         else:
           target.elemall.connect(self.key)
         if fcmp:
-          fcmp.connect(self, self.recv_fcmp)
+          fcmp.connect(self.recv_fcmp)
         return
       
       def recv_fkey(self, src):
@@ -289,7 +257,7 @@ class ListType(BuiltinSequenceType):
 
   def create_sequence(self, frame, node):
     listobj = ListType.create_list()
-    node.connect(BuiltinSequenceObject.SequenceConverter(frame, listobj))
+    node.connect(SequenceConverter(frame, listobj))
     return listobj
 
   def create_null(self):
@@ -342,7 +310,7 @@ class TupleType(BuiltinSequenceType):
 
   def create_sequence(self, frame, node):
     tupleobj = TupleType.create_tuple()
-    node.connect(BuiltinSequenceObject.SequenceConverter(frame, tupleobj))
+    node.connect(SequenceConverter(frame, tupleobj))
     return tupleobj
   
   def create_null(self):
@@ -364,19 +332,19 @@ class SetObject(BuiltinSequenceObject):
         self.types1 = CompoundTypeNode()
         self.types2 = CompoundTypeNode()
         CompoundTypeNode.__init__(self)
-        src1.connect(self, self.recv1)
-        src2.connect(self, self.recv2)
+        src1.connect(self.recv1)
+        src2.connect(self.recv2)
         return
       
       def recv1(self, src):
         for obj in src:
-          ElementGetter(obj, self.frame).connect(self.types1)
+          IterElement(self.frame, obj).connect(self.types1)
         self.update_intersection()
         return
       
       def recv2(self, src):
         for obj in src:
-          ElementGetter(obj, self.frame).connect(self.types2)
+          IterElement(self.frame, obj).connect(self.types2)
         self.update_intersection()
         return
         
@@ -460,7 +428,7 @@ class SetType(BuiltinSequenceType):
 
   def create_sequence(self, frame, node):
     setobj = SetType.create_set()
-    node.connect(BuiltinSequenceObject.SequenceConverter(frame, setobj))
+    node.connect(SequenceConverter(frame, setobj))
     return setobj
 
   def create_null(self):
@@ -579,7 +547,7 @@ class DictObject(BuiltinAggregateObject):
     
     def recv(self, src):
       for obj in src:
-        ElementGetter(obj, self.frame).connect(self, self.recv_pair)
+        IterElement(self.frame, obj).connect(self.recv_pair)
       return
   
     def recv_pair(self, src):
@@ -592,7 +560,7 @@ class DictObject(BuiltinAggregateObject):
           else:
             self.frame.raise_expt(TypeErrorType.occur('cannot convert to dict: tuple length is not 2: %s' % obj))
           continue
-        elem = ElementGetter(obj, self.frame)
+        elem = IterElement(self.frame, obj)
         elem.connect(self.target.key)
         elem.connect(self.target.value)
         self.frame.raise_expt(TypeErrorType.maybe('might not be able to convert to dict: %s' % obj))
@@ -609,7 +577,7 @@ class DictObject(BuiltinAggregateObject):
     
     def recv(self, src):
       for obj in src:
-        ElementGetter(obj, self.frame).connect(self.target.key)
+        IterElement(self.frame, obj).connect(self.target.key)
       return
 
   # dict.fromkeys

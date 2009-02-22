@@ -7,22 +7,19 @@ stderr = sys.stderr
 ##  TracebackObject
 ##
 ##  A TracebackObject is an exception object (or whatever is thrown)
-##  associated with a specific location.
+##  associated with a specific execution frame.
 ##
 class TracebackObject(TypeNode):
 
-  def __init__(self, expt):
+  def __init__(self, expt, frame):
     self.expt = expt
-    self.frame = None
+    self.frame = frame
     TypeNode.__init__(self, [self])
     return
 
   def __repr__(self):
-    loc = self.frame.loc
-    if loc:
-      return '%s at %s(%s)' % (self.expt, loc._module.get_loc(), loc.lineno)
-    else:
-      return '%s at ???' % (self.expt)
+    (module,lineno) = self.frame.getloc()
+    return '%s at %s(%s)' % (self.expt, module.get_loc(), lineno)
 
   def desc1(self, _):
     return repr(self)
@@ -39,46 +36,33 @@ class ExecutionFrame(object):
 
   debug = 0
 
-  class ExceptionAnnotator(CompoundTypeNode):
-    
-    def __init__(self, frame):
-      self.frame = frame
-      self.done = set()
-      CompoundTypeNode.__init__(self)
-      return
-
-    def __repr__(self):
-      return '<Exceptions at %r>' % self.frame
-    
-    def recv(self, src):
-      for obj in src:
-        if obj in self.done: continue
-        self.done.add(obj)
-        assert isinstance(obj, TracebackObject), obj
-        if not obj.frame: obj.frame = self.frame
-        self.update_type(obj)
-      return
-
-  def __init__(self, parent=None, loc=None):
+  def __init__(self, parent=None, tree=None):
     self.parent = parent
-    self.loc = loc
+    self.loc = None
     self.done = set()
-    self.annotator = self.ExceptionAnnotator(self)
+    self.buffer = CompoundTypeNode()
     if parent:
       self.connect_expt(parent)
+    if tree:
+      self.setloc(tree)
     return
 
   def getloc(self):
-    if self.loc:
-      return (self.loc._module, self.loc.lineno)
-    else:
-      return None
+    loc = None
+    while not loc:
+      loc = self.loc
+      self = self.parent
+    return loc
+
+  def setloc(self, tree):
+    self.loc = (tree._module, tree.lineno)
+    return
 
   def connect_expt(self, frame):
     assert isinstance(frame, ExecutionFrame)
     if self.debug:
       print >>stderr, 'connect_expt: %r <- %r' % (frame, self)
-    self.annotator.connect(frame.annotator)
+    self.buffer.connect(frame.buffer)
     return
   
   def raise_expt(self, expt):
@@ -86,7 +70,7 @@ class ExecutionFrame(object):
     self.done.add(expt)
     if self.debug:
       print >>stderr, 'raise_expt: %r <- %r' % (self, expt)
-    TracebackObject(expt).connect(self.annotator)
+    TracebackObject(expt, self).connect(self.buffer)
     return
 
   def associate_frame(self, frame):
@@ -95,7 +79,7 @@ class ExecutionFrame(object):
   def show(self, p):
     expts_here = []
     expts_there = []
-    for expt in self.annotator:
+    for expt in self.buffer:
       frame = expt.frame
       while frame:
         if frame == self:
@@ -144,11 +128,11 @@ class ExceptionCatcher(ExecutionFrame):
       return
 
     def catch(self, obj, var):
-      obj.connect(self, lambda src: self.recv_expt(src, var))
+      obj.connect(lambda src: self.recv_expt(src, var))
       return
 
   def __init__(self, parent):
-    self.annotator = self.ExceptionFilter(self)
+    self.buffer = self.ExceptionFilter(self)
     self.vars = {}
     self.done = set()
     self.catchall = False
@@ -167,7 +151,7 @@ class ExceptionCatcher(ExecutionFrame):
   def add_handler(self, src):
     if src not in self.vars:
       self.vars[src] = CompoundTypeNode()
-    src.connect(self, self.recv_handler_expt)
+    src.connect(self.recv_handler_expt)
     return self.vars[src]
 
   def recv_handler_expt(self, src):
@@ -176,9 +160,9 @@ class ExceptionCatcher(ExecutionFrame):
       if obj in self.done: continue
       self.done.add(obj)
       if obj.is_type(TupleType.get_typeobj()):
-        self.annotator.catch(obj.elemall, self.vars[src])
+        self.buffer.catch(obj.elemall, self.vars[src])
       else:
-        self.annotator.catch(obj, self.vars[src])
+        self.buffer.catch(obj, self.vars[src])
     return
 
 
@@ -194,7 +178,7 @@ class ExceptionMaker(CompoundTypeNode, ExecutionFrame):
     self.done = set()
     CompoundTypeNode.__init__(self)
     ExecutionFrame.__init__(self, parent=parent)
-    exctype.connect(self, self.recv_type)
+    exctype.connect(self.recv_type)
     return
   
   def __repr__(self):
@@ -225,9 +209,9 @@ class MustBeDefinedNode(CompoundTypeNode, ExecutionFrame):
 
   nodes = None
   
-  def __init__(self, parent=None, loc=None):
+  def __init__(self, parent=None):
     CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent=parent, loc=loc)
+    ExecutionFrame.__init__(self, parent=parent)
     MustBeDefinedNode.nodes.append(self)
     return
 
@@ -244,5 +228,3 @@ class MustBeDefinedNode(CompoundTypeNode, ExecutionFrame):
     for node in klass.nodes:
       node.check_undefined()
     return
-
-

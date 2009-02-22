@@ -156,20 +156,17 @@ class TypeChecker(CompoundTypeNode):
 class SequenceTypeChecker(TypeChecker):
   
   def __init__(self, parent_frame, types, blame=None):
+    self.done = set()
     self.elemdone = set()
     TypeChecker.__init__(self, parent_frame, types, blame=blame)
     return
   
   def recv(self, src):
-    from aggregate_types import ElementGetter
+    from expression import IterElement
     for obj in src:
       if obj in self.done: continue
       self.done.add(obj)
-      try:
-        ElementGetter(obj, self.parent_frame).connect(self, self.recv_elemobj)
-      except (NodeTypeError, NodeAttrError):
-        if self.blame:
-          self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be iterable' % (self.blame, obj)))
+      IterElement(self.parent_frame, obj).connect(self.recv_elemobj)
     return
   
   def recv_elemobj(self, src):
@@ -204,8 +201,8 @@ class KeyValueTypeChecker(TypeChecker):
       if obj in self.done: continue
       self.done.add(obj)
       if isinstance(obj, DictObject):
-        obj.key.connect(self, self.recv_key)
-        obj.value.connect(self, self.recv_value)
+        obj.key.connect(self.recv_key)
+        obj.value.connect(self.recv_value)
       else:
         if self.blame:
           self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be dictionary' % (self.blame, obj)))
@@ -236,4 +233,3 @@ class KeyValueTypeChecker(TypeChecker):
         self.parent_frame.raise_expt(TypeErrorType.occur(
           'value %s (%s) must be [%s]' % (self.blame, obj, '|'.join(map(repr, self.validtypes)))))
     return
-

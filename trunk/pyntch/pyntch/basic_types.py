@@ -324,14 +324,15 @@ class BaseStringType(BuiltinBasicType, BuiltinConstCallable):
       return
     
     def recv(self, src):
+      from expression import MethodCall
       for obj in src:
         if obj in self.done: continue
         self.done.add(obj)
         if isinstance(obj, InstanceObject):
-          value = obj.get_attr('__str__').optcall(self.frame, (), {})
+          value = MethodCall(self.frame, obj, '__str__', (), {})
           value.connect(TypeChecker(self.frame, BaseStringType.get_typeobj(), 
                                     'the return value of __str__ method'))
-          value = obj.get_attr('__repr__').optcall(self.frame, (), {})
+          value = MethodCall(self.frame, obj, '__repr__', (), {})
           value.connect(TypeChecker(self.frame, BaseStringType.get_typeobj(), 
                                     'the return value of __repr__ method'))
       return
