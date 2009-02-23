@@ -428,7 +428,8 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
       build_expr(reporter, frame, space, tree.upper, evals)
 
   elif isinstance(tree, ast.Assert):
-    build_typecheck(reporter, frame, space, tree.test, tree.fail, evals)
+    frame1 = ExecutionFrame(frame, tree)
+    build_typecheck(reporter, frame1, space, tree.test, tree.fail, evals)
     build_expr(reporter, frame, space, tree.test, evals)
     if tree.fail:
       build_expr(reporter, frame, space, tree.fail, evals)

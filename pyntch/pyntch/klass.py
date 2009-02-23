@@ -82,6 +82,9 @@ class ClassType(BuiltinType, TreeReporter):
   def get_type(self):
     return self
 
+  def get_name(self):
+    return self.fullname()
+  
   def is_subclass(self, klassobj):
     if self is klassobj: return True
     for klass in self.baseklass:
