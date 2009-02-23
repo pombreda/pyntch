@@ -5,7 +5,6 @@ README
 # TODO:
 #  hier class types.
 #  handle star, dstar.
-#  slice, get_element, sliceobj
 #  automatic coercion for builtin functions.
 #  re-raise in except.
 #  suppress warnings.

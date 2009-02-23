@@ -395,6 +395,7 @@ class BuiltinExceptionsNamespace(Namespace):
     self.register_var('UnicodeDecodeError').bind(exception.UnicodeDecodeErrorType.get_typeobj())
     self.register_var('UnicodeEncodeError').bind(exception.UnicodeEncodeErrorType.get_typeobj())
     self.register_var('UnicodeTranslateError').bind(exception.UnicodeTranslateErrorType.get_typeobj())
+    print exception.TypeErrorType.get_typeobj()
     return
   
 class BuiltinNamespace(Namespace):

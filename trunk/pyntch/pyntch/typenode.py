@@ -156,9 +156,10 @@ class BuiltinObject(SimpleTypeNode):
 class BuiltinType(BuiltinObject):
 
   TYPE_NAME = None # must be defined by subclass
-  
+  TYPEOBJS = {}
+
   def __init__(self):
-    self.__class__.TYPEOBJ = self
+    self.initialize(self)
     SimpleTypeNode.__init__(self, self)
     return
 
@@ -183,12 +184,16 @@ class BuiltinType(BuiltinObject):
   fullname = get_name
 
   # get_typeobj()
-  TYPEOBJ = None
   @classmethod
   def get_typeobj(klass):
-    if klass.TYPEOBJ == None:
-      klass.TYPEOBJ = klass()
-    return klass.TYPEOBJ
+    if klass not in klass.TYPEOBJS:
+      klass()
+    return klass.TYPEOBJS[klass]
+
+  @classmethod
+  def initialize(klass, obj):
+    klass.TYPEOBJS[klass] = obj
+    return
 
   class InitMethod(BuiltinObject):
     def call(self, frame, args, kwargs):
@@ -206,12 +211,12 @@ class BuiltinType(BuiltinObject):
 class BuiltinBasicType(BuiltinType):
 
   TYPE_INSTANCE = None
-  
+  OBJECTS = {}
+
   # get_object()
-  OBJECT = None
   @classmethod
   def get_object(klass):
     assert klass.TYPE_INSTANCE
-    if not klass.OBJECT:
-      klass.OBJECT = klass.TYPE_INSTANCE(klass.get_typeobj())
-    return klass.OBJECT
+    if klass not in klass.OBJECTS:
+      klass.OBJECTS[klass] = klass.TYPE_INSTANCE(klass.get_typeobj())
+    return klass.OBJECTS[klass]
