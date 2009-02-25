@@ -17,11 +17,13 @@ def main(argv):
   except getopt.GetoptError:
     return usage()
   debug = 0
+  verbose = 1
   modpath = ['stub']+sys.path[:]
   for (k, v) in opts:
     if k == '-d': debug += 1
     elif k == '-p': modpath.extend(v.split(':'))
   TypeNode.debug = debug
+  TypeNode.verbose = verbose
   #ExecutionFrame.debug = debug
   #Namespace.debug = debug
   #Interpreter.debug = debug
@@ -37,7 +39,7 @@ def main(argv):
       module = Interpreter.load_module(name)
     MustBeDefinedNode.check()
     module.showall(sys.stdout)
-  print TypeNode.N
+  TypeNode.showstat()
   return 0
 
 if __name__ == '__main__': sys.exit(main(sys.argv))

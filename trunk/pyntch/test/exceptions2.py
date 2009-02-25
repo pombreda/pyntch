@@ -2,6 +2,7 @@
 
 class A: pass
 class B(A): pass
+class C(A): pass
 
 try:
   raise B
@@ -12,6 +13,12 @@ try:
   raise A
 except B:
   print 'B'
+
+try:
+  raise B
+  raise C
+except (B,C):
+  print 'B,C'
 
 try:
   raise 'foo'
