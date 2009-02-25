@@ -79,9 +79,6 @@ class ClassType(BuiltinType, TreeReporter):
   def __repr__(self):
     return ('<class %s>' % self.fullname())
   
-  def get_type(self):
-    return self
-
   def get_name(self):
     return self.fullname()
   

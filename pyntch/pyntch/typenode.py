@@ -14,15 +14,27 @@ class NodeAttrError(NodeError): pass
 
 class TypeNode(object):
 
+  verbose = 0
   debug = 0
   N = 0
+
+  @classmethod
+  def inc(klass):
+    if not klass.verbose: return
+    klass.N += 1
+    if klass.N % 1000 == 0:
+      sys.stderr.write('.'); sys.stderr.flush()
+    return
+  @classmethod  
+  def showstat(klass):
+    if not klass.verbose: return
+    print >>sys.stderr, '%d nodes' % klass.N
+    return
 
   def __init__(self, types):
     self.types = set(types)
     self.sendto = []
-    TypeNode.N += 1
-    if TypeNode.N % 1000 == 0:
-      print >>sys.stderr, 'nodes:', TypeNode.N
+    TypeNode.inc()
     return
 
   def __iter__(self):

@@ -3,11 +3,11 @@ README
 
 
 # TODO:
-#  hier class types.
 #  handle star, dstar.
 #  automatic coercion for builtin functions.
 #  re-raise in except.
 #  suppress warnings.
+#  variable type spec.
 #  test cases.
 
 Pyntch is a PYthoN Type CHecker.  It examines a Python source code

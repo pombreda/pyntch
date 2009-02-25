@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys
-from typenode import TypeNode, CompoundTypeNode, NodeTypeError
+from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeTypeError
 stderr = sys.stderr
 
 
@@ -47,6 +47,10 @@ class ExecutionFrame(object):
       self.setloc(tree)
     return
 
+  def __repr__(self):
+    (module,lineno) = self.getloc()
+    return '<Frame at %s(%s)>' % (module.get_loc(), lineno)
+
   def getloc(self):
     loc = None
     while not loc:
@@ -66,6 +70,7 @@ class ExecutionFrame(object):
     return
   
   def raise_expt(self, expt):
+    assert not isinstance(expt, CompoundTypeNode)
     if expt in self.done: return
     self.done.add(expt)
     if self.debug:
@@ -103,7 +108,7 @@ class ExceptionCatcher(ExecutionFrame):
     
     def __init__(self, catcher):
       self.catcher = catcher
-      self.handlers = {}
+      self.handlers = []
       self.done = set()
       CompoundTypeNode.__init__(self)
       return
@@ -114,17 +119,18 @@ class ExceptionCatcher(ExecutionFrame):
         if obj in self.done: continue
         self.done.add(obj)
         assert isinstance(obj, TracebackObject), obj
-        for expt in obj.expt:
-          try:
-            var = self.handlers[expt.get_type()]
-            expt.connect(var)
-          except KeyError:
-            self.update_type(obj)
+        assert isinstance(obj.expt, SimpleTypeNode), obj.expt
+        for (typeobj, var) in self.handlers:
+          if obj.expt.is_type(typeobj):
+            obj.expt.connect(var)
+            break
+        else:
+          self.update_type(obj)
       return
 
     def recv_expt(self, src, var):
       for obj in src:
-        self.handlers[obj.get_type()] = var
+        self.handlers.append((obj, var))
       return
 
     def catch(self, obj, var):
@@ -132,10 +138,13 @@ class ExceptionCatcher(ExecutionFrame):
       return
 
   def __init__(self, parent):
-    self.buffer = self.ExceptionFilter(self)
+    self.parent = parent
+    self.catchall = False
     self.vars = {}
     self.done = set()
-    self.catchall = False
+    self.buffer = self.ExceptionFilter(self)
+    if parent:
+      self.connect_expt(parent)
     return
   
   def __repr__(self):
@@ -149,20 +158,19 @@ class ExceptionCatcher(ExecutionFrame):
     return
   
   def add_handler(self, src):
-    if src not in self.vars:
-      self.vars[src] = CompoundTypeNode()
-    src.connect(self.recv_handler_expt)
-    return self.vars[src]
+    var = CompoundTypeNode()
+    src.connect(lambda src: self.recv_handler_expt(src, var))
+    return var
 
-  def recv_handler_expt(self, src):
+  def recv_handler_expt(self, src, var):
     from aggregate_types import TupleType
     for obj in src:
       if obj in self.done: continue
       self.done.add(obj)
       if obj.is_type(TupleType.get_typeobj()):
-        self.buffer.catch(obj.elemall, self.vars[src])
+        self.buffer.catch(obj.elemall, var)
       else:
-        self.buffer.catch(obj, self.vars[src])
+        self.buffer.catch(obj, var)
     return
 
 
@@ -197,9 +205,9 @@ class ExceptionMaker(CompoundTypeNode, ExecutionFrame):
         except NodeTypeError:
           self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.exctype, obj)))
           continue
-        result.connect(self)
+        self.raise_expt(result)
       else:
-        obj.connect(self)
+        self.raise_expt(obj)
     return
 
 
