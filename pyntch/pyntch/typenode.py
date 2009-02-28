@@ -27,7 +27,7 @@ class TypeNode(object):
     return
   @classmethod  
   def showstat(klass):
-    if not klass.verbose: return
+    if not klass.debug: return
     print >>sys.stderr, '%d nodes' % klass.N
     return
 
@@ -207,15 +207,11 @@ class BuiltinType(BuiltinObject):
     klass.TYPEOBJS[klass] = obj
     return
 
+  # default methods
   class InitMethod(BuiltinObject):
     def call(self, frame, args, kwargs):
       from basic_types import NoneType
       return NoneType.get_object()
-
-  def get_attr(self, name, write=False):
-    if name == '__init__':
-      return self.InitMethod(self)
-    raise NodeAttrError(name)
 
 
 ##  BuiltinBasicType

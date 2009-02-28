@@ -34,28 +34,35 @@ class TracebackObject(TypeNode):
 ##
 class ExecutionFrame(object):
 
-  debug = 0
+  debug = 1
 
   def __init__(self, parent=None, tree=None):
     self.parent = parent
     self.loc = None
-    self.done = set()
-    self.buffer = CompoundTypeNode()
+    self.raised = set()
+    self.buffer = self.get_buffer()
     if parent:
       self.connect_expt(parent)
     if tree:
       self.setloc(tree)
     return
 
+  def get_buffer(self):
+    return CompoundTypeNode()
+
   def __repr__(self):
-    (module,lineno) = self.getloc()
-    return '<Frame at %s(%s)>' % (module.get_loc(), lineno)
+    try:
+      (module,lineno) = self.getloc()
+      return '<Frame at %s(%s)>' % (module.get_loc(), lineno)
+    except ValueError:
+      return '<Frame at ???>'
 
   def getloc(self):
     loc = None
     while not loc:
       loc = self.loc
       self = self.parent
+      if not self: raise ValueError
     return loc
 
   def setloc(self, tree):
@@ -71,8 +78,8 @@ class ExecutionFrame(object):
   
   def raise_expt(self, expt):
     assert not isinstance(expt, CompoundTypeNode)
-    if expt in self.done: return
-    self.done.add(expt)
+    if expt in self.raised: return
+    self.raised.add(expt)
     if self.debug:
       print >>stderr, 'raise_expt: %r <- %r' % (self, expt)
     TracebackObject(expt, self).connect(self.buffer)
@@ -96,7 +103,7 @@ class ExecutionFrame(object):
     for expt in sorted(expts_here, key=lambda expt:expt.frame.getloc()):
       out.write('  raises %r' % expt)
     for expt in sorted(expts_there, key=lambda expt:expt.frame.getloc()):
-      out.write('  [raises %r]' % expt)
+      out.write('  (raises %r)' % expt)
     return
 
 
@@ -109,15 +116,15 @@ class ExceptionCatcher(ExecutionFrame):
     def __init__(self, catcher):
       self.catcher = catcher
       self.handlers = []
-      self.done = set()
+      self.filtered = set()
       CompoundTypeNode.__init__(self)
       return
     
     def recv(self, src):
       if self.catcher.catchall: return
       for obj in src:
-        if obj in self.done: continue
-        self.done.add(obj)
+        if obj in self.filtered: continue
+        self.filtered.add(obj)
         assert isinstance(obj, TracebackObject), obj
         assert isinstance(obj.expt, SimpleTypeNode), obj.expt
         for (typeobj, var) in self.handlers:
@@ -138,20 +145,25 @@ class ExceptionCatcher(ExecutionFrame):
       return
 
   def __init__(self, parent):
-    self.parent = parent
     self.catchall = False
     self.vars = {}
-    self.done = set()
-    self.buffer = self.ExceptionFilter(self)
-    if parent:
-      self.connect_expt(parent)
+    ExecutionFrame.__init__(self, parent=parent)
     return
+
+  def get_buffer(self):
+    return self.ExceptionFilter(self)
   
   def __repr__(self):
     if self.catchall:
-      return '<catch all>'
+      s = 'all'
     else:
-      return '<catch %s>' % ', '.join(map(repr, self.vars.iterkeys()))
+      s = ', '.join(map(repr, self.vars.iterkeys()))
+    try:
+      (module,lineno) = self.getloc()
+      return '<catch %s at %s(%s)>' % (s, module.get_loc(), lineno)
+    except ValueError:
+      return '<Catch %s at ???>' % s
+
 
   def add_all(self):
     self.catchall = True
@@ -165,49 +177,10 @@ class ExceptionCatcher(ExecutionFrame):
   def recv_handler_expt(self, src, var):
     from aggregate_types import TupleType
     for obj in src:
-      if obj in self.done: continue
-      self.done.add(obj)
       if obj.is_type(TupleType.get_typeobj()):
         self.buffer.catch(obj.elemall, var)
       else:
         self.buffer.catch(obj, var)
-    return
-
-
-##  ExceptionMaker
-##
-##  Special behaviour on raising an exception.
-##
-class ExceptionMaker(CompoundTypeNode, ExecutionFrame):
-  
-  def __init__(self, parent, exctype, excargs):
-    self.exctype = exctype
-    self.excargs = excargs
-    self.done = set()
-    CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent=parent)
-    exctype.connect(self.recv_type)
-    return
-  
-  def __repr__(self):
-    return '<exception %s>' % (self.describe())
-
-  def recv_type(self, src):
-    from klass import ClassType
-    for obj in src:
-      if obj in self.done: continue
-      self.done.add(obj)
-      # Instantiate an object only if it is a class object.
-      # Otherwise, just return the object given.
-      if isinstance(obj, ClassType):
-        try:
-          result = obj.call(self, self.excargs, {})
-        except NodeTypeError:
-          self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.exctype, obj)))
-          continue
-        self.raise_expt(result)
-      else:
-        self.raise_expt(obj)
     return
 
 
@@ -235,4 +208,41 @@ class MustBeDefinedNode(CompoundTypeNode, ExecutionFrame):
   def check(klass):
     for node in klass.nodes:
       node.check_undefined()
+    return
+
+
+##  ExceptionMaker
+##
+##  Special behaviour on raising an exception.
+##
+class ExceptionMaker(CompoundTypeNode, ExecutionFrame):
+  
+  def __init__(self, parent, exctype, excargs):
+    self.exctype = exctype
+    self.excargs = excargs
+    self.processed = set()
+    CompoundTypeNode.__init__(self)
+    ExecutionFrame.__init__(self, parent=parent)
+    exctype.connect(self.recv_type)
+    return
+  
+  def __repr__(self):
+    return '<exception %s>' % (self.describe())
+
+  def recv_type(self, src):
+    from klass import ClassType
+    for obj in src:
+      if obj in self.processed: continue
+      self.processed.add(obj)
+      # Instantiate an object only if it is a class object.
+      # Otherwise, just return the object given.
+      if isinstance(obj, ClassType):
+        try:
+          result = obj.call(self, self.excargs, {})
+        except NodeTypeError:
+          self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.exctype, obj)))
+          continue
+        self.raise_expt(result)
+      else:
+        self.raise_expt(obj)
     return

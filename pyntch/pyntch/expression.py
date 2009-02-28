@@ -30,7 +30,7 @@ class AttrRef(MustBeDefinedNode):
       try:
         obj.get_attr(self.attrname).connect(self)
       except NodeAttrError:
-        self.raise_expt(AttributeErrorType.occur('attribute not defined: %r.%s.' % (obj, self.attrname)))
+        self.raise_expt(AttributeErrorType.occur('attribute not allowed: %r.%s.' % (obj, self.attrname)))
     return
 
   def check_undefined(self):

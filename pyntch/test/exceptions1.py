@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
-class E():
+class E(Exception):
   def __init__(self, *args):
+    Exception.__init__(self, args)
     return
 
 def foo():
@@ -19,8 +20,14 @@ def baz():
   except E, e:
     pass
 
+def boz():
+  try:
+    raise 'this should be propagated'
+  except:
+    raise
+
 if __name__ == '__main__':
   foo()
   bar()
   baz()
-
+  boz()

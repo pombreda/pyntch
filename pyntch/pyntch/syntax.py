@@ -383,6 +383,9 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     elif tree.expr1:
       expttype = build_expr(reporter, frame, space, tree.expr1, evals)
       ExceptionMaker(ExecutionFrame(frame, tree), expttype, ())
+    else:
+      # re-raise
+      assert 0, tree
 
   # printnl
   elif isinstance(tree, (ast.Print, ast.Printnl)):
