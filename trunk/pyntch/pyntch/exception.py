@@ -14,7 +14,7 @@ from klass import ClassType, InstanceObject
 ##  throughout the entire program so we define it here for a
 ##  convenience.
 ##
-class ExceptionObject(InstanceObject):
+class InternalException(InstanceObject):
 
   def __init__(self, klass, message=None):
     self.message = message
@@ -36,13 +36,18 @@ class ExceptionType(ClassType):
     ClassType.__init__(self, self.TYPE_NAME, [])
     return
 
+  def get_attr(self, name, write=False):
+    if name == '__init__':
+      return self.InitMethod(self)
+    return ClassType.get_attr(self, name, write=write)
+
   @classmethod
   def occur(klass, message):
     k = (klass.get_typeobj(), message)
     if k in klass.OBJECTS:
       expt = klass.OBJECTS[k]
     else:
-      expt = ExceptionObject(klass.get_typeobj(), message)
+      expt = InternalException(klass.get_typeobj(), message)
       klass.OBJECTS[k] = expt
     return expt
   maybe = occur
@@ -233,3 +238,5 @@ class KeyValueTypeChecker(TypeChecker):
         self.parent_frame.raise_expt(TypeErrorType.occur(
           'value %s (%s) must be [%s]' % (self.blame, obj, '|'.join(map(repr, self.validtypes)))))
     return
+
+
