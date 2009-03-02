@@ -18,8 +18,11 @@ class TracebackObject(TypeNode):
     return
 
   def __repr__(self):
-    (module,lineno) = self.frame.getloc()
-    return '%s at %s(%s)' % (self.expt, module.get_loc(), lineno)
+    try:
+      (module,lineno) = self.frame.getloc()
+      return '%s at %s(%s)' % (self.expt, module.get_loc(), lineno)
+    except ValueError:
+      return '%s at ???' % self.expt
 
   def desc1(self, _):
     return repr(self)
@@ -34,7 +37,7 @@ class TracebackObject(TypeNode):
 ##
 class ExecutionFrame(object):
 
-  debug = 1
+  debug = 0
 
   def __init__(self, parent=None, tree=None):
     self.parent = parent
@@ -164,7 +167,6 @@ class ExceptionCatcher(ExecutionFrame):
     except ValueError:
       return '<Catch %s at ???>' % s
 
-
   def add_all(self):
     self.catchall = True
     return
@@ -238,7 +240,7 @@ class ExceptionMaker(CompoundTypeNode, ExecutionFrame):
       # Otherwise, just return the object given.
       if isinstance(obj, ClassType):
         try:
-          result = obj.call(self, self.excargs, {})
+          result = obj.call(self, self.excargs)
         except NodeTypeError:
           self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.exctype, obj)))
           continue
