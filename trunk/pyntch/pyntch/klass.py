@@ -24,8 +24,8 @@ class BoundMethodType(BuiltinType):
   def get_type(self):
     return self
 
-  def call(self, frame, args, kwargs):
-    return self.func.call(frame, (self.arg0,)+tuple(args), kwargs)
+  def call(self, frame, args, kwargs, star, dstar):
+    return self.func.call(frame, (self.arg0,)+tuple(args), kwargs, star, dstar)
 
 
 ##  ClassType
@@ -105,10 +105,10 @@ class ClassType(BuiltinType, TreeReporter):
       method = self.boundmethods[func]
     return method
 
-  def call(self, frame, args, kwargs):
+  def call(self, frame, args, kwargs, star, dstar):
     from expression import MethodCall
     self.frames.add(frame)
-    MethodCall(frame, self, '__init__', (self.instance,)+args, kwargs)
+    MethodCall(frame, self, '__init__', (self.instance,)+args, kwargs, star, dstar)
     return self.instance
   
 class PythonClassType(ClassType, TreeReporter):
@@ -218,14 +218,14 @@ class InstanceObject(BuiltinObject):
 
   def get_iter(self, frame):
     from expression import MethodCall
-    return MethodCall(frame, self, '__iter__', [], {})
+    return MethodCall(frame, self, '__iter__')
 
   def get_element(self, frame, subs, write=False):
     from expression import MethodCall
     if write:
-      return MethodCall(frame, self, '__setelem__', subs, {})
+      return MethodCall(frame, self, '__setelem__', subs)
     else:
-      return MethodCall(frame, self, '__getelem__', subs, {})
+      return MethodCall(frame, self, '__getelem__', subs)
   
   def bind_func(self, func):
     if func not in self.boundmethods:

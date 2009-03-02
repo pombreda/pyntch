@@ -252,10 +252,12 @@ class SliceAssign(CompoundTypeNode, ExecutionFrame):
 ##
 class FunCall(CompoundTypeNode, ExecutionFrame):
   
-  def __init__(self, parent_frame, func, args, kwargs):
+  def __init__(self, parent_frame, func, args=None, kwargs=None, star=None, dstar=None):
     self.func = func
-    self.args = args
-    self.kwargs = kwargs
+    self.args = args or ()
+    self.kwargs = kwargs or {}
+    self.star = star
+    self.dstar = dstar
     self.done = set()
     CompoundTypeNode.__init__(self)
     ExecutionFrame.__init__(self, parent_frame)
@@ -272,7 +274,7 @@ class FunCall(CompoundTypeNode, ExecutionFrame):
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        obj.call(self, self.args, self.kwargs).connect(self)
+        obj.call(self, self.args, self.kwargs, self.star, self.dstar).connect(self)
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.func, obj)))
     return
@@ -416,9 +418,9 @@ class BinaryOp(MustBeDefinedNode):
       return
     # Handle optional methods.
     if isinstance(lobj, InstanceObject):
-      MethodCall(self, lobj, self.LMETHOD[self.op], [robj], {}).connect(self)
+      MethodCall(self, lobj, self.LMETHOD[self.op], [robj]).connect(self)
     if isinstance(robj, InstanceObject):
-      MethodCall(self, robj, self.RMETHOD[self.op], [lobj], {}).connect(self)
+      MethodCall(self, robj, self.RMETHOD[self.op], [lobj]).connect(self)
     return
   
   def check_undefined(self):
@@ -483,7 +485,7 @@ class UnaryOp(MustBeDefinedNode):
       if obj.is_type(NumberType.get_typeobj()):
         obj.connect(self)
       elif isinstance(obj, InstanceObject):
-        MethodCall(self, obj, self.METHOD[self.op], [], {}).connect(self)
+        MethodCall(self, obj, self.METHOD[self.op]).connect(self)
     return
 
 
@@ -523,7 +525,7 @@ class CompareOp(CompoundTypeNode, ExecutionFrame):
       if lobj in self.done: continue
       self.done.add(lobj)
       if isinstance(lobj, InstanceObject):
-        MethodCall(self, lobj, self.LMETHOD[self.op], [self.right], {})
+        MethodCall(self, lobj, self.LMETHOD[self.op], [self.right])
     return
 
 
@@ -590,8 +592,9 @@ class IfExpOp(CompoundTypeNode, ExecutionFrame):
 
 ##  MethodCall
 ##
-def MethodCall(parent_frame, target, name, args, kwargs):
-  return FunCall(parent_frame, OptAttrRef(parent_frame, target, name), args, kwargs)
+def MethodCall(parent_frame, target, name, args=None, kwargs=None, star=None, dstar=None):
+  return FunCall(parent_frame, OptAttrRef(parent_frame, target, name),
+                 args=args, kwargs=kwargs, star=star, dstar=dstar)
 
 
 ##  IterElement
@@ -600,8 +603,8 @@ def IterElement(parent_frame, target):
   from frame import ExceptionCatcher
   from exception import StopIterationType
   frame1 = ExceptionCatcher(parent_frame)
-  frame1.add_handler(StopIterationType.occur(''))
-  return MethodCall(frame1, IterRef(parent_frame, target), 'next', [], {})
+  frame1.add_handler(StopIterationType.get_typeobj())
+  return MethodCall(frame1, IterRef(parent_frame, target), 'next')
 
 
 ##  TupleUnpack

@@ -78,12 +78,12 @@ def build_expr(reporter, frame, space, tree, evals):
                   for arg1 in tree.args if not isinstance(arg1, ast.Keyword) )
     kwargs = dict( (arg1.name, build_expr(reporter, frame, space, arg1.expr, evals))
                    for arg1 in tree.args if isinstance(arg1, ast.Keyword) )
-    # XXX handle: tree.star_args, tree.dstar_args
+    star = dstar = None
     if tree.star_args:
-      build_expr(reporter, frame, space, tree.star_args, evals)
+      star = build_expr(reporter, frame, space, tree.star_args, evals)
     if tree.dstar_args:
-      build_expr(reporter, frame, space, tree.dstar_args, evals)
-    expr = FunCall(frame, func, args, kwargs)
+      dstar = build_expr(reporter, frame, space, tree.dstar_args, evals)
+    expr = FunCall(frame, func, args, kwargs, star, dstar)
     expr.setloc(tree)
 
   elif isinstance(tree, ast.Getattr):
@@ -278,7 +278,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     if tree.decorators:
       for node in tree.decorators:
         decor = build_expr(reporter, frame, space, node, evals)
-        func = FunCall(frame, decor, (func,), {})
+        func = FunCall(frame, decor, (func,))
         func.setloc(tree)
     space[name].bind(func)
 

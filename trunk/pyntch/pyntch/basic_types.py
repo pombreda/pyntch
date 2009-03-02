@@ -29,7 +29,7 @@ class BuiltinCallable(object):
     self.expts = (expts or [])
     return
   
-  def call(self, frame, args, kwargs):
+  def call(self, frame, args, kwargs, star, dstar):
     if len(args) < self.minargs:
       frame.raise_expt(TypeErrorType.occur(
         'too few argument for %s: %d or more.' % (self.name, self.minargs)))
@@ -330,10 +330,10 @@ class BaseStringType(BuiltinBasicType, BuiltinConstCallable):
         if obj in self.done: continue
         self.done.add(obj)
         if isinstance(obj, InstanceObject):
-          value = MethodCall(self.frame, obj, '__str__', (), {})
+          value = MethodCall(self.frame, obj, '__str__')
           value.connect(TypeChecker(self.frame, BaseStringType.get_typeobj(), 
                                     'the return value of __str__ method'))
-          value = MethodCall(self.frame, obj, '__repr__', (), {})
+          value = MethodCall(self.frame, obj, '__repr__')
           value.connect(TypeChecker(self.frame, BaseStringType.get_typeobj(), 
                                     'the return value of __repr__ method'))
       return
@@ -342,11 +342,11 @@ class BaseStringType(BuiltinBasicType, BuiltinConstCallable):
     arg1.connect(self.StrConvChecker(frame))
     return
 
-  def call(self, frame, args, kwargs):
+  def call(self, frame, args, kwargs, star, dstar):
     if self.TYPE_NAME == 'basestring':
       frame.raise_expt(TypeErrorType.occur('cannot instantiate a basestring type.'))
       return UndefinedTypeNode()
-    return BuiltinConstCallable.call(self, frame, args, kwargs)
+    return BuiltinConstCallable.call(self, frame, args, kwargs, star, dstar)
 
   def __init__(self):
     BuiltinBasicType.__init__(self)
