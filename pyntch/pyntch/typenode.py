@@ -178,6 +178,9 @@ class BuiltinType(BuiltinObject):
   def __repr__(self):
     return '<type %s>' % self.get_name()
 
+  def get_attr(self, name, write=False):
+    raise NodeAttrError(name)
+  
   @classmethod
   def get_type(klass):
     from basic_types import TypeType

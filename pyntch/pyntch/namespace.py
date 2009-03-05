@@ -330,15 +330,16 @@ class BuiltinTypesNamespace(Namespace):
     self.register_var('object').bind(basic_types.ObjectType.get_typeobj())
     self.register_var('file').bind(basic_types.FileType.get_typeobj())
     self.register_var('open').bind(basic_types.FileType.get_typeobj())
+    self.register_var('xrange').bind(basic_types.XRangeType.get_typeobj())
+    self.register_var('staticmethod').bind(basic_types.StaticMethodType.get_typeobj())
+    self.register_var('classmethod').bind(basic_types.ClassMethodType.get_typeobj())
     self.register_var('list').bind(aggregate_types.ListType.get_typeobj())
     self.register_var('tuple').bind(aggregate_types.TupleType.get_typeobj())
     self.register_var('set').bind(aggregate_types.SetType.get_typeobj())
     self.register_var('dict').bind(aggregate_types.DictType.get_typeobj())
-    #self.register_var('xrange').bind(basic_types.XRangeType.get_typeobj())
-    #self.register_var('staticmethod').bind(basic_types.StaticMethodType.get_typeobj())
-    #self.register_var('classmethod').bind(basic_types.ClassMethodType.get_typeobj())
-    #self.register_var('reversed').bind(basic_types.ReversedType.get_typeobj())
-    #self.register_var('frozenset').bind(basic_types.FrozenSetType.get_typeobj())
+    self.register_var('enumerate').bind(aggregate_types.EnumerateType.get_typeobj())
+    #self.register_var('reversed').bind(aggregate_types.ReversedType.get_typeobj())
+    #self.register_var('frozenset').bind(aggregate_types.FrozenSetType.get_typeobj())
     
     self.register_var('InstanceType').bind(klass.InstanceType.get_typeobj())
     self.register_var('ModuleType').bind(module.ModuleType.get_typeobj())
@@ -349,7 +350,8 @@ class BuiltinTypesNamespace(Namespace):
     #self.register_var('LambdaType').bind(function.LambdaFuncType.get_typeobj())
     #self.register_var('GeneratorType').bind(function.IterType.get_typeobj())
     #self.register_var('MethodType').bind(function.MethodType.get_typeobj())
-    
+
+    # obsolete
     #self.register_var('buffer').bind(basic_types.BufferType.get_typeobj())
     #self.register_var('property').bind(basic_types.PropertyType.get_typeobj())
     return
@@ -412,7 +414,6 @@ class BuiltinNamespace(Namespace):
     self.register_var('cmp').bind(builtin_funcs.CmpFunc())
     self.register_var('dir').bind(builtin_funcs.DirFunc())
     self.register_var('divmod').bind(builtin_funcs.DivmodFunc())
-    #self.register_var('enumerate').bind(builtin_funcs.EnumerateFunc())
     #self.register_var('filter').bind(builtin_funcs.FilterFunc())
     self.register_var('hash').bind(builtin_funcs.HashFunc())
     self.register_var('hex').bind(builtin_funcs.HexFunc())

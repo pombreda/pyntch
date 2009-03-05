@@ -392,7 +392,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     for node in tree.nodes:
       value = build_expr(reporter, frame, space, node, evals)
       locframe = ExecutionFrame(frame, node)
-      value.connect(StrType.StrConvChecker(locframe))
+      value.connect(StrType.StrConverter(locframe))
 
   # discard
   elif isinstance(tree, ast.Discard):

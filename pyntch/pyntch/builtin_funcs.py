@@ -460,3 +460,5 @@ class ReduceFunc(BuiltinFunc):
     if 2 < len(args):
       initial = args[2]
     return self.ReduceCaller(frame, args[0], args[1], initial)
+
+
