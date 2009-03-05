@@ -98,7 +98,7 @@ class BuiltinConstMethod(BuiltinConstCallable, BuiltinObject):
 
 ##  TypeType
 ##
-class TypeType(BuiltinType, BuiltinConstCallable):
+class TypeType(BuiltinConstCallable, BuiltinType):
   TYPE_NAME = 'type'
 
   def __init__(self):
@@ -129,12 +129,12 @@ class NumberType(BuiltinBasicType):
     return klass.RANK
   
 class IntObject(BuiltinObject): pass
-class IntType(NumberType, BuiltinConstCallable):
+class IntType(BuiltinConstCallable, NumberType):
   TYPE_NAME = 'int'
   TYPE_INSTANCE = IntObject
   RANK = 1
 
-  class IntConvChecker(CompoundTypeNode):
+  class IntConverter(CompoundTypeNode):
     
     def __init__(self, frame):
       self.frame = frame
@@ -156,7 +156,7 @@ class IntType(NumberType, BuiltinConstCallable):
 
   def accept_arg(self, frame, i, arg1):
     if i == 0:
-      arg1.connect(IntType.IntConvChecker(frame))
+      arg1.connect(IntType.IntConverter(frame))
     else:
       BuiltinConstCallable.accept_arg(self, frame, i, arg1)
     return
@@ -207,7 +207,7 @@ class BaseStringObject(BuiltinObject):
       frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
     return self
 
-class BaseStringType(BuiltinBasicType, BuiltinConstCallable):
+class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
   TYPE_NAME = 'basestring'
 
   def get_attr(self, name, write=False):
@@ -316,7 +316,7 @@ class BaseStringType(BuiltinBasicType, BuiltinConstCallable):
                            [IntType])
     raise NodeAttrError(name)
 
-  class StrConvChecker(CompoundTypeNode):
+  class StrConverter(CompoundTypeNode):
     
     def __init__(self, frame):
       self.frame = frame
@@ -339,7 +339,7 @@ class BaseStringType(BuiltinBasicType, BuiltinConstCallable):
       return
 
   def accept_arg(self, frame, i, arg1):
-    arg1.connect(self.StrConvChecker(frame))
+    arg1.connect(self.StrConverter(frame))
     return
 
   def call(self, frame, args, kwargs, star, dstar):
@@ -414,7 +414,7 @@ class FileObject(BuiltinObject):
       self.iter = IterType.create_iter(StrType.get_object())
     return self.iter
   
-class FileType(BuiltinBasicType, BuiltinConstCallable):
+class FileType(BuiltinConstCallable, BuiltinBasicType):
   TYPE_NAME = 'file'
   TYPE_INSTANCE = FileObject
   
@@ -485,7 +485,7 @@ class FileType(BuiltinBasicType, BuiltinConstCallable):
 ##  ObjectType
 ##
 class ObjectObject(BuiltinObject): pass
-class ObjectType(BuiltinBasicType, BuiltinConstCallable):
+class ObjectType(BuiltinConstCallable, BuiltinBasicType):
   TYPE_NAME = 'object'
   TYPE_INSTANCE = ObjectObject
   
@@ -498,3 +498,89 @@ BUILTIN_OBJECT = dict(
   (cls.get_name(), cls.get_object()) for cls in
   ( NoneType, BoolType, IntType, LongType, FloatType, ComplexType, StrType, UnicodeType, FileType ))
 
+
+##  XRangeType
+##
+class XRangeObject(BuiltinObject):
+  
+  def __init__(self, typeobj):
+    self.iter = None
+    BuiltinObject.__init__(self, typeobj)
+    return
+  
+  def get_iter(self, frame):
+    from aggregate_types import IterType
+    if not self.iter:
+      self.iter = IterType.create_iter(IntType.get_object())
+    return self.iter
+
+class XRangeType(BuiltinConstCallable, BuiltinBasicType):
+  TYPE_NAME = 'xrange'
+  TYPE_INSTANCE = XRangeObject
+  
+  def __init__(self):
+    BuiltinBasicType.__init__(self)
+    BuiltinConstCallable.__init__(self, 'xrange', self.get_object(),
+                                  [IntType], [IntType, IntType])
+    return
+
+
+##  StaticMethodType
+##
+class StaticMethodObject(BuiltinObject):
+  
+  def __init__(self, typeobj, realobj):
+    self.typeobj = typeobj
+    self.realobj = realobj
+    BuiltinObject.__init__(self, typeobj)
+    return
+
+  def get_object(self):
+    return self.realobj
+
+class ClassMethodObject(BuiltinObject):
+  
+  def __init__(self, typeobj, realobj):
+    self.typeobj = typeobj
+    self.realobj = realobj
+    BuiltinObject.__init__(self, typeobj)
+    return
+
+  def get_object(self):
+    return self.realobj
+
+class StaticMethodType(BuiltinCallable, BuiltinType):
+
+  class MethodConverter(CompoundTypeNode):
+
+    def __init__(self, typeobj, wrapper, obj):
+      self.typeobj = typeobj
+      self.wrapper = wrapper
+      self.done = set()
+      CompoundTypeNode.__init__(self, [obj])
+      return
+    
+    def recv(self, src):
+      for obj in src:
+        if obj in self.done: continue
+        self.done.add(obj)
+        self.update_type(self.wrapper(self.typeobj, obj))
+      return
+
+  def __init__(self, name='staticmethod', wrapper=StaticMethodObject):
+    self.wrapper = wrapper
+    BuiltinType.__init__(self)
+    BuiltinCallable.__init__(self, name, [ANY])
+    return
+
+  def process_args(self, frame, args, kwargs):
+    if kwargs:
+      frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
+      return UndefinedTypeNode()
+    return self.MethodConverter(self.get_typeobj(), self.wrapper, args[0])
+
+class ClassMethodType(StaticMethodType):
+
+  def __init__(self):
+    StaticMethodType.__init__(self, 'classmethod', wrapper=ClassMethodObject)
+    return

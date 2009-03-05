@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from typenode import CompoundTypeNode, \
-     NodeTypeError, NodeAttrError, BuiltinType, BuiltinObject
+     NodeTypeError, NodeAttrError, BuiltinType, BuiltinObject, UndefinedTypeNode
 from namespace import Namespace
 from module import TreeReporter
 
@@ -174,14 +174,15 @@ class InstanceObject(BuiltinObject):
       return '%r.%s' % (self.instance, self.name)
 
     def recv(self, src):
-      from function import FuncType, StaticMethodType, ClassMethodType 
+      from function import FuncType
+      from basic_types import StaticMethodObject, ClassMethodObject
       for obj in src:
         if obj in self.processed: continue
         self.processed.add(obj)
-        if isinstance(obj, StaticMethodType):
-          pass
-        elif isinstance(obj, ClassMethodType):
-          obj = self.klass.bind_func(obj)
+        if isinstance(obj, StaticMethodObject):
+          obj = obj.get_object()
+        elif isinstance(obj, ClassMethodObject):
+          obj = self.klass.bind_func(obj.get_object())
         elif isinstance(obj, FuncType):
           obj = self.instance.bind_func(obj)
         self.update_type(obj)

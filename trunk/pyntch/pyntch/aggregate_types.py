@@ -771,3 +771,22 @@ class DictType(BuiltinAggregateType):
 
   def create_null(self):
     return DictType.create_dict()
+
+
+##  EnumerateType
+##
+class EnumerateType(BuiltinCallable, BuiltinType):
+
+  def __init__(self):
+    BuiltinType.__init__(self)
+    BuiltinCallable.__init__(self, 'enumerate', [ANY])
+    return
+
+  def process_args(self, frame, args, kwargs):
+    if kwargs:
+      frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
+      return UndefinedTypeNode()
+    elemall = TupleType.create_tuple([IntType.get_object(), IterElement(frame, args[0])])
+    return IterObject(self.get_typeobj(), elemall=elemall)
+
+
