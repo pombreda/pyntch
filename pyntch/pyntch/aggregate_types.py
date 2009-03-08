@@ -156,9 +156,9 @@ class ListObject(BuiltinSequenceObject):
       def recv_fkey(self, src):
         for obj in src:
           try:
-            obj.call(self.frame, [self.target.elemall]).connect(self.key)
+            obj.call(self.frame, [self.target.elemall], {}, None, None).connect(self.key)
           except NodeTypeError:
-            frame.raise_expt(TypeErrorType.occur('key function not callable:' % obj))
+            self.frame.raise_expt(TypeErrorType.occur('key function not callable:' % obj))
         return
       
       def recv_fcmp(self, src):
@@ -166,9 +166,9 @@ class ListObject(BuiltinSequenceObject):
           try:
             tc = TypeChecker(self.frame, IntType.get_typeobj(),
                              'the return value of comparison function')
-            obj.call(self.frame, [self.key, self.key]).connect(tc)
+            obj.call(self.frame, [self.key, self.key], {}, None, None).connect(tc)
           except NodeTypeError:
-            frame.raise_expt(TypeErrorType.occur('cmp function not callable:' % obj))
+            self.frame.raise_expt(TypeErrorType.occur('cmp function not callable:' % obj))
         return
 
     def __init__(self, name, target):
@@ -178,6 +178,7 @@ class ListObject(BuiltinSequenceObject):
     
     def process_args(self, frame, args, kwargs):
       params = dict.fromkeys(['cmp', 'key', 'reverse'])
+      args = list(args)
       if args:
         params['cmp'] = args.pop(0)
       if args:
@@ -192,7 +193,8 @@ class ListObject(BuiltinSequenceObject):
             params[k] = v
         else:
           frame.raise_expt(TypeErrorType.occur('%s cannot take keyword: %s' % (self.name, k)))
-      return self.FuncChecker(frame, self.target, params['cmp'], params['key'])
+      self.FuncChecker(frame, self.target, params['cmp'], params['key'])
+      return NoneType.get_object()
 
   # ListObject
   def desc1(self, done):
@@ -788,5 +790,3 @@ class EnumerateType(BuiltinCallable, BuiltinType):
       return UndefinedTypeNode()
     elemall = TupleType.create_tuple([IntType.get_object(), IterElement(frame, args[0])])
     return IterObject(self.get_typeobj(), elemall=elemall)
-
-

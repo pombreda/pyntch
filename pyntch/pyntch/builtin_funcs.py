@@ -9,11 +9,11 @@ from exception import TypeChecker, SequenceTypeChecker
 from exception import TypeErrorType
 from namespace import Namespace
 from klass import InstanceObject
-from basic_types import TypeType, NumberType, BoolType, IntType, LongType, FloatType, \
+from basic_types import TypeType, NoneType, NumberType, BoolType, IntType, LongType, FloatType, \
      BaseStringType, StrType, UnicodeType, ANY, \
      BuiltinCallable, BuiltinConstCallable
-from aggregate_types import ListType, TupleType, DictType, IterType
-from expression import IterElement
+from aggregate_types import ListType, TupleType, DictType, IterType, ListObject
+from expression import IterElement, BinaryOp
 
 
 ##  BuiltinFunc
@@ -398,7 +398,7 @@ class MapFunc(BuiltinFunc):
       return
       
   def __init__(self):
-    BuiltinFunc.__init__(self, 'map', [ANY])
+    BuiltinFunc.__init__(self, 'map', [ANY, ANY])
     return
 
   def call(self, frame, args, kwargs, star, dstar):
@@ -428,7 +428,7 @@ class ReduceFunc(BuiltinFunc):
       else:
         self.elem.connect(self.result)
       self.args = (self.result, self.elem)
-      CompoundTypeNode.__init__(self)
+      CompoundTypeNode.__init__(self, [self.result])
       func.connect(self.recv_func)
       return
 
@@ -457,8 +457,128 @@ class ReduceFunc(BuiltinFunc):
         'too few argument for %s: %d or more.' % (self.name, self.minargs)))
       return UndefinedTypeNode()
     initial = None
-    if 2 < len(args):
+    if 3 <= len(args):
       initial = args[2]
     return self.ReduceCaller(frame, args[0], args[1], initial)
 
 
+##  FilterFunc
+##
+class FilterFunc(BuiltinFunc):
+
+  class FilterCaller(CompoundTypeNode):
+    
+    def __init__(self, frame, func, seq):
+      self.frame = frame
+      self.done = set()
+      self.elem = IterElement(frame, seq)
+      CompoundTypeNode.__init__(self, [seq])
+      func.connect(self.recv_func)
+      return
+
+    def recv_func(self, src):
+      for obj in src:
+        if obj in self.done: continue
+        self.done.add(obj)
+        if not isinstance(obj, NoneType):
+          try:
+            obj.call(self.frame, [self.elem], {}, None, None)
+          except NodeTypeError:
+            self.frame.raise_expt(TypeErrorType.occur('function not callable:' % obj))
+      return
+      
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'filter', [ANY, ANY])
+    return
+
+  def call(self, frame, args, kwargs, star, dstar):
+    if kwargs:
+      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
+      return UndefinedTypeNode()
+    if len(args) < self.minargs:
+      frame.raise_expt(TypeErrorType.occur(
+        'too few argument for %s: %d or more.' % (self.name, self.minargs)))
+      return UndefinedTypeNode()
+    return self.FilterCaller(frame, args[0], args[1])
+
+
+##  SumFunc
+##
+class SumFunc(BuiltinFunc):
+
+  class SumCaller(CompoundTypeNode):
+    
+    def __init__(self, frame, seq, initial):
+      self.frame = frame
+      self.done = set()
+      self.elem = IterElement(frame, seq)
+      self.result = CompoundTypeNode()
+      if initial:
+        initial.connect(self.result)
+      else:
+        self.elem.connect(self.result)
+      CompoundTypeNode.__init__(self, [self.result])
+      IterElement(frame, seq).connect(self.recv_elem)
+      return
+
+    def recv_elem(self, src):
+      for obj in src:
+        if obj in self.done: continue
+        self.done.add(obj)
+        BinaryOp(self.frame, 'Add', obj, self.result).connect(self.result)
+      return
+  
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'sum', [ANY], [ANY])
+    return
+
+  def call(self, frame, args, kwargs, star, dstar):
+    if kwargs:
+      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
+      return UndefinedTypeNode()
+    if len(args) < self.minargs:
+      frame.raise_expt(TypeErrorType.occur(
+        'too few argument for %s: %d or more.' % (self.name, self.minargs)))
+      return UndefinedTypeNode()
+    initial = None
+    if 2 <= len(args):
+      initial = args[1]
+    return self.SumCaller(frame, args[0], initial)
+
+
+##  SortedFunc
+##
+class SortedFunc(BuiltinFunc):
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'sorted', [ANY])
+    return
+
+  def call(self, frame, args, kwargs, star, dstar):
+    if len(args) < self.minargs:
+      frame.raise_expt(TypeErrorType.occur(
+        'too few argument for %s: %d or more.' % (self.name, self.minargs)))
+      return UndefinedTypeNode()
+    seq = ListType.create_list(elemall=IterElement(frame, args[0]))
+    ListObject.SortMethod('sorted', seq).process_args(frame, args[1:], kwargs)
+    return seq
+
+
+##  ZipFunc
+##
+class ZipFunc(BuiltinFunc):
+
+  def __init__(self):
+    BuiltinFunc.__init__(self, 'zip')
+    return
+
+  def call(self, frame, args, kwargs, star, dstar):
+    if kwargs:
+      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
+      return UndefinedTypeNode()
+    elems = [ CompoundTypeNode() for arg1 in args ]
+    zipelem = TupleType.create_tuple(elements=elems)
+    seq = ListType.create_list(elemall=zipelem)
+    for (i,arg1) in enumerate(args):
+      IterElement(frame, arg1).connect(elems[i])
+    return seq

@@ -414,7 +414,7 @@ class BuiltinNamespace(Namespace):
     self.register_var('cmp').bind(builtin_funcs.CmpFunc())
     self.register_var('dir').bind(builtin_funcs.DirFunc())
     self.register_var('divmod').bind(builtin_funcs.DivmodFunc())
-    #self.register_var('filter').bind(builtin_funcs.FilterFunc())
+    self.register_var('filter').bind(builtin_funcs.FilterFunc())
     self.register_var('hash').bind(builtin_funcs.HashFunc())
     self.register_var('hex').bind(builtin_funcs.HexFunc())
     self.register_var('id').bind(builtin_funcs.IdFunc())
@@ -433,10 +433,10 @@ class BuiltinNamespace(Namespace):
     self.register_var('reduce').bind(builtin_funcs.ReduceFunc())
     self.register_var('repr').bind(builtin_funcs.ReprFunc())
     self.register_var('round').bind(builtin_funcs.RoundFunc())
-    #self.register_var('sum').bind(builtin_funcs.SumFunc())
-    #self.register_var('sorted').bind(builtin_funcs.SortedFunc())
+    self.register_var('sum').bind(builtin_funcs.SumFunc())
+    self.register_var('sorted').bind(builtin_funcs.SortedFunc())
     self.register_var('unichr').bind(builtin_funcs.UnichrFunc())
-    #self.register_var('zip').bind(builtin_funcs.ZipFunc())
+    self.register_var('zip').bind(builtin_funcs.ZipFunc())
 
     # coerce, intern
     # vars,eval,locals,globals,compile,getattr,hasattr,setattr,delattr,reload,__import__,execfile,input

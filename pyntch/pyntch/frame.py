@@ -240,7 +240,7 @@ class ExceptionMaker(CompoundTypeNode, ExecutionFrame):
       # Otherwise, just return the object given.
       if isinstance(obj, ClassType):
         try:
-          result = obj.call(self, self.excargs)
+          result = obj.call(self, self.excargs, {}, None, None)
         except NodeTypeError:
           self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.exctype, obj)))
           continue
