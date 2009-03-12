@@ -4,7 +4,6 @@
 ##  as it causes circular imports!
 
 from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, BuiltinType
-from frame import MustBeDefinedNode
 from exception import TypeChecker, SequenceTypeChecker
 from exception import TypeErrorType
 from namespace import Namespace
@@ -13,7 +12,7 @@ from basic_types import TypeType, NoneType, NumberType, BoolType, IntType, LongT
      BaseStringType, StrType, UnicodeType, ANY, \
      BuiltinCallable, BuiltinConstCallable
 from aggregate_types import ListType, TupleType, DictType, IterType, ListObject
-from expression import IterElement, BinaryOp
+from expression import IterElement, BinaryOp, MustBeDefinedNode
 
 
 ##  BuiltinFunc
@@ -93,7 +92,7 @@ class LenFunc(BuiltinFunc):
         if obj.is_type(ListType.get_typeobj(), TupleType.get_typeobj(), DictType.get_typeobj()):
           obj.connect(self)
         elif isinstance(obj, InstanceObject):
-          MethodCall(self, obj, '__len__').connect(self)
+          MethodCall(self.frame, obj, '__len__').connect(self)
       return
 
     def check_undefined(self):

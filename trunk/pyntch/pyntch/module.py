@@ -80,13 +80,13 @@ class ModuleType(BuiltinType):
 
 ##  Python Module
 ##
-class PythonModuleObject(ModuleObject, TreeReporter, ExecutionFrame):
+class PythonModuleObject(ModuleObject, TreeReporter):
 
   def __init__(self, name, parent_space, path=None):
     self.path = path
+    self.frame = ExecutionFrame(None)
     ModuleObject.__init__(self, name, Namespace(parent_space, name))
     TreeReporter.__init__(self, None, name)
-    ExecutionFrame.__init__(self)
     return
   
   def __repr__(self):
@@ -96,7 +96,7 @@ class PythonModuleObject(ModuleObject, TreeReporter, ExecutionFrame):
     from syntax import build_stmt
     evals = []
     self.space.register_names(tree)
-    build_stmt(self, self, self.space, tree, evals, isfuncdef=True)
+    build_stmt(self, self.frame, self.space, tree, evals, isfuncdef=True)
     return
 
   def get_path(self):
@@ -109,7 +109,7 @@ class PythonModuleObject(ModuleObject, TreeReporter, ExecutionFrame):
     for (name,v) in sorted(self.space):
       if name in blocks: continue
       out.write('  %s = %s' % (name, v.describe()))
-    ExecutionFrame.show(self, out)
+    self.frame.show(out)
     return
   
 

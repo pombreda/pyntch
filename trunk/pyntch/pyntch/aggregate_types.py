@@ -93,7 +93,9 @@ class BuiltinSequenceObject(BuiltinAggregateObject):
 
   # BuiltinSequenceObject
   def __init__(self, typeobj, elemall=None):
-    self.elemall = elemall or CompoundTypeNode()
+    self.elemall = CompoundTypeNode()
+    if elemall:
+      elemall.connect(self.elemall)
     self.iter = None
     BuiltinAggregateObject.__init__(self, typeobj)
     return
