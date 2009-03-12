@@ -39,7 +39,7 @@ class ExecutionFrame(CompoundTypeNode):
 
   debug = 0
 
-  def __init__(self, parent, tree=None):
+  def __init__(self, parent, tree):
     self.parent = parent
     self.raised = set()
     if tree:
@@ -60,6 +60,11 @@ class ExecutionFrame(CompoundTypeNode):
       return '<Frame at %s(%s)>' % (module.get_loc(), lineno)
     except ValueError:
       return '<Frame at ???>'
+
+  def set_reraise(self):
+    from exception import SyntaxErrorType
+    self.raise_expt(SyntaxErrorType.occur('raise with no argument outside try-except'))
+    return
 
   def getloc(self):
     loc = None
@@ -112,12 +117,12 @@ class ExceptionCatcher(ExecutionFrame):
 
   class ExceptionHandler(ExecutionFrame):
     
-    def __init__(self, parent, expt=None):
+    def __init__(self, parent, expt):
       self.var = CompoundTypeNode()
       self.expt = expt
       self.reraise = False
       self.catchtypes = set()
-      ExecutionFrame.__init__(self, parent)
+      ExecutionFrame.__init__(self, parent, None)
       if expt:
         expt.connect(self.recv_expt)
       return
@@ -147,7 +152,7 @@ class ExceptionCatcher(ExecutionFrame):
   def __init__(self, parent):
     self.handlers = []
     self.done = set()
-    ExecutionFrame.__init__(self, parent)
+    ExecutionFrame.__init__(self, parent, None)
     return
 
   def __repr__(self):

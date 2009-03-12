@@ -84,7 +84,7 @@ class PythonModuleObject(ModuleObject, TreeReporter):
 
   def __init__(self, name, parent_space, path=None):
     self.path = path
-    self.frame = ExecutionFrame(None)
+    self.frame = ExecutionFrame(None, None)
     ModuleObject.__init__(self, name, Namespace(parent_space, name))
     TreeReporter.__init__(self, None, name)
     return
