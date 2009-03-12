@@ -51,7 +51,7 @@ class FuncType(BuiltinType, TreeReporter):
     self.name = name
     # prepare local variables that hold passed arguments.
     self.space = Namespace(parent_space, name)
-    self.frame = ExecutionFrame(parent_frame)
+    self.frame = ExecutionFrame(None, tree)
     self.loc = (tree._module, tree.lineno)
     # handle "**kwd".
     self.kwarg = None
@@ -159,6 +159,7 @@ class FuncType(BuiltinType, TreeReporter):
       self.space[self.vararg].bind(TupleType.create_tuple(CompoundTypeNode(varargs)))
     if len(self.defaults) < len(argvars):
       frame.raise_expt(TypeErrorType.occur('too few argument for %s: %d or more' % (self.name, len(argvars))))
+    self.frame.connect(frame)
     return self.body
 
   def show(self, out):
