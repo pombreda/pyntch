@@ -4,6 +4,7 @@ from typenode import CompoundTypeNode, \
      NodeTypeError, NodeAttrError, BuiltinType, BuiltinObject, UndefinedTypeNode
 from namespace import Namespace
 from module import TreeReporter
+from frame import ExecutionFrame
 
 
 ##  BoundMethodType
@@ -107,6 +108,7 @@ class ClassType(BuiltinType, TreeReporter):
 
   def call(self, frame, args, kwargs, star, dstar):
     from expression import MethodCall
+    assert isinstance(frame, ExecutionFrame)
     self.frames.add(frame)
     MethodCall(frame, self, '__init__', (self.instance,)+args, kwargs, star, dstar)
     return self.instance
@@ -219,6 +221,7 @@ class InstanceObject(BuiltinObject):
 
   def get_iter(self, frame):
     from expression import MethodCall
+    assert isinstance(frame, ExecutionFrame)
     return MethodCall(frame, self, '__iter__')
 
   def get_element(self, frame, subs, write=False):

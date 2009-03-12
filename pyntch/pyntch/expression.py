@@ -2,7 +2,47 @@
 
 from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError
 from exception import TypeErrorType, AttributeErrorType, ValueErrorType
-from frame import ExecutionFrame, MustBeDefinedNode
+from frame import ExecutionFrame
+
+
+##  ExpressionNode
+##
+class ExpressionNode(CompoundTypeNode):
+  
+  def __init__(self, frame):
+    self.frame = frame
+    CompoundTypeNode.__init__(self)
+    return
+  
+  def raise_expt(self, expt):
+    self.frame.raise_expt(expt)
+    return
+
+
+##  MustBeDefinedNode
+##
+class MustBeDefinedNode(ExpressionNode):
+
+  nodes = None
+  
+  def __init__(self, frame):
+    ExpressionNode.__init__(self, frame)
+    MustBeDefinedNode.nodes.append(self)
+    return
+
+  def check_undefined(self):
+    return
+  
+  @classmethod
+  def reset(klass):
+    klass.nodes = []
+    return
+  
+  @classmethod
+  def check(klass):
+    for node in klass.nodes:
+      node.check_undefined()
+    return
 
 
 ###  References
@@ -12,11 +52,11 @@ from frame import ExecutionFrame, MustBeDefinedNode
 ##
 class AttrRef(MustBeDefinedNode):
   
-  def __init__(self, parent_frame, target, attrname):
+  def __init__(self, frame, target, attrname):
     self.target = target
     self.attrname = attrname
     self.done = set()
-    MustBeDefinedNode.__init__(self, parent_frame)
+    MustBeDefinedNode.__init__(self, frame)
     self.target.connect(self.recv_target)
     return
 
@@ -39,14 +79,13 @@ class AttrRef(MustBeDefinedNode):
     return
 
 
-class OptAttrRef(CompoundTypeNode, ExecutionFrame):
+class OptAttrRef(ExpressionNode):
   
-  def __init__(self, parent_frame, target, attrname):
+  def __init__(self, frame, target, attrname):
     self.target = target
     self.attrname = attrname
     self.done = set()
-    CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent_frame)
+    ExpressionNode.__init__(self, frame)
     self.target.connect(self.recv_target)
     return
 
@@ -66,13 +105,12 @@ class OptAttrRef(CompoundTypeNode, ExecutionFrame):
 
 ##  IterRef
 ##
-class IterRef(CompoundTypeNode, ExecutionFrame):
+class IterRef(ExpressionNode):
   
-  def __init__(self, parent_frame, target):
+  def __init__(self, frame, target):
     self.target = target
     self.done = set()
-    CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent_frame)
+    ExpressionNode.__init__(self, frame)
     self.target.connect(self.recv_target)
     return
 
@@ -84,7 +122,7 @@ class IterRef(CompoundTypeNode, ExecutionFrame):
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        obj.get_iter(self).connect(self)
+        obj.get_iter(self.frame).connect(self)
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
     return
@@ -92,14 +130,13 @@ class IterRef(CompoundTypeNode, ExecutionFrame):
 
 ##  SubRef
 ##
-class SubRef(CompoundTypeNode, ExecutionFrame):
+class SubRef(ExpressionNode):
   
-  def __init__(self, parent_frame, target, subs):
+  def __init__(self, frame, target, subs):
     self.target = target
     self.subs = subs
     self.done = set()
-    CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent_frame)
+    ExpressionNode.__init__(self, frame)
     self.target.connect(self.recv_target)
     return
 
@@ -111,7 +148,7 @@ class SubRef(CompoundTypeNode, ExecutionFrame):
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        obj.get_element(self, self.subs).connect(self)
+        obj.get_element(self.frame, self.subs).connect(self)
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
@@ -119,16 +156,15 @@ class SubRef(CompoundTypeNode, ExecutionFrame):
 
 ##  SliceRef
 ##
-class SliceRef(CompoundTypeNode, ExecutionFrame):
+class SliceRef(ExpressionNode):
   
-  def __init__(self, parent_frame, target, lower, upper, step=None):
+  def __init__(self, frame, target, lower, upper, step=None):
     self.target = target
     self.lower = lower
     self.upper = upper
     self.step = step
     self.done = set()
-    CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent_frame)
+    ExpressionNode.__init__(self, frame)
     self.target.connect(self.recv_target)
     return
 
@@ -147,7 +183,7 @@ class SliceRef(CompoundTypeNode, ExecutionFrame):
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        obj.get_element(self, [self.lower, self.upper])
+        obj.get_element(self.frame, [self.lower, self.upper])
         # if an element can be retrieved from the object,
         # it can be the result of the slice of itself.
         obj.connect(self)
@@ -161,15 +197,14 @@ class SliceRef(CompoundTypeNode, ExecutionFrame):
 
 ##  AttrAssign
 ##
-class AttrAssign(CompoundTypeNode, ExecutionFrame):
+class AttrAssign(ExpressionNode):
   
-  def __init__(self, parent_frame, target, attrname, value):
+  def __init__(self, frame, target, attrname, value):
     self.target = target
     self.attrname = attrname
     self.value = value
     self.done = set()
-    CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent_frame)
+    ExpressionNode.__init__(self, frame)
     self.target.connect(self.recv_target)
     return
 
@@ -190,15 +225,14 @@ class AttrAssign(CompoundTypeNode, ExecutionFrame):
 
 ##  SubAssign
 ##
-class SubAssign(CompoundTypeNode, ExecutionFrame):
+class SubAssign(ExpressionNode):
   
-  def __init__(self, parent_frame, target, subs, value):
+  def __init__(self, frame, target, subs, value):
     self.target = target
     self.subs = subs
     self.value = value
     self.done = set()
-    CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent_frame)
+    ExpressionNode.__init__(self, frame)
     self.target.connect(self.recv_target)
     return
 
@@ -210,7 +244,7 @@ class SubAssign(CompoundTypeNode, ExecutionFrame):
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        self.value.connect(obj.get_element(self, self.subs, write=True))
+        self.value.connect(obj.get_element(self.frame, self.subs, write=True))
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
@@ -218,16 +252,15 @@ class SubAssign(CompoundTypeNode, ExecutionFrame):
 
 ##  SliceAssign
 ##
-class SliceAssign(CompoundTypeNode, ExecutionFrame):
+class SliceAssign(ExpressionNode):
   
-  def __init__(self, parent_frame, target, lower, upper, value):
+  def __init__(self, frame, target, lower, upper, value):
     self.target = target
     self.lower = lower
     self.upper = upper
     self.done = set()
-    CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent_frame)
-    self.elemall = IterElement(self, value)
+    ExpressionNode.__init__(self, frame)
+    self.elemall = IterElement(frame, value)
     self.target.connect(self.recv_target)
     return
 
@@ -239,7 +272,7 @@ class SliceAssign(CompoundTypeNode, ExecutionFrame):
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        self.elemall.connect(obj.get_element(self, [self.lower, self.upper], write=True))
+        self.elemall.connect(obj.get_element(self.frame, [self.lower, self.upper], write=True))
       except (NodeTypeError, NodeAttrError):
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
@@ -250,17 +283,17 @@ class SliceAssign(CompoundTypeNode, ExecutionFrame):
 
 ##  FunCall
 ##
-class FunCall(CompoundTypeNode, ExecutionFrame):
+class FunCall(ExpressionNode):
   
-  def __init__(self, parent_frame, func, args=None, kwargs=None, star=None, dstar=None):
+  def __init__(self, frame, func, args=None, kwargs=None, star=None, dstar=None):
     self.func = func
     self.args = args or ()
     self.kwargs = kwargs or {}
     self.star = star
     self.dstar = dstar
     self.done = set()
-    CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent_frame)
+    assert isinstance(frame, ExecutionFrame)
+    ExpressionNode.__init__(self, frame)
     func.connect(self.recv_func)
     return
 
@@ -274,7 +307,7 @@ class FunCall(CompoundTypeNode, ExecutionFrame):
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        obj.call(self, self.args, self.kwargs, self.star, self.dstar).connect(self)
+        obj.call(self.frame, self.args, self.kwargs, self.star, self.dstar).connect(self)
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.func, obj)))
     return
@@ -284,7 +317,7 @@ class FunCall(CompoundTypeNode, ExecutionFrame):
 ##
 class BinaryOp(MustBeDefinedNode):
   
-  def __init__(self, parent_frame, op, left, right):
+  def __init__(self, frame, op, left, right):
     assert op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power',
                   'Bitand','Bitor','Bitxor','RightShift','LeftShift')
     self.op = op
@@ -292,7 +325,7 @@ class BinaryOp(MustBeDefinedNode):
     self.right = right
     self.done = set()
     self.tupleobj = self.listobj = None
-    MustBeDefinedNode.__init__(self, parent_frame)
+    MustBeDefinedNode.__init__(self, frame)
     self.left.connect(self.recv_left)
     self.right.connect(self.recv_right)
     return
@@ -418,9 +451,9 @@ class BinaryOp(MustBeDefinedNode):
       return
     # Handle optional methods.
     if isinstance(lobj, InstanceObject):
-      MethodCall(self, lobj, self.LMETHOD[self.op], [robj]).connect(self)
+      MethodCall(self.frame, lobj, self.LMETHOD[self.op], [robj]).connect(self)
     if isinstance(robj, InstanceObject):
-      MethodCall(self, robj, self.RMETHOD[self.op], [lobj]).connect(self)
+      MethodCall(self.frame, robj, self.RMETHOD[self.op], [lobj]).connect(self)
     return
   
   def check_undefined(self):
@@ -449,8 +482,8 @@ class AssignOp(BinaryOp):
     '<<=': 'LeftShift',
     }
   
-  def __init__(self, parent_frame, op, left, right):
-    BinaryOp.__init__(self, parent_frame, self.OPS[op], left, right)
+  def __init__(self, frame, op, left, right):
+    BinaryOp.__init__(self, frame, self.OPS[op], left, right)
     self.connect(left)
     return
 
@@ -465,11 +498,11 @@ class UnaryOp(MustBeDefinedNode):
     'Invert': '__invert__',
     }
   
-  def __init__(self, parent_frame, op, value):
+  def __init__(self, frame, op, value):
     self.value = value
     self.op = op
     self.done = set()
-    MustBeDefinedNode.__init__(self, parent_frame)
+    MustBeDefinedNode.__init__(self, frame)
     self.value.connect(self.recv_value)
     return
   
@@ -485,13 +518,13 @@ class UnaryOp(MustBeDefinedNode):
       if obj.is_type(NumberType.get_typeobj()):
         obj.connect(self)
       elif isinstance(obj, InstanceObject):
-        MethodCall(self, obj, self.METHOD[self.op]).connect(self)
+        MethodCall(self.frame, obj, self.METHOD[self.op]).connect(self)
     return
 
 
 ##  CompareOp
 ##
-class CompareOp(CompoundTypeNode, ExecutionFrame):
+class CompareOp(ExpressionNode):
 
   LMETHOD = {
     '==': '__eq__',
@@ -504,14 +537,14 @@ class CompareOp(CompoundTypeNode, ExecutionFrame):
     'not in': '__contains__',
     }
   
-  def __init__(self, parent_frame, op, left, right):
+  def __init__(self, frame, op, left, right):
     from basic_types import BoolType
     self.op = op
     self.left = left
     self.right = right
     self.done = set()
-    CompoundTypeNode.__init__(self, [BoolType.get_object()])
-    ExecutionFrame.__init__(self, parent_frame)
+    ExpressionNode.__init__(self, frame)
+    BoolType.get_object().connect(self)
     if op not in ('is', 'is not'):
       self.left.connect(self.recv_left)
     return
@@ -525,20 +558,19 @@ class CompareOp(CompoundTypeNode, ExecutionFrame):
       if lobj in self.done: continue
       self.done.add(lobj)
       if isinstance(lobj, InstanceObject):
-        MethodCall(self, lobj, self.LMETHOD[self.op], [self.right])
+        MethodCall(self.frame, lobj, self.LMETHOD[self.op], [self.right])
     return
 
 
 ##  BooleanOp
 ##
-class BooleanOp(CompoundTypeNode, ExecutionFrame):
+class BooleanOp(ExpressionNode):
   
-  def __init__(self, parent_frame, op, nodes):
+  def __init__(self, frame, op, nodes):
     from basic_types import BoolType
     self.op = op
     self.nodes = nodes
-    CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent_frame)
+    ExpressionNode.__init__(self, frame)
     if op == 'Or' and not [ 1 for node in nodes if isinstance(node, SimpleTypeNode) ]:
       BoolType.get_object().connect(self)
     for node in self.nodes:
@@ -551,13 +583,13 @@ class BooleanOp(CompoundTypeNode, ExecutionFrame):
 
 ##  NotOp
 ##
-class NotOp(CompoundTypeNode, ExecutionFrame):
+class NotOp(ExpressionNode):
   
-  def __init__(self, parent_frame, value):
+  def __init__(self, frame, value):
     from basic_types import BoolType
     self.value = value
-    CompoundTypeNode.__init__(self, [BoolType.get_object()])
-    ExecutionFrame.__init__(self, parent_frame)
+    ExpressionNode.__init__(self, frame)
+    BoolType.get_object().connect(self)
     self.value.connect(self)
     return
   
@@ -571,14 +603,13 @@ class NotOp(CompoundTypeNode, ExecutionFrame):
 
 ##  IfExpOp
 ##
-class IfExpOp(CompoundTypeNode, ExecutionFrame):
+class IfExpOp(ExpressionNode):
   
-  def __init__(self, parent_frame, test, then, else_):
+  def __init__(self, frame, test, then, else_):
     self.test = test
     self.then = then
     self.else_ = else_
-    CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent_frame)
+    ExpressionNode.__init__(self, frame)
     self.then.connect(self)
     self.else_.connect(self)
     return
@@ -592,24 +623,25 @@ class IfExpOp(CompoundTypeNode, ExecutionFrame):
 
 ##  MethodCall
 ##
-def MethodCall(parent_frame, target, name, args=None, kwargs=None, star=None, dstar=None):
-  return FunCall(parent_frame, OptAttrRef(parent_frame, target, name),
+def MethodCall(frame, target, name, args=None, kwargs=None, star=None, dstar=None):
+  assert isinstance(frame, ExecutionFrame)
+  return FunCall(frame, OptAttrRef(frame, target, name),
                  args=args, kwargs=kwargs, star=star, dstar=dstar)
 
 
 ##  IterElement
 ##
-def IterElement(parent_frame, target):
+def IterElement(frame0, target):
   from frame import ExceptionCatcher
   from exception import StopIterationType
-  frame1 = ExceptionCatcher(parent_frame)
+  frame1 = ExceptionCatcher(frame0)
   frame1.add_handler(StopIterationType.get_typeobj())
-  return MethodCall(frame1, IterRef(parent_frame, target), 'next')
+  return MethodCall(frame1, IterRef(frame0, target), 'next')
 
 
 ##  TupleUnpack
 ##
-class TupleUnpack(CompoundTypeNode, ExecutionFrame):
+class TupleUnpack(ExpressionNode):
 
   ##  Element
   ##
@@ -625,12 +657,11 @@ class TupleUnpack(CompoundTypeNode, ExecutionFrame):
       return '<TupleElement: %r[%d]>' % (self.tup, self.i)
   
   #
-  def __init__(self, parent_frame, tupobj, nelements):
+  def __init__(self, frame, tupobj, nelements):
     self.tupobj = tupobj
     self.elements = [ self.Element(self, i) for i in xrange(nelements) ]
     self.done = set()
-    CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent_frame)
+    ExpressionNode.__init__(self, frame)
     self.tupobj.connect(self.recv_tupobj)
     return
 
@@ -655,7 +686,7 @@ class TupleUnpack(CompoundTypeNode, ExecutionFrame):
             src.connect(dest)
       else:
         # Unpack a variable-length tuple or other iterable.
-        elemall = IterElement(self, obj)
+        elemall = IterElement(self.frame, obj)
         for dest in self.elements:
           elemall.connect(dest)
     return

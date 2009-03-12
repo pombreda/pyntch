@@ -1,22 +1,23 @@
 Pyntch
 README
 
-
 # TODO:
+#  re-raise in except.
 #  handle star, dstar.
 #  automatic coercion for builtin functions.
-#  re-raise in except.
-#  suppress warnings.
+#  control errors and warnings.
 #  variable type spec.
 #  test cases.
 
+What's it?
+
 Pyntch is a PYthoN Type CHecker.  It examines a Python source code
-and infers possible types of the variables, class attributes, and
-the return values of the functions defined there. Then it detects
-possible errors caused by type mismatch. Optionally, Pyntch can
-infer possible exceptions that arise from functions and
-methods. Unlike Pychecker or Pyflakes, it does not check the style
-issue.
+and infers possible types of variables, class attributes, function
+signatures, and the return values of the functions or methods. It
+also detects possible errors caused by type mismatch and
+exceptions raised from functions. Unlike other Python code checker
+such as Pychecker or Pyflakes, Pyntch does not check the style
+issues.
 
 Pyntch can detect the following kinds of errors:
 
@@ -24,6 +25,39 @@ Pyntch can detect the following kinds of errors:
  * call of something uncallable (e.g. f(1) where f is not a function).
  * subscript access to unsubscriptable objects (e.g. a[1] where a is not an array).
  * access to undefined attributes (e.g. "obj.attr" when "obj" does not have "attr").
+
+NOTICE: Pyntch is still under at the proof-of-ideas stage and not
+intended for daily use.
+
+Background
+
+One of the greatest strength on scripting languages is its
+flexibility. You can define any functions, variables and data
+structures whenever you want without elaborating lots of
+specifications. However, this feature leads to an annoying
+drawback in these languages: it is difficult to find potential
+errors that are caused by type mismatch in advance.  Have you
+experienced giving a wrong type of arguments, say, a string to
+numeric functions and got TypeErrors? Or trying to access a
+nonexistent method of a wrongly passed class that would otherwise
+have such a method? As the program gets larger, it's getting hard
+to track these kinds of erros, and it's even harder to prevent
+them by infering which types/values can be passed or returned by
+each function. This kind of behavior is particulary unfavorable
+for mission critical applications, because an unexpected type
+error might crash the whole system.
+
+Pyntch is aiming to help reducing these burdens by infering what
+kind of types can be assigned to variables/members/function
+arguments and what kind of types can be returned from a function
+at any time of execution, and what kind of exceptions might be
+raised. This is basically done by examing the code without
+executing it. It employs a technique called "typeflow analysis",
+which is basically a rehash of dataflow analysis. The code has to
+meet several
+and the result is 
+
+Restrictions
 
 Pyntch supports most of the features in Python language.
 Therefore it can correctly analyze most programs that are written

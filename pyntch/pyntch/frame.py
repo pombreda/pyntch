@@ -35,23 +35,24 @@ class TracebackObject(TypeNode):
 ##  within this frame are propagated to other ExecutionFrames which
 ##  invoke the function.
 ##
-class ExecutionFrame(object):
+class ExecutionFrame(CompoundTypeNode):
 
   debug = 0
 
-  def __init__(self, parent=None, tree=None):
+  def __init__(self, parent, tree=None):
     self.parent = parent
-    self.loc = None
     self.raised = set()
-    self.buffer = self.get_buffer()
-    if parent:
-      self.connect_expt(parent)
     if tree:
-      self.setloc(tree)
+      self.loc = (tree._module, tree.lineno)
+    else:
+      self.loc = None
+    CompoundTypeNode.__init__(self)
+    if parent:
+      if self.debug:
+        print >>stderr, 'connect_expt: %r <- %r' % (parent, self)
+      assert isinstance(parent, ExecutionFrame), parent
+      self.connect(parent)
     return
-
-  def get_buffer(self):
-    return CompoundTypeNode()
 
   def __repr__(self):
     try:
@@ -67,17 +68,6 @@ class ExecutionFrame(object):
       self = self.parent
       if not self: raise ValueError
     return loc
-
-  def setloc(self, tree):
-    self.loc = (tree._module, tree.lineno)
-    return
-
-  def connect_expt(self, frame):
-    assert isinstance(frame, ExecutionFrame)
-    if self.debug:
-      print >>stderr, 'connect_expt: %r <- %r' % (frame, self)
-    self.buffer.connect(frame.buffer)
-    return
   
   def raise_expt(self, expt):
     assert not isinstance(expt, CompoundTypeNode)
@@ -85,16 +75,22 @@ class ExecutionFrame(object):
     self.raised.add(expt)
     if self.debug:
       print >>stderr, 'raise_expt: %r <- %r' % (self, expt)
-    TracebackObject(expt, self).connect(self.buffer)
+    TracebackObject(expt, self).connect(self)
     return
 
   def associate_frame(self, frame):
     return
 
+  def recv(self, src):
+    for obj in src:
+      assert isinstance(obj, TracebackObject), obj
+      self.update_type(obj)
+    return
+  
   def show(self, out):
     expts_here = []
     expts_there = []
-    for expt in self.buffer:
+    for expt in self:
       frame = expt.frame
       while frame:
         if frame == self:
@@ -114,102 +110,69 @@ class ExecutionFrame(object):
 ##
 class ExceptionCatcher(ExecutionFrame):
 
-  class ExceptionFilter(CompoundTypeNode):
+  class ExceptionHandler(ExecutionFrame):
     
-    def __init__(self, catcher):
-      self.catcher = catcher
-      self.handlers = []
-      self.filtered = set()
-      CompoundTypeNode.__init__(self)
+    def __init__(self, parent, expt=None):
+      self.var = CompoundTypeNode()
+      self.expt = expt
+      self.reraise = False
+      self.catchtypes = set()
+      ExecutionFrame.__init__(self, parent)
+      if expt:
+        expt.connect(self.recv_expt)
       return
+
+    def __repr__(self):
+      return '<Handler for %r>' % ','.join(repr, self.catchtypes)
     
-    def recv(self, src):
-      if self.catcher.catchall: return
+    def recv_expt(self, src):
+      from aggregate_types import TupleType
       for obj in src:
-        if obj in self.filtered: continue
-        self.filtered.add(obj)
-        assert isinstance(obj, TracebackObject), obj
-        assert isinstance(obj.expt, SimpleTypeNode), obj.expt
-        for (typeobj, var) in self.handlers:
-          if obj.expt.is_type(typeobj):
-            obj.expt.connect(var)
-            break
+        if obj.is_type(TupleType.get_typeobj()):
+          self.recv_expt(obj.elemall)
         else:
-          self.update_type(obj)
+          self.catchtypes.add(obj)
       return
 
-    def recv_expt(self, src, var):
-      for obj in src:
-        self.handlers.append((obj, var))
+    def set_reraise(self):
+      self.reraise = True
       return
 
-    def catch(self, obj, var):
-      obj.connect(lambda src: self.recv_expt(src, var))
-      return
-
+    def handle_expt(self, expt):
+      if (not self.expt) or (expt.get_type() in self.catchtypes):
+        expt.connect(self.var)
+        return not self.reraise
+      return False
+    
   def __init__(self, parent):
-    self.catchall = False
-    self.vars = {}
-    ExecutionFrame.__init__(self, parent=parent)
+    self.handlers = []
+    self.done = set()
+    ExecutionFrame.__init__(self, parent)
     return
 
-  def get_buffer(self):
-    return self.ExceptionFilter(self)
-  
   def __repr__(self):
-    if self.catchall:
-      s = 'all'
-    else:
-      s = ', '.join(map(repr, self.vars.iterkeys()))
+    s = ', '.join(map(repr, self.handlers))
     try:
       (module,lineno) = self.getloc()
       return '<catch %s at %s(%s)>' % (s, module.get_loc(), lineno)
     except ValueError:
       return '<Catch %s at ???>' % s
-
-  def add_all(self):
-    self.catchall = True
-    return
   
   def add_handler(self, src):
-    var = CompoundTypeNode()
-    src.connect(lambda src: self.recv_handler_expt(src, var))
-    return var
+    handler = self.ExceptionHandler(self.parent, src)
+    self.handlers.append(handler)
+    return handler
 
-  def recv_handler_expt(self, src, var):
-    from aggregate_types import TupleType
+  def recv(self, src):
     for obj in src:
-      if obj.is_type(TupleType.get_typeobj()):
-        self.buffer.catch(obj.elemall, var)
+      if obj in self.done: continue
+      self.done.add(obj)
+      assert isinstance(obj, TracebackObject), obj
+      assert isinstance(obj.expt, SimpleTypeNode), obj.expt
+      for frame in self.handlers:
+        if frame.handle_expt(obj.expt): break
       else:
-        self.buffer.catch(obj, var)
-    return
-
-
-##  MustBeDefinedNode
-##
-class MustBeDefinedNode(CompoundTypeNode, ExecutionFrame):
-
-  nodes = None
-  
-  def __init__(self, parent=None):
-    CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent=parent)
-    MustBeDefinedNode.nodes.append(self)
-    return
-
-  def check_undefined(self):
-    return
-  
-  @classmethod
-  def reset(klass):
-    klass.nodes = []
-    return
-  
-  @classmethod
-  def check(klass):
-    for node in klass.nodes:
-      node.check_undefined()
+        self.update_type(obj)
     return
 
 
@@ -217,14 +180,14 @@ class MustBeDefinedNode(CompoundTypeNode, ExecutionFrame):
 ##
 ##  Special behaviour on raising an exception.
 ##
-class ExceptionMaker(CompoundTypeNode, ExecutionFrame):
+class ExceptionMaker(CompoundTypeNode):
   
-  def __init__(self, parent, exctype, excargs):
+  def __init__(self, frame, exctype, excargs):
+    self.frame = frame
     self.exctype = exctype
     self.excargs = excargs
     self.processed = set()
     CompoundTypeNode.__init__(self)
-    ExecutionFrame.__init__(self, parent=parent)
     exctype.connect(self.recv_type)
     return
   
@@ -240,11 +203,11 @@ class ExceptionMaker(CompoundTypeNode, ExecutionFrame):
       # Otherwise, just return the object given.
       if isinstance(obj, ClassType):
         try:
-          result = obj.call(self, self.excargs, {}, None, None)
+          result = obj.call(self.frame, self.excargs, {}, None, None)
         except NodeTypeError:
-          self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.exctype, obj)))
+          self.frame.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.exctype, obj)))
           continue
-        self.raise_expt(result)
+        self.frame.raise_expt(result)
       else:
-        self.raise_expt(obj)
+        self.frame.raise_expt(obj)
     return

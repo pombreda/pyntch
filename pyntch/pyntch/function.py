@@ -3,9 +3,9 @@
 from typenode import CompoundTypeNode, \
      NodeTypeError, NodeAttrError, BuiltinType, BuiltinObject
 from namespace import Namespace, Variable
-from frame import ExecutionFrame, MustBeDefinedNode
 from exception import TypeErrorType
 from module import TreeReporter
+from frame import ExecutionFrame
 
 
 ##  FuncType
@@ -16,11 +16,10 @@ class FuncType(BuiltinType, TreeReporter):
   
   ##  FuncBody
   ##
-  class FuncBody(CompoundTypeNode, ExecutionFrame):
+  class FuncBody(CompoundTypeNode):
 
     def __init__(self, name):
       self.name = name
-      ExecutionFrame.__init__(self)
       CompoundTypeNode.__init__(self)
       return
 
@@ -52,6 +51,7 @@ class FuncType(BuiltinType, TreeReporter):
     self.name = name
     # prepare local variables that hold passed arguments.
     self.space = Namespace(parent_space, name)
+    self.frame = ExecutionFrame(parent_frame)
     self.loc = (tree._module, tree.lineno)
     # handle "**kwd".
     self.kwarg = None
@@ -76,7 +76,6 @@ class FuncType(BuiltinType, TreeReporter):
       assert not isinstance(arg1, list), arg1
       if isinstance(var1, tuple):
         tup = TupleUnpack(parent_frame, arg1, len(var1))
-        tup.setloc(code)
         for (i,v) in enumerate(var1):
           assign(v, tup.get_nth(i))
       else:
@@ -95,7 +94,7 @@ class FuncType(BuiltinType, TreeReporter):
     body = self.FuncBody(name)
     evals = []
     self.space.register_names(tree)
-    build_stmt(self, body, self.space, tree, evals, isfuncdef=True)
+    build_stmt(self, self.frame, self.space, tree, evals, isfuncdef=True)
     body.set_retval(evals)
     return body
 
@@ -112,6 +111,7 @@ class FuncType(BuiltinType, TreeReporter):
     from basic_types import StrType
     from aggregate_types import DictType, TupleType
     from expression import TupleUnpack
+    assert isinstance(frame, ExecutionFrame)
     self.frames.add(frame)
     # Copy the list of argument variables.
     argvars = list(self.argvars)
@@ -159,7 +159,6 @@ class FuncType(BuiltinType, TreeReporter):
       self.space[self.vararg].bind(TupleType.create_tuple(CompoundTypeNode(varargs)))
     if len(self.defaults) < len(argvars):
       frame.raise_expt(TypeErrorType.occur('too few argument for %s: %d or more' % (self.name, len(argvars))))
-    self.body.connect_expt(frame)
     return self.body
 
   def show(self, out):
@@ -188,7 +187,7 @@ class FuncType(BuiltinType, TreeReporter):
       if k not in names:
         out.write('  %s = %s' % (k, v.describe()))
     out.write('  return %s' % self.body.describe())
-    self.body.show(out)
+    self.frame.show(out)
     return
 
 
@@ -211,7 +210,7 @@ class LambdaFuncType(FuncType):
     from syntax import build_expr
     body = self.FuncBody(name)
     evals = []
-    evals.append(('r', build_expr(self, body, self.space, tree, evals)))
+    evals.append(('r', build_expr(self, self.frame, self.space, tree, evals)))
     body.set_retval(evals)
     return body
   

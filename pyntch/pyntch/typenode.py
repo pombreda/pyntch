@@ -6,12 +6,17 @@
 import sys
 
 
-##  TypeNode
-##
 class NodeError(Exception): pass
 class NodeTypeError(NodeError): pass
 class NodeAttrError(NodeError): pass
 
+
+##  TypeNode
+##
+##  A TypeNode object represents a place where a potential
+##  data could be stored or passed. This can be either a variable
+##  or a continuation that exchange values between functions.
+##
 class TypeNode(object):
 
   verbose = 0
@@ -25,6 +30,7 @@ class TypeNode(object):
     if klass.N % 1000 == 0:
       sys.stderr.write('.'); sys.stderr.flush()
     return
+  
   @classmethod  
   def showstat(klass):
     if not klass.debug: return
@@ -40,6 +46,11 @@ class TypeNode(object):
   def __iter__(self):
     return iter(list(self.types))
 
+  # connect(receiver): connects this node into
+  # another node and designates that any data flown into
+  # this node be propagated to the connected node(s).
+  # The receiver parameter is either CompoundTypeNode object or
+  # a function object that receives a value every time it changed.
   def connect(self, receiver):
     if isinstance(receiver, CompoundTypeNode):
       receiver = receiver.recv
@@ -48,9 +59,6 @@ class TypeNode(object):
     if receiver in self.sendto: return False
     self.sendto.append(receiver)
     return receiver(self)
-
-  def recv(self, src):
-    raise NodeTypeError('cannot receive a value: %r' % self)
 
   def get_attr(self, name, write=False):
     raise NodeAttrError(name)
@@ -73,6 +81,10 @@ class TypeNode(object):
 
 ##  SimpleTypeNode
 ##
+##  A SimpleTypeNode holds a value of a particular type.
+##  This type of nodes can be a leaf in a typeflow graph
+##  and propagates its data to other compound type nodes.
+##
 class SimpleTypeNode(TypeNode):
 
   def __init__(self, typeobj):
@@ -90,6 +102,12 @@ class SimpleTypeNode(TypeNode):
 
 ##  CompoundTypeNode
 ##
+##  A CompoundTypeNode holds a multiple types of values that
+##  can be potentially stored. This type of nodes can be either
+##  a leaf or intermediate node in a typeflow graph. The node can have
+##  both inbound and outbound links and the data stored in the node
+##  can be further propagated to other nodes.
+##
 class CompoundTypeNode(TypeNode):
 
   def __init__(self, nodes=None):
@@ -101,15 +119,6 @@ class CompoundTypeNode(TypeNode):
   def __repr__(self):
     return '<CompoundTypeNode: %s>' % self.describe()
 
-  def desc1(self, done):
-    if self in done:
-      return '...'
-    elif self.types:
-      done = done.union([self])
-      return '|'.join( sorted(set( obj.desc1(done) for obj in self )) )
-    else:
-      return '?'
-                                  
   def recv(self, src):
     for obj in src:
       self.update_type(obj)
@@ -122,8 +131,24 @@ class CompoundTypeNode(TypeNode):
       receiver(self)
     return True
 
+  def desc1(self, done):
+    if self in done:
+      return '...'
+    elif self.types:
+      done = done.union([self])
+      return '|'.join( sorted(set( obj.desc1(done) for obj in self )) )
+    else:
+      return '?'
+                                  
 
 ##  UndefinedTypeNode
+##
+##  An UndefinedTypeNode is a special TypeNode object that
+##  represents an undefined value. This node can be used as
+##  a value in undefined variables or undefined attribues,
+##  or a return value from illegal function calls. All the operation
+##  on this node always returns itself (i.e. any operation on
+##  undefined value is always undefined.)
 ##
 class UndefinedTypeNode(TypeNode):
   
@@ -231,3 +256,5 @@ class BuiltinBasicType(BuiltinType):
     if klass not in klass.OBJECTS:
       klass.OBJECTS[klass] = klass.TYPE_INSTANCE(klass.get_typeobj())
     return klass.OBJECTS[klass]
+
+

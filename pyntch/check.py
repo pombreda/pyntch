@@ -2,7 +2,8 @@
 
 import sys, os.path
 from pyntch.typenode import TypeNode, CompoundTypeNode
-from pyntch.frame import ExecutionFrame, MustBeDefinedNode
+from pyntch.frame import ExecutionFrame
+from pyntch.expression import MustBeDefinedNode
 from pyntch.namespace import Namespace
 from pyntch.module import Interpreter
 
