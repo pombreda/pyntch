@@ -192,11 +192,9 @@ class SequenceTypeChecker(TypeChecker):
 class KeyValueTypeChecker(TypeChecker):
   
   def __init__(self, parent_frame, keys, values, blame=None):
-    self.validkeys = CompoundTypeNode()
+    self.validkeys = CompoundTypeNode(keys)
     self.keydone = set()
     self.valuedone = set()
-    for obj in keys:
-      obj.connect(self.validkeys)
     TypeChecker.__init__(self, parent_frame, values, blame=blame)
     return
     

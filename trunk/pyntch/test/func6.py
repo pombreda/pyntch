@@ -10,7 +10,7 @@ def bar(y):
   print 'bar', y
   if y == 0:
     return 1
-  return foo(y-1)
+  return foo(y+'a')
 
 if __name__ == '__main__':
   print foo(10)

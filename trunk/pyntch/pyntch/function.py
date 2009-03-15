@@ -36,7 +36,7 @@ class FuncType(BuiltinType, TreeReporter):
       else:
         retvals = returns
       for obj in retvals:
-        obj.connect(self)
+        obj.connect(self.recv)
       return
 
   def __init__(self, parent_reporter, parent_frame, parent_space,
@@ -52,7 +52,6 @@ class FuncType(BuiltinType, TreeReporter):
     # prepare local variables that hold passed arguments.
     self.space = Namespace(parent_space, name)
     self.frame = ExecutionFrame(None, tree)
-    self.loc = (tree._module, tree.lineno)
     # handle "**kwd".
     self.kwarg = None
     if kwargs:
@@ -79,7 +78,7 @@ class FuncType(BuiltinType, TreeReporter):
         for (i,v) in enumerate(var1):
           assign(v, tup.get_nth(i))
       else:
-        arg1.connect(var1)
+        arg1.connect(var1.recv)
       return
     for (var1,arg1) in zip(self.argvars[-len(defaults):], self.defaults):
       assign(var1, arg1)
@@ -120,13 +119,13 @@ class FuncType(BuiltinType, TreeReporter):
     for (kwname, kwvalue) in kwargs.iteritems():
       for var1 in argvars:
         if isinstance(var1, Variable) and var1.name == kwname:
-          kwvalue.connect(var1)
+          kwvalue.connect(var1.recv)
           # When a keyword argument is given, remove that name from the remaining arguments.
           argvars.remove(var1)
           break
       else:
         if self.kwarg:
-          kwvalue.connect(varkwargs)
+          kwvalue.connect(varkwargs.recv)
         else:
           frame.raise_expt(TypeErrorType.occur('invalid keyword argument for %s: %r' % (self.name, kwname)))
     # Handle standard arguments.
@@ -141,7 +140,7 @@ class FuncType(BuiltinType, TreeReporter):
         for (i,v) in enumerate(var1):
           assign(v, tup.get_nth(i))
       else:
-        arg1.connect(var1)
+        arg1.connect(var1.recv)
       return
     varargs = []
     for arg1 in args:
@@ -159,15 +158,15 @@ class FuncType(BuiltinType, TreeReporter):
       self.space[self.vararg].bind(TupleType.create_tuple(CompoundTypeNode(varargs)))
     if len(self.defaults) < len(argvars):
       frame.raise_expt(TypeErrorType.occur('too few argument for %s: %d or more' % (self.name, len(argvars))))
-    self.frame.connect(frame)
+    self.frame.connect(frame.recv)
     return self.body
 
   def show(self, out):
-    (module,lineno) = self.loc
-    out.write('### %s(%s)' % (module.get_loc(), lineno))
+    (module,lineno) = self.frame.getloc()
+    out.write('### %s(%s)' % (module.get_path(), lineno))
     for frame in self.frames:
       (module,lineno) = frame.getloc()
-      out.write('# called at %s(%s)' % (module.get_loc(), lineno))
+      out.write('# called at %s(%s)' % (module.get_path(), lineno))
     names = set()
     def recjoin(sep, seq):
       for x in seq:

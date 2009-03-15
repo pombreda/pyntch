@@ -101,7 +101,6 @@ class PythonModuleObject(ModuleObject, TreeReporter):
 
   def get_path(self):
     return self.path
-  get_loc = get_path
 
   def show(self, out):
     out.write('[%s]' % self.name)

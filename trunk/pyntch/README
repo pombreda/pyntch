@@ -2,71 +2,139 @@ Pyntch
 README
 
 # TODO:
-#  re-raise in except.
 #  handle star, dstar.
-#  automatic coercion for builtin functions.
-#  control errors and warnings.
 #  variable type spec.
+#  control errors and warnings.
+#  automatic coercion for builtin functions.
 #  test cases.
 
-What's it?
 
-Pyntch is a PYthoN Type CHecker.  It examines a Python source code
-and infers possible types of variables, class attributes, function
-signatures, and the return values of the functions or methods. It
-also detects possible errors caused by type mismatch and
-exceptions raised from functions. Unlike other Python code checker
-such as Pychecker or Pyflakes, Pyntch does not check the style
-issues.
+What's It?
+
+Pyntch is a PYthoN Type CHecker. It aims to catch possible runtime
+errors before actually running a code. Pyntch examines a Python
+source code statically and infers all possible types of variables, class
+attributes, function signatures, and the return values of the
+functions or methods. Then it detects possible errors caused by
+type mismatch and exceptions raised from functions. Unlike other
+Python code checker (such as Pychecker or Pyflakes), Pyntch does
+not check the style issues. NOTICE: Pyntch is still at the
+proof-of-ideas stage and not proven to be effective.
 
 Pyntch can detect the following kinds of errors:
 
- * type mismatch (e.g. 1+'a')
- * call of something uncallable (e.g. f(1) where f is not a function).
- * subscript access to unsubscriptable objects (e.g. a[1] where a is not an array).
+ * type mismatch (e.g. 3+'a').
  * access to undefined attributes (e.g. "obj.attr" when "obj" does not have "attr").
+ * subscript access to unsubscriptable objects (e.g. a[1] where a is not a list, tuple or string).
+ * call of something uncallable (e.g. f(1) where f is not a function or class).
+ * iteration over non-iterable objects (e.g. sorted(x) where x is not a list or tuple).
+ * etc.
 
-NOTICE: Pyntch is still under at the proof-of-ideas stage and not
-intended for daily use.
 
 Background
 
 One of the greatest strength on scripting languages is its
-flexibility. You can define any functions, variables and data
-structures whenever you want without elaborating lots of
-specifications. However, this feature leads to an annoying
-drawback in these languages: it is difficult to find potential
-errors that are caused by type mismatch in advance.  Have you
-experienced giving a wrong type of arguments, say, a string to
-numeric functions and got TypeErrors? Or trying to access a
-nonexistent method of a wrongly passed class that would otherwise
-have such a method? As the program gets larger, it's getting hard
-to track these kinds of erros, and it's even harder to prevent
-them by infering which types/values can be passed or returned by
-each function. This kind of behavior is particulary unfavorable
-for mission critical applications, because an unexpected type
-error might crash the whole system.
+dynamicity. You can define any functions, variables and data
+structures whenever you want without elaborating the detailed
+specifications. However, this feature leads to some drawback:
+sometimes it is difficult to find potential errors that are caused
+by type mismatch before actually running the program.
 
-Pyntch is aiming to help reducing these burdens by infering what
-kind of types can be assigned to variables/members/function
-arguments and what kind of types can be returned from a function
-at any time of execution, and what kind of exceptions might be
-raised. This is basically done by examing the code without
-executing it. It employs a technique called "typeflow analysis",
-which is basically a rehash of dataflow analysis. The code has to
-meet several
-and the result is 
+Have you experienced a TypeError caused by giving a wrong type of
+arguments, say, a string object to numeric functions?  Or trying
+to access a nonexistent method of a wrongly passed class that
+would otherwise have such a method? There is always a risk of such
+unexpected exceptions that cause sudden death of a program.  This
+kind of behavior is particulary unfavorable for mission critical
+applications, so we want to catch these errors in
+advance. Unfortunately, as the program gets larger, it's getting
+hard to track these kinds of errors, and it's even harder to
+prevent them by infering which types/values can be passed or
+returned by each function.
 
-Restrictions
+Pyntch aims to help reducing these burdens by infering what kind
+of types can be assigned to variables/members/function arguments
+and what kind of types can be returned from a function at any time
+of execution, and what kind of exceptions might be raised. This is
+done by examining the code without executing it. The goal of
+Pyntch is to try to analyze every possible execution path and
+every possible combination of data.
 
-Pyntch supports most of the features in Python language.
-Therefore it can correctly analyze most programs that are written
-purely in Python. However, due to the nature of source level
-analysis, Pyntch cannot analyze a program that uses extension
-modules, in which the code behavior are embedded in opaque
-binaries.  In that case, a user can instruct Pyntch to use an
-alternative "stub" module which is written in Python and defines
-only the return type of each function, just like C headers.
+Because the purpose of Pyntch is to catch as many obscure errors
+as possible before the code is acutally used in a production, it
+focuses on the coverage of the analysis at the expense of its accuracy.
+Sometimes Pyntch brings a lot of false positives in its result,
+which need to be further examined by human programmers.
+
+
+How to Use
+
+The basic use of Pyntch is pretty simple and straightforward.
+Take this sample code:
+
+  $ cat mycode.py
+0 def f(x,y):
+1   return x+y
+2 print f(3, 4)
+3 print f(3, 'a')
+
+To check this code, simply run the check.py against the source file:
+
+   $ ./check.py mycode.py
+ 0 === basic.py ===
+ 1 loading: 'basic.py'
+ 2 [basic]
+ 3   (raises <TypeError: unsupported operand Add for <int> and <int>> at basic.py(2))
+ 4
+ 5   ### basic.py(1)
+ 6   # called at basic.py(4)
+ 7   # called at basic.py(3)
+ 8   def f(x=<int>, y=<int>|<str>):
+ 9     return <int>
+10     raises <TypeError: unsupported operand Add for <int> and <int>> at basic.py(2)
+
+The output shows several things:
+
+ * Line 3 shows that running this entire code might raise a TypeError exception
+   that is caused at line 2 of basic.py.
+ * Line 5-10 tells about the function defined at line 1.
+ * Line 6,7 says that this function is called from line 3 and 4.
+ * Line 8 shows the possible types of parameters to this function:
+   x is an integer, and y is either an integer or string.
+ * Line 9 says that this function returns an integer.
+ * Line 10 says that this function might raise a TypeError exception caused at line 2.
+
+
+How It Works
+
+The basic mechanism of Pyntch is based on the idea of "typeflow
+analysis."  This is similar to dataflow analysis, which gives the
+maximal set of possible data that are stored at each location
+(either variable or continuation) in a program.
+
+One of the major drawbacks of typeflow analysis is its inability
+to take account of execution order (which is also true for
+dataflow analysis). The sequence of statements is simply ignored
+and all the possible order is considered. This is like considering
+every permutation of statements in a program and combining them
+into one. This sometimes brings inaccuracy to its result in
+exchange for a comprehensiveness of the checking. For example,
+think the following two consecutive statements:
+
+  x = 1
+  x = 'a'
+
+After executing these two statements, it is obvious that variable
+x has always a string object, not an integer object. However,
+due to the lack of awareness of execution order, Pyntch concludes
+this variable may have both an integer and string type.
+
+Due to the nature of source level analysis, Pyntch cannot analyze
+a program that uses extension modules, in which the code behavior
+are embedded in opaque binaries.  In that case, a user can
+instruct Pyntch to use an alternative "stub" module which is
+written in Python and defines only the return type of each
+function, just like C headers.
 
 Pyntch assumes the scope of each namespace is statically defined,
 i.e. all the names (variables, functions, classes and attributes)

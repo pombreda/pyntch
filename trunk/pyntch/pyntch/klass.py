@@ -56,7 +56,7 @@ class ClassType(BuiltinType, TreeReporter):
         if klass in self.done: continue
         self.done.add(klass)
         try:
-          klass.get_attr(self.name).connect(self)
+          klass.get_attr(self.name).connect(self.recv)
         except NodeAttrError:
           pass
       return
@@ -69,12 +69,10 @@ class ClassType(BuiltinType, TreeReporter):
     self.bases = bases
     self.attrs = {}
     self.boundmethods = {}
-    self.baseklass = CompoundTypeNode()
+    self.baseklass = CompoundTypeNode(bases)
     self.frames = set()
     BuiltinType.__init__(self)
     self.instance = InstanceObject(self)
-    for base in bases:
-      base.connect(self.baseklass)
     return
 
   def __repr__(self):
@@ -128,7 +126,7 @@ class PythonClassType(ClassType, TreeReporter):
       # Do not consider the values of attributes inherited from the base class
       # if they are explicitly overriden.
       attr = self.ClassAttr(name, self)
-      var.connect(attr)
+      var.connect(attr.recv)
       self.attrs[name] = attr
     return
 
@@ -137,10 +135,10 @@ class PythonClassType(ClassType, TreeReporter):
   
   def show(self, out):
     (module,lineno) = self.loc
-    out.write('### %s(%s)' % (module.get_loc(), lineno))
+    out.write('### %s(%s)' % (module.get_path(), lineno))
     for frame in self.frames:
       (module,lineno) = frame.getloc()
-      out.write('# instantiated at %s(%d)' % (module.get_loc(), lineno))
+      out.write('# instantiated at %s(%d)' % (module.get_path(), lineno))
     if self.bases:
       out.write('class %s(%s):' % (self.name, ', '.join( base.fullname() for base in self.baseklass.types )))
     else:
@@ -197,7 +195,7 @@ class InstanceObject(BuiltinObject):
     self.boundmethods = {}
     BuiltinObject.__init__(self, klass)
     for (name, value) in klass.attrs.iteritems():
-      value.connect(self.get_attr(name))
+      value.connect(self.get_attr(name).recv)
     return
   
   def __repr__(self):
@@ -224,12 +222,19 @@ class InstanceObject(BuiltinObject):
     assert isinstance(frame, ExecutionFrame)
     return MethodCall(frame, self, '__iter__')
 
-  def get_element(self, frame, subs, write=False):
+  def get_element(self, frame, sub, write=False):
     from expression import MethodCall
     if write:
-      return MethodCall(frame, self, '__setelem__', subs)
+      return MethodCall(frame, self, '__setelem__', sub)
     else:
-      return MethodCall(frame, self, '__getelem__', subs)
+      return MethodCall(frame, self, '__getelem__', sub)
+    
+  def get_slice(self, frame, subs, write=False):
+    from expression import MethodCall
+    if write:
+      return MethodCall(frame, self, '__setslice__', sub)
+    else:
+      return MethodCall(frame, self, '__getslice__', sub)
   
   def bind_func(self, func):
     if func not in self.boundmethods:
