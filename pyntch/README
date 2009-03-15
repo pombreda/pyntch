@@ -125,9 +125,12 @@ think the following two consecutive statements:
   x = 'a'
 
 After executing these two statements, it is obvious that variable
-x has always a string object, not an integer object. However,
-due to the lack of awareness of execution order, Pyntch concludes
-this variable may have both an integer and string type.
+x has always a string object, not an integer object. However, due
+to the lack of awareness of execution order, Pyntch reports this
+variable might have two possible types: an integer and string.
+Although we expect this kind of errors does not affect much to the
+overall usefulness of the report, we provide a way to supress this
+type of output.
 
 Due to the nature of source level analysis, Pyntch cannot analyze
 a program that uses extension modules, in which the code behavior
