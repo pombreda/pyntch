@@ -696,18 +696,23 @@ class TupleUnpack(ExpressionNode):
 ##
 class TupleSlice(ExpressionNode):
 
-  def __init__(self, frame, tupobj, start, end):
+  def __init__(self, frame, tupobj, start, end=None):
     self.tupobj = tupobj
     self.start = start
-    self.end = end
-    self.elements = [ CompoundTypeNode() for _ in xrange(nelements) ]
+    if end == None:
+      self.length = 0
+    else:
+      self.length = end-start+1
     self.done = set()
     ExpressionNode.__init__(self, frame)
     self.tupobj.connect(self.recv_tupobj)
     return
 
   def __repr__(self):
-    return '<TupleSlice: %r[%r-%r]>' % (self.tupobj, self.start, self.end)
+    if self.length:
+      return '<TupleSlice: %r[%r:%r]>' % (self.tupobj, self.start, self.start+self.length-1)
+    else:
+      return '<TupleSlice: %r[%r:]>' % (self.tupobj, self.start)
 
   def recv_tupobj(self, src):
     from aggregate_types import TupleType
@@ -716,13 +721,15 @@ class TupleSlice(ExpressionNode):
       self.done.add(obj)
       if obj.is_type(TupleType.get_typeobj()) and obj.elements != None:
         # Unpack a fixed-length tuple.
-        if self.start == None and self.end == None:
-          
-        if len(obj.elements) != len(self.elements):
-          self.raise_expt(ValueErrorType.occur('tuple unpackable: len(%r) != %r' % (obj, len(self.elements))))
+        if self.length:
+          if self.length != len(obj.elements):
+            self.raise_expt(ValueErrorType.occur('tuple unpackable: len(%r) != %r' % (obj, self.length)))
+          else:
+            for i in xrange(self.length):
+              obj.elements[self.start+i].connect(self.recv)
         else:
-          for (src,dest) in zip(obj.elements, self.elements):
-            src.connect(dest.recv)
+          for i in xrange(self.start, len(obj.elements)):
+            obj.elements[i].connect(self.recv)
       else:
         # Unpack a variable-length tuple or other iterable.
         IterElement(self.frame, obj).connect(self.recv)
