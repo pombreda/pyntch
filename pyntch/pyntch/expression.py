@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError
+from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, NodeAssignError
 from exception import TypeErrorType, AttributeErrorType, ValueErrorType
 from frame import ExecutionFrame
 
@@ -68,7 +68,7 @@ class AttrRef(MustBeDefinedNode):
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        obj.get_attr(self.attrname).connect(self)
+        obj.get_attr(self.attrname).connect(self.recv)
       except NodeAttrError:
         self.raise_expt(AttributeErrorType.occur('attribute not allowed: %r.%s.' % (obj, self.attrname)))
     return
@@ -97,7 +97,7 @@ class OptAttrRef(ExpressionNode):
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        obj.get_attr(self.attrname).connect(self)
+        obj.get_attr(self.attrname).connect(self.recv)
       except NodeAttrError:
         self.raise_expt(AttributeErrorType.occur('attribute not defined: %r.%s.' % (obj, self.attrname)))
     return
@@ -122,7 +122,7 @@ class IterRef(ExpressionNode):
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        obj.get_iter(self.frame).connect(self)
+        obj.get_iter(self.frame).connect(self.recv)
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
     return
@@ -148,7 +148,7 @@ class SubRef(ExpressionNode):
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        obj.get_element(self.frame, self.subs).connect(self)
+        obj.get_element(self.frame, self.subs).connect(self.recv)
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
@@ -158,35 +158,23 @@ class SubRef(ExpressionNode):
 ##
 class SliceRef(ExpressionNode):
   
-  def __init__(self, frame, target, lower, upper, step=None):
+  def __init__(self, frame, target, subs):
     self.target = target
-    self.lower = lower
-    self.upper = upper
-    self.step = step
+    self.subs = subs
     self.done = set()
     ExpressionNode.__init__(self, frame)
     self.target.connect(self.recv_target)
     return
 
   def __repr__(self):
-    if self.lower and self.upper:
-      return '%r[%r:%r]' % (self.target, self.lower, self.upper)
-    elif self.lower:
-      return '%r[%r:]' % (self.target, self.lower)
-    elif self.upper:
-      return '%r[:%r]' % (self.target, self.upper)
-    else:
-      return '%r[:]' % self.target
+    return '%r%r' % (self.target, self.subs)
 
   def recv_target(self, src):
     for obj in src:
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        obj.get_element(self.frame, [self.lower, self.upper])
-        # if an element can be retrieved from the object,
-        # it can be the result of the slice of itself.
-        obj.connect(self)
+        obj.get_slice(self.frame, self.subs).connect(self.recv)
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
     return
@@ -216,10 +204,12 @@ class AttrAssign(ExpressionNode):
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        self.value.connect(obj.get_attr(self.attrname, write=True))
+        self.value.connect(obj.get_attr(self.attrname, write=True).recv)
       except (NodeAttrError, NodeTypeError):
         self.raise_expt(AttributeErrorType.occur(
           'cannot assign attribute: %r might be %r, no attr %s' % (self.target, obj, self.attrname)))
+      except NodeAssignError:
+        self.raise_expt(AttributeErrorType.occur('cannot assign attribute: %r' % obj))
     return
 
 
@@ -227,9 +217,9 @@ class AttrAssign(ExpressionNode):
 ##
 class SubAssign(ExpressionNode):
   
-  def __init__(self, frame, target, subs, value):
+  def __init__(self, frame, target, sub, value):
     self.target = target
-    self.subs = subs
+    self.sub = sub
     self.value = value
     self.done = set()
     ExpressionNode.__init__(self, frame)
@@ -237,16 +227,18 @@ class SubAssign(ExpressionNode):
     return
 
   def __repr__(self):
-    return 'assign(%r%r, %r)' % (self.target, self.subs, self.value)
+    return 'assign(%r[%r], %r)' % (self.target, self.sub, self.value)
 
   def recv_target(self, src):
     for obj in src:
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        self.value.connect(obj.get_element(self.frame, self.subs, write=True))
+        self.value.connect(obj.get_element(self.frame, self.sub, write=True).recv)
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
+      except NodeAssignError:
+        self.raise_expt(TypeErrorType.occur('cannot assign item: %r' % obj))
     return
 
 
@@ -254,10 +246,9 @@ class SubAssign(ExpressionNode):
 ##
 class SliceAssign(ExpressionNode):
   
-  def __init__(self, frame, target, lower, upper, value):
+  def __init__(self, frame, target, subs, value):
     self.target = target
-    self.lower = lower
-    self.upper = upper
+    self.subs = subs
     self.done = set()
     ExpressionNode.__init__(self, frame)
     self.elemall = IterElement(frame, value)
@@ -265,16 +256,19 @@ class SliceAssign(ExpressionNode):
     return
 
   def __repr__(self):
-    return 'assign(%r[%r:%r], %r)' % (self.target, self.lower, self.upper, self.target)
+    return 'assign(%r%r, %r)' % (self.target, self.subs, self.target)
 
   def recv_target(self, src):
     for obj in src:
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        self.elemall.connect(obj.get_element(self.frame, [self.lower, self.upper], write=True))
+        seq = obj.get_slice(self.frame, self.subs, write=True)
+        self.elemall.connect(seq.elemall.recv)
       except (NodeTypeError, NodeAttrError):
         self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
+      except NodeAssignError:
+        self.raise_expt(TypeErrorType.occur('cannot assign item: %r' % obj))
     return
 
 
@@ -307,7 +301,7 @@ class FunCall(ExpressionNode):
       if obj in self.done: continue
       self.done.add(obj)
       try:
-        obj.call(self.frame, self.args, self.kwargs, self.star, self.dstar).connect(self)
+        obj.call(self.frame, self.args, self.kwargs, self.star, self.dstar).connect(self.recv)
       except NodeTypeError:
         self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.func, obj)))
     return
@@ -317,34 +311,6 @@ class FunCall(ExpressionNode):
 ##
 class BinaryOp(MustBeDefinedNode):
   
-  def __init__(self, frame, op, left, right):
-    assert op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power',
-                  'Bitand','Bitor','Bitxor','RightShift','LeftShift')
-    self.op = op
-    self.left = left
-    self.right = right
-    self.done = set()
-    self.tupleobj = self.listobj = None
-    MustBeDefinedNode.__init__(self, frame)
-    self.left.connect(self.recv_left)
-    self.right.connect(self.recv_right)
-    return
-  
-  def __repr__(self):
-    return '%s(%r,%r)' % (self.op, self.left, self.right)
-
-  def recv_left(self, left):
-    for lobj in left:
-      for robj in self.right:
-        self.update_op(lobj, robj)
-    return
-  
-  def recv_right(self, right):
-    for lobj in self.left:
-      for robj in right:
-        self.update_op(lobj, robj)
-    return
-
   LMETHOD = {
     'Add': '__add__',
     'Sub': '__sub__',
@@ -382,84 +348,133 @@ class BinaryOp(MustBeDefinedNode):
     ('int', 'Mul', 'unicode'): 'unicode',
     }
 
+  def __init__(self, frame, op, left, right):
+    assert op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power',
+                  'Bitand','Bitor','Bitxor','RightShift','LeftShift')
+    self.op = op
+    self.left = left
+    self.right = right
+    self.received = set()
+    self.computed = set()
+    self.tupleobj = self.listobj = None
+    MustBeDefinedNode.__init__(self, frame)
+    self.left.connect(self.recv_left)
+    self.right.connect(self.recv_right)
+    return
+  
+  def __repr__(self):
+    return '%s(%r,%r)' % (self.op, self.left, self.right)
+
+  def recv_left(self, left):
+    for lobj in left:
+      for robj in self.right:
+        self.update_op(lobj, robj)
+    return
+  
+  def recv_right(self, right):
+    for lobj in self.left:
+      for robj in right:
+        self.update_op(lobj, robj)
+    return
+
   def update_op(self, lobj, robj):
     from basic_types import NumberType, IntType, BaseStringType, BUILTIN_OBJECT
     from aggregate_types import ListType, ListObject, TupleType
     from klass import InstanceObject
-    if (lobj,robj) in self.done: return
-    self.done.add((lobj,robj))
+    if (lobj,robj) in self.received: return
+    self.received.add((lobj,robj))
     # special handling for a formatting (%) operator
     ltype = lobj.get_type()
     rtype = robj.get_type()
     if (lobj.is_type(BaseStringType.get_typeobj()) and
         self.op == 'Mod'):
-      lobj.connect(self)
+      self.computed.add((lobj,robj))
+      lobj.connect(self.recv)
       return
     # for numeric operation, the one with a higher rank is chosen.
     if (lobj.is_type(NumberType.get_typeobj()) and robj.is_type(NumberType.get_typeobj()) and
         self.op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power','LeftShift','RightShift')):
+      self.computed.add((lobj,robj))
       if ltype.get_rank() < rtype.get_rank():
-        robj.connect(self)
+        robj.connect(self.recv)
       else:
-        lobj.connect(self)
+        lobj.connect(self.recv)
       return
     if (lobj.is_type(IntType.get_typeobj()) and robj.is_type(IntType.get_typeobj()) and
         self.op in ('Bitand','Bitor','Bitxor')):
-      robj.connect(self)
+      self.computed.add((lobj,robj))
+      robj.connect(self.recv)
       return
     # for string operation, only Add is supported.
     if (lobj.is_type(BaseStringType.get_typeobj()) and robj.is_type(BaseStringType.get_typeobj()) and
         self.op == 'Add'):
-      robj.connect(self)
+      self.computed.add((lobj,robj))
+      robj.connect(self.recv)
       return
-    # for list operation, only Add and Mul is supported.
+    # adding lists.
     if (self.op == 'Add' and
         (lobj.is_type(ListType.get_typeobj()) and robj.is_type(ListType.get_typeobj()))):
       if not self.listobj:
         self.listobj = ListType.create_list()
-        self.listobj.connect(self)
+        self.listobj.connect(self.recv)
+      self.computed.add((lobj,robj))
       lobj.connect_element(self.listobj)
       robj.connect_element(self.listobj)
       return
+    # multiplying a list by an integer.
     if self.op == 'Mul':
       if lobj.is_type(ListType.get_typeobj()) and robj.is_type(IntType.get_typeobj()):
-        lobj.connect(self)
+        self.computed.add((lobj,robj))
+        lobj.connect(self.recv)
         return
       elif lobj.is_type(IntType.get_typeobj()) and robj.is_type(ListType.get_typeobj()):
-        robj.connect(self)
+        self.computed.add((lobj,robj))
+        robj.connect(self.recv)
         return
-    # for tuple operation, only Add and Mul is supported.
+    # adding tuples.
     if (self.op == 'Add' and
         (lobj.is_type(TupleType.get_typeobj()) and robj.is_type(TupleType.get_typeobj()))):
       if not self.tupleobj:
         self.tupleobj = TupleType.create_tuple()
-        self.tupleobj.connect(self)
+        self.tupleobj.connect(self.recv)
+      self.computed.add((lobj,robj))
       lobj.connect_element(self.tupleobj)
       robj.connect_element(self.tupleobj)
       return
+    # multiplying a tuple by an integer.
     if self.op == 'Mul':
       if lobj.is_type(TupleType.get_typeobj()) and robj.is_type(IntType.get_typeobj()):
-        lobj.connect(self)
+        self.computed.add((lobj,robj))
+        lobj.connect(self.recv)
         return
       elif lobj.is_type(IntType.get_typeobj()) and robj.is_type(TupleType.get_typeobj()):
-        robj.connect(self)
+        self.computed.add((lobj,robj))
+        robj.connect(self.recv)
         return
-    # other operations.
+    # other valid operations.
     k = (ltype.get_name(), self.op, rtype.get_name())
     if k in self.VALID_TYPES:
-      BUILTIN_OBJECT[self.VALID_TYPES[k]].connect(self)
+      self.computed.add((lobj,robj))
+      BUILTIN_OBJECT[self.VALID_TYPES[k]].connect(self.recv)
       return
     # Handle optional methods.
     if isinstance(lobj, InstanceObject):
-      MethodCall(self.frame, lobj, self.LMETHOD[self.op], [robj]).connect(self)
+      result = MethodCall(self.frame, lobj, self.LMETHOD[self.op], [robj])
+      result.connect(lambda src: self.recv_result(src, (lobj, robj)))
     if isinstance(robj, InstanceObject):
-      MethodCall(self.frame, robj, self.RMETHOD[self.op], [lobj]).connect(self)
+      result = MethodCall(self.frame, robj, self.RMETHOD[self.op], [lobj])
+      result.connect(lambda src: self.recv_result(src, (lobj, robj)))
     return
+
+  def recv_result(self, src, objs):
+    self.computed.add(objs)
+    return self.recv(src)
   
   def check_undefined(self):
-    if not self.types:
-      self.raise_expt(TypeErrorType.occur('unsupported operand %s for %s and %s' %
-                                          (self.op, self.left.describe(), self.right.describe())))
+    for (lobj,robj) in self.received:
+      if (lobj,robj) not in self.computed:
+        self.raise_expt(TypeErrorType.occur('unsupported operand %s for %s and %s' %
+                                            (self.op, lobj.describe(), lobj.describe())))
     return
 
 
@@ -484,7 +499,7 @@ class AssignOp(BinaryOp):
   
   def __init__(self, frame, op, left, right):
     BinaryOp.__init__(self, frame, self.OPS[op], left, right)
-    self.connect(left)
+    self.connect(left.recv)
     return
 
 
@@ -516,9 +531,9 @@ class UnaryOp(MustBeDefinedNode):
       if obj in self.done: continue
       self.done.add(obj)
       if obj.is_type(NumberType.get_typeobj()):
-        obj.connect(self)
+        obj.connect(self.recv)
       elif isinstance(obj, InstanceObject):
-        MethodCall(self.frame, obj, self.METHOD[self.op]).connect(self)
+        MethodCall(self.frame, obj, self.METHOD[self.op]).connect(self.recv)
     return
 
 
@@ -544,7 +559,7 @@ class CompareOp(ExpressionNode):
     self.right = right
     self.done = set()
     ExpressionNode.__init__(self, frame)
-    BoolType.get_object().connect(self)
+    BoolType.get_object().connect(self.recv)
     if op not in ('is', 'is not'):
       self.left.connect(self.recv_left)
     return
@@ -572,9 +587,9 @@ class BooleanOp(ExpressionNode):
     self.nodes = nodes
     ExpressionNode.__init__(self, frame)
     if op == 'Or' and not [ 1 for node in nodes if isinstance(node, SimpleTypeNode) ]:
-      BoolType.get_object().connect(self)
+      BoolType.get_object().connect(self.recv)
     for node in self.nodes:
-      node.connect(self)
+      node.connect(self.recv)
     return
   
   def __repr__(self):
@@ -589,8 +604,8 @@ class NotOp(ExpressionNode):
     from basic_types import BoolType
     self.value = value
     ExpressionNode.__init__(self, frame)
-    BoolType.get_object().connect(self)
-    self.value.connect(self)
+    BoolType.get_object().connect(self.recv)
+    self.value.connect(self.recv)
     return
   
   def __repr__(self):
@@ -610,8 +625,8 @@ class IfExpOp(ExpressionNode):
     self.then = then
     self.else_ = else_
     ExpressionNode.__init__(self, frame)
-    self.then.connect(self)
-    self.else_.connect(self)
+    self.then.connect(self.recv)
+    self.else_.connect(self.recv)
     return
   
   def __repr__(self):
@@ -643,37 +658,22 @@ def IterElement(frame0, target):
 ##
 class TupleUnpack(ExpressionNode):
 
-  ##  Element
-  ##
-  class Element(CompoundTypeNode):
-    
-    def __init__(self, tup, i):
-      self.tup = tup
-      self.i = i
-      CompoundTypeNode.__init__(self)
-      return
-
-    def __repr__(self):
-      return '<TupleElement: %r[%d]>' % (self.tup, self.i)
-  
-  #
   def __init__(self, frame, tupobj, nelements):
     self.tupobj = tupobj
-    self.elements = [ self.Element(self, i) for i in xrange(nelements) ]
+    self.elements = [ CompoundTypeNode() for _ in xrange(nelements) ]
     self.done = set()
     ExpressionNode.__init__(self, frame)
     self.tupobj.connect(self.recv_tupobj)
     return
 
   def __repr__(self):
-    return '<TupleUnpack: %r>' % (self.tupobj,)
+    return '<TupleUnpack: %r (%d)>' % (self.tupobj, len(self.elements))
 
   def get_nth(self, i):
     return self.elements[i]
 
   def recv_tupobj(self, src):
     from aggregate_types import TupleType
-    assert src is self.tupobj
     for obj in src:
       if obj in self.done: continue
       self.done.add(obj)
@@ -683,10 +683,47 @@ class TupleUnpack(ExpressionNode):
           self.raise_expt(ValueErrorType.occur('tuple unpackable: len(%r) != %r' % (obj, len(self.elements))))
         else:
           for (src,dest) in zip(obj.elements, self.elements):
-            src.connect(dest)
+            src.connect(dest.recv)
       else:
         # Unpack a variable-length tuple or other iterable.
         elemall = IterElement(self.frame, obj)
         for dest in self.elements:
-          elemall.connect(dest)
+          elemall.connect(dest.recv)
+    return
+
+
+##  TupleSlice
+##
+class TupleSlice(ExpressionNode):
+
+  def __init__(self, frame, tupobj, start, end):
+    self.tupobj = tupobj
+    self.start = start
+    self.end = end
+    self.elements = [ CompoundTypeNode() for _ in xrange(nelements) ]
+    self.done = set()
+    ExpressionNode.__init__(self, frame)
+    self.tupobj.connect(self.recv_tupobj)
+    return
+
+  def __repr__(self):
+    return '<TupleSlice: %r[%r-%r]>' % (self.tupobj, self.start, self.end)
+
+  def recv_tupobj(self, src):
+    from aggregate_types import TupleType
+    for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
+      if obj.is_type(TupleType.get_typeobj()) and obj.elements != None:
+        # Unpack a fixed-length tuple.
+        if self.start == None and self.end == None:
+          
+        if len(obj.elements) != len(self.elements):
+          self.raise_expt(ValueErrorType.occur('tuple unpackable: len(%r) != %r' % (obj, len(self.elements))))
+        else:
+          for (src,dest) in zip(obj.elements, self.elements):
+            src.connect(dest.recv)
+      else:
+        # Unpack a variable-length tuple or other iterable.
+        IterElement(self.frame, obj).connect(self.recv)
     return

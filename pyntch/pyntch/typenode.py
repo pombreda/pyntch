@@ -9,13 +9,15 @@ import sys
 class NodeError(Exception): pass
 class NodeTypeError(NodeError): pass
 class NodeAttrError(NodeError): pass
+class NodeAssignError(NodeError): pass
 
 
 ##  TypeNode
 ##
 ##  A TypeNode object represents a place where a potential
-##  data could be stored or passed. This can be either a variable
-##  or a continuation that exchange values between functions.
+##  data could be stored or passed in the course of execution of
+##  the whole program. The data once stored in a node can be propagated to
+##  other nodes via one or multiple outbound links.
 ##
 class TypeNode(object):
 
@@ -46,14 +48,13 @@ class TypeNode(object):
   def __iter__(self):
     return iter(list(self.types))
 
-  # connect(receiver): connects this node into
-  # another node and designates that any data flown into
-  # this node be propagated to the connected node(s).
+  # connect(receiver): connects this node to
+  # another node and designates that any data stored at
+  # this node be propagated to the other node(s).
   # The receiver parameter is either CompoundTypeNode object or
   # a function object that receives a value every time it changed.
   def connect(self, receiver):
-    if isinstance(receiver, CompoundTypeNode):
-      receiver = receiver.recv
+    assert callable(receiver)
     if self.debug:
       print >>sys.stderr, 'connect: %r -> %r' % (self, receiver)
     if receiver in self.sendto: return False
@@ -62,7 +63,9 @@ class TypeNode(object):
 
   def get_attr(self, name, write=False):
     raise NodeAttrError(name)
-  def get_element(self, frame, subs, write=False):
+  def get_element(self, frame, sub, write=False):
+    raise NodeTypeError('not subscriptable')
+  def get_slice(self, frame, subs, write=False):
     raise NodeTypeError('not subscriptable')
   def get_iter(self, frame):
     raise NodeTypeError('not iterator')
@@ -81,9 +84,9 @@ class TypeNode(object):
 
 ##  SimpleTypeNode
 ##
-##  A SimpleTypeNode holds a value of a particular type.
+##  A SimpleTypeNode holds a particular type of value.
 ##  This type of nodes can be a leaf in a typeflow graph
-##  and propagates its data to other compound type nodes.
+##  and is not altered after creation.
 ##
 class SimpleTypeNode(TypeNode):
 
@@ -103,8 +106,7 @@ class SimpleTypeNode(TypeNode):
 ##  CompoundTypeNode
 ##
 ##  A CompoundTypeNode holds a multiple types of values that
-##  can be potentially stored. This type of nodes can be either
-##  a leaf or intermediate node in a typeflow graph. The node can have
+##  can be potentially stored. This type of nodes can have
 ##  both inbound and outbound links and the data stored in the node
 ##  can be further propagated to other nodes.
 ##
@@ -112,8 +114,9 @@ class CompoundTypeNode(TypeNode):
 
   def __init__(self, nodes=None):
     TypeNode.__init__(self, [])
-    for obj in (nodes or []):
-      obj.connect(self)
+    if nodes:
+      for obj in nodes:
+        obj.connect(self.recv)
     return
 
   def __repr__(self):
@@ -162,9 +165,13 @@ class UndefinedTypeNode(TypeNode):
   def desc1(self, _):
     return '(undef)'
 
+  def recv(self, src):
+    return
   def get_attr(self, name, write=False):
     return self
-  def get_element(self, frame, subs, write=False):
+  def get_element(self, frame, sub, write=False):
+    return self
+  def get_slice(self, frame, subs, write=False):
     return self
   def get_iter(self, frame):
     return self

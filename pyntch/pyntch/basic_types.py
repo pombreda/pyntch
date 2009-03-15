@@ -3,7 +3,7 @@
 ##  This module should not be imported as toplevel,
 ##  as it causes circular imports!
 
-from typenode import TypeNode, CompoundTypeNode, NodeAttrError, \
+from typenode import TypeNode, CompoundTypeNode, NodeAttrError, NodeAssignError, \
      BuiltinType, BuiltinBasicType, BuiltinObject, UndefinedTypeNode
 from exception import TypeChecker, SequenceTypeChecker
 from exception import TypeErrorType, ValueErrorType, IndexErrorType, IOErrorType, EOFErrorType, \
@@ -68,15 +68,16 @@ class BuiltinConstCallable(BuiltinCallable):
     spec = self.args[i]
     if isinstance(spec, list):
       if spec == [ANY]:
-        arg1.connect(SequenceTypeChecker(frame, ANY, s))
+        checker = SequenceTypeChecker(frame, ANY, s)
       else:
-        arg1.connect(SequenceTypeChecker(frame, [ x.get_typeobj() for x in spec ], s))
+        checker = SequenceTypeChecker(frame, [ x.get_typeobj() for x in spec ], s)
     elif isinstance(spec, tuple):
-      arg1.connect(TypeChecker(frame, [ x.get_typeobj() for x in spec ], s))
+      checker = TypeChecker(frame, [ x.get_typeobj() for x in spec ], s)
     elif spec == ANY:
-      arg1.connect(TypeChecker(frame, ANY, s))
+      checker = TypeChecker(frame, ANY, s)
     else:
-      arg1.connect(TypeChecker(frame, [spec.get_typeobj()], s))
+      checker = TypeChecker(frame, [spec.get_typeobj()], s)
+    arg1.connect(checker.recv)
     return
 
 
@@ -136,10 +137,10 @@ class IntType(BuiltinConstCallable, NumberType):
 
   class IntConverter(CompoundTypeNode):
     
-    def __init__(self, frame):
+    def __init__(self, frame, value):
       self.frame = frame
       self.done = set()
-      CompoundTypeNode.__init__(self)
+      CompoundTypeNode.__init__(self, [value])
       return
     
     def recv(self, src):
@@ -156,7 +157,7 @@ class IntType(BuiltinConstCallable, NumberType):
 
   def accept_arg(self, frame, i, arg1):
     if i == 0:
-      arg1.connect(IntType.IntConverter(frame))
+      IntType.IntConverter(frame, arg1)
     else:
       BuiltinConstCallable.accept_arg(self, frame, i, arg1)
     return
@@ -200,11 +201,14 @@ class BaseStringObject(BuiltinObject):
       self.iter = IterType.create_iter(self)
     return self.iter
 
-  def get_element(self, frame, subs, write=False):
-    if write:
-      frame.raise_expt(TypeErrorType.occur('cannot change a string.'))
-    else:
-      frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
+  def get_element(self, frame, sub, write=False):
+    if write: raise NodeAssignError
+    frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
+    return self
+
+  def get_slice(self, frame, subs, write=False):
+    if write: raise NodeAssignError
+    frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
     return self
 
 class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
@@ -318,10 +322,10 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
 
   class StrConverter(CompoundTypeNode):
     
-    def __init__(self, frame):
+    def __init__(self, frame, value):
       self.frame = frame
       self.done = set()
-      CompoundTypeNode.__init__(self)
+      CompoundTypeNode.__init__(self, [value])
       return
     
     def recv(self, src):
@@ -331,15 +335,17 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
         self.done.add(obj)
         if isinstance(obj, InstanceObject):
           value = MethodCall(self.frame, obj, '__str__')
-          value.connect(TypeChecker(self.frame, BaseStringType.get_typeobj(), 
-                                    'the return value of __str__ method'))
+          checker = TypeChecker(self.frame, BaseStringType.get_typeobj(), 
+                                'the return value of __str__ method')
+          value.connect(checker.recv)
           value = MethodCall(self.frame, obj, '__repr__')
-          value.connect(TypeChecker(self.frame, BaseStringType.get_typeobj(), 
-                                    'the return value of __repr__ method'))
+          checker = TypeChecker(self.frame, BaseStringType.get_typeobj(), 
+                                'the return value of __repr__ method')
+          value.connect(checker.recv)
       return
 
   def accept_arg(self, frame, i, arg1):
-    arg1.connect(self.StrConverter(frame))
+    self.StrConverter(frame, arg1)
     return
 
   def call(self, frame, args, kwargs, star, dstar):
@@ -377,10 +383,10 @@ class UnicodeType(BaseStringType):
 
   class TranslateFunc(BuiltinConstMethod):
     def accept_arg(self, frame, i, arg1):
-      arg1.connect(KeyValueTypeChecker(frame,
-                                       [IntType.get_typeobj()],
-                                       [IntType.get_typeobj(), UnicodeType.get_typeobj(), NoneType.get_typeobj()],
-                                       'arg%d' % i))
+      checker = KeyValueTypeChecker(frame, [IntType.get_typeobj()],
+                                    [IntType.get_typeobj(), UnicodeType.get_typeobj(), NoneType.get_typeobj()],
+                                    'arg%d' % i)
+      arg1.connect(checker.recv)
       return
 
   def get_attr(self, name, write=False):

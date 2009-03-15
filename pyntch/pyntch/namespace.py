@@ -21,7 +21,7 @@ class Variable(CompoundTypeNode):
     return '%s.%s' % (self.space.fullname()[1:], self.name)
 
   def bind(self, obj):
-    obj.connect(self)
+    obj.connect(self.recv)
     return
 
   
@@ -300,7 +300,7 @@ class Namespace(object):
           self.register_names(qif.test)
     
     else:
-      raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._module.get_loc(), tree.lineno))
+      raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._module.get_path(), tree.lineno))
     return
 
   def import_all(self, space):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys
-from typenode import TypeNode, SimpleTypeNode, CompoundTypeNode, NodeTypeError
+from typenode import TypeNode, CompoundTypeNode, NodeTypeError
 stderr = sys.stderr
 
 
@@ -20,7 +20,7 @@ class TracebackObject(TypeNode):
   def __repr__(self):
     try:
       (module,lineno) = self.frame.getloc()
-      return '%s at %s(%s)' % (self.expt, module.get_loc(), lineno)
+      return '%s at %s(%s)' % (self.expt, module.get_path(), lineno)
     except ValueError:
       return '%s at ???' % self.expt
 
@@ -37,7 +37,7 @@ class TracebackObject(TypeNode):
 ##
 class ExecutionFrame(CompoundTypeNode):
 
-  debug = 0
+  expt_debug = 0
 
   def __init__(self, parent, tree):
     self.parent = parent
@@ -48,17 +48,18 @@ class ExecutionFrame(CompoundTypeNode):
       self.loc = None
     CompoundTypeNode.__init__(self)
     if parent:
-      if self.debug:
-        print >>stderr, 'connect_expt: %r <- %r' % (parent, self)
       assert isinstance(parent, ExecutionFrame), parent
-      self.connect(parent)
+      if self.expt_debug:
+        print >>stderr, 'connect_expt: %r <- %r' % (parent, self)
+      self.connect(parent.recv)
     return
 
   def __repr__(self):
-    try:
-      (module,lineno) = self.getloc()
-      return '<Frame at %s(%s)>' % (module.get_loc(), lineno)
-    except ValueError:
+    loc = self.getloc()
+    if loc:
+      (module,lineno) = loc
+      return '<Frame at %s(%s)>' % (module.get_path(), lineno)
+    else:
       return '<Frame at ???>'
 
   def set_reraise(self):
@@ -68,30 +69,21 @@ class ExecutionFrame(CompoundTypeNode):
 
   def getloc(self):
     loc = None
-    while not loc:
+    while self:
       loc = self.loc
+      if loc: break
       self = self.parent
-      if not self: raise ValueError
     return loc
   
   def raise_expt(self, expt):
     assert not isinstance(expt, CompoundTypeNode)
     if expt in self.raised: return
     self.raised.add(expt)
-    if self.debug:
+    if self.expt_debug:
       print >>stderr, 'raise_expt: %r <- %r' % (self, expt)
-    TracebackObject(expt, self).connect(self)
+    TracebackObject(expt, self).connect(self.recv)
     return
 
-  def associate_frame(self, frame):
-    return
-
-  def recv(self, src):
-    for obj in src:
-      assert isinstance(obj, TracebackObject), obj
-      self.update_type(obj)
-    return
-  
   def show(self, out):
     expts_here = []
     expts_there = []
@@ -111,44 +103,50 @@ class ExecutionFrame(CompoundTypeNode):
     return
 
 
+##  ExceptionHandler
+##
+class ExceptionHandler(ExecutionFrame):
+
+  def __init__(self, parent, expt):
+    self.var = CompoundTypeNode()
+    self.expt = expt
+    self.reraise = False
+    self.catchtypes = set()
+    self.done = set()
+    ExecutionFrame.__init__(self, parent, None)
+    if expt:
+      expt.connect(self.recv_expt)
+    return
+
+  def __repr__(self):
+    return '<Handler for %r>' % ','.join(map(repr, self.catchtypes))
+
+  def recv_expt(self, src):
+    from aggregate_types import TupleType
+    for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
+      if obj.is_type(TupleType.get_typeobj()):
+        self.recv_expt(obj.elemall)
+      else:
+        self.catchtypes.add(obj)
+    return
+
+  def set_reraise(self):
+    self.reraise = True
+    return
+
+  def handle_expt(self, expt):
+    if (not self.expt) or (expt.get_type() in self.catchtypes):
+      expt.connect(self.var.recv)
+      return not self.reraise
+    return False
+
+
 ##  ExceptionCatcher
 ##
 class ExceptionCatcher(ExecutionFrame):
 
-  class ExceptionHandler(ExecutionFrame):
-    
-    def __init__(self, parent, expt):
-      self.var = CompoundTypeNode()
-      self.expt = expt
-      self.reraise = False
-      self.catchtypes = set()
-      ExecutionFrame.__init__(self, parent, None)
-      if expt:
-        expt.connect(self.recv_expt)
-      return
-
-    def __repr__(self):
-      return '<Handler for %r>' % ','.join(repr, self.catchtypes)
-    
-    def recv_expt(self, src):
-      from aggregate_types import TupleType
-      for obj in src:
-        if obj.is_type(TupleType.get_typeobj()):
-          self.recv_expt(obj.elemall)
-        else:
-          self.catchtypes.add(obj)
-      return
-
-    def set_reraise(self):
-      self.reraise = True
-      return
-
-    def handle_expt(self, expt):
-      if (not self.expt) or (expt.get_type() in self.catchtypes):
-        expt.connect(self.var)
-        return not self.reraise
-      return False
-    
   def __init__(self, parent):
     self.handlers = []
     self.done = set()
@@ -157,14 +155,15 @@ class ExceptionCatcher(ExecutionFrame):
 
   def __repr__(self):
     s = ', '.join(map(repr, self.handlers))
-    try:
-      (module,lineno) = self.getloc()
-      return '<catch %s at %s(%s)>' % (s, module.get_loc(), lineno)
-    except ValueError:
+    x = self.getloc()
+    if x:
+      (module,lineno) = x
+      return '<catch %s at %s(%s)>' % (s, module.get_path(), lineno)
+    else:
       return '<Catch %s at ???>' % s
   
   def add_handler(self, src):
-    handler = self.ExceptionHandler(self.parent, src)
+    handler = ExceptionHandler(self.parent, src)
     self.handlers.append(handler)
     return handler
 
@@ -173,7 +172,6 @@ class ExceptionCatcher(ExecutionFrame):
       if obj in self.done: continue
       self.done.add(obj)
       assert isinstance(obj, TracebackObject), obj
-      assert isinstance(obj.expt, SimpleTypeNode), obj.expt
       for frame in self.handlers:
         if frame.handle_expt(obj.expt): break
       else:

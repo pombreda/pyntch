@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, \
+from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, NodeAssignError, \
      BuiltinType, BuiltinObject
 from exception import TypeChecker, \
      TypeErrorType, IndexErrorType, ValueErrorType, KeyErrorType, StopIterationType
@@ -17,7 +17,7 @@ class BuiltinAggregateObject(BuiltinObject):
     return
   
   def get_attr(self, name, write=False):
-    if write: raise NodeAttrError(name)
+    if write: raise NodeAssignError(name)
     if name in self.attrs:
       attr = self.attrs[name]
     else:
@@ -73,7 +73,7 @@ class BuiltinSequenceObject(BuiltinAggregateObject):
       return '%r.extend' % self.target
     
     def accept_arg(self, frame, i, arg1):
-      IterElement(frame, arg1).connect(self.target.elemall)
+      IterElement(frame, arg1).connect(self.target.elemall.recv)
       return
 
   # SequenceAppender
@@ -88,14 +88,14 @@ class BuiltinSequenceObject(BuiltinAggregateObject):
       return '%r.append' % self.target
     
     def accept_arg(self, frame, i, arg1):
-      arg1.connect(self.target.elemall)
+      arg1.connect(self.target.elemall.recv)
       return
 
   # BuiltinSequenceObject
   def __init__(self, typeobj, elemall=None):
     self.elemall = CompoundTypeNode()
     if elemall:
-      elemall.connect(self.elemall)
+      elemall.connect(self.elemall.recv)
     self.iter = None
     BuiltinAggregateObject.__init__(self, typeobj)
     return
@@ -107,7 +107,7 @@ class BuiltinSequenceObject(BuiltinAggregateObject):
 
   def connect_element(self, seqobj):
     assert isinstance(seqobj, BuiltinSequenceObject)
-    self.elemall.connect(seqobj.elemall)
+    self.elemall.connect(seqobj.elemall.recv)
     return
 
 ##  BuiltinSequenceType
@@ -150,7 +150,7 @@ class ListObject(BuiltinSequenceObject):
         if fkey:
           fkey.connect(self.recv_fkey)
         else:
-          target.elemall.connect(self.key)
+          target.elemall.connect(self.key.recv)
         if fcmp:
           fcmp.connect(self.recv_fcmp)
         return
@@ -158,7 +158,7 @@ class ListObject(BuiltinSequenceObject):
       def recv_fkey(self, src):
         for obj in src:
           try:
-            obj.call(self.frame, [self.target.elemall], {}, None, None).connect(self.key)
+            obj.call(self.frame, [self.target.elemall], {}, None, None).connect(self.key.recv)
           except NodeTypeError:
             self.frame.raise_expt(TypeErrorType.occur('key function not callable:' % obj))
         return
@@ -166,9 +166,9 @@ class ListObject(BuiltinSequenceObject):
       def recv_fcmp(self, src):
         for obj in src:
           try:
-            tc = TypeChecker(self.frame, IntType.get_typeobj(),
-                             'the return value of comparison function')
-            obj.call(self.frame, [self.key, self.key], {}, None, None).connect(tc)
+            checker = TypeChecker(self.frame, IntType.get_typeobj(),
+                                  'the return value of comparison function')
+            obj.call(self.frame, [self.key, self.key], {}, None, None).connect(checker.recv)
           except NodeTypeError:
             self.frame.raise_expt(TypeErrorType.occur('cmp function not callable:' % obj))
         return
@@ -202,10 +202,14 @@ class ListObject(BuiltinSequenceObject):
   def desc1(self, done):
     return '[%s]' % self.elemall.desc1(done)
 
-  def get_element(self, frame, subs, write=False):
+  def get_element(self, frame, sub, write=False):
     frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
     return self.elemall
 
+  def get_slice(self, frame, subs, write=False):
+    frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
+    return self
+  
   def create_attr(self, name):
     if name == 'append':
       return self.SequenceAppender('list.append', self, args=[ANY])
@@ -243,7 +247,7 @@ class ListType(BuiltinSequenceType):
 
   def create_sequence(self, frame, node):
     listobj = ListType.create_list()
-    IterElement(frame, node).connect(listobj.elemall)
+    IterElement(frame, node).connect(listobj.elemall.recv)
     return listobj
 
   def create_null(self):
@@ -273,13 +277,16 @@ class TupleObject(BuiltinSequenceObject):
     else:
       return '(%s)' % ','.join( obj.desc1(done) for obj in self.elements )
 
-  def get_element(self, frame, subs, write=False):
-    if write:
-      frame.raise_expt(TypeErrorType.occur('cannot assign to a tuple.'))
-    else:
-      frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
+  def get_element(self, frame, sub, write=False):
+    if write: raise NodeAssignError
+    frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
     return self.elemall
 
+  def get_slice(self, frame, subs, write=False):
+    if write: raise NodeAssignError
+    frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
+    return self
+  
   def create_attr(self, name):
     raise NodeAttrError(name)
 
@@ -296,7 +303,7 @@ class TupleType(BuiltinSequenceType):
 
   def create_sequence(self, frame, node):
     tupleobj = TupleType.create_tuple()
-    IterElement(frame, node).connect(tupleobj.elemall)
+    IterElement(frame, node).connect(tupleobj.elemall.recv)
     return tupleobj
   
   def create_null(self):
@@ -324,13 +331,13 @@ class SetObject(BuiltinSequenceObject):
       
       def recv1(self, src):
         for obj in src:
-          IterElement(self.frame, obj).connect(self.types1)
+          IterElement(self.frame, obj).connect(self.types1.recv)
         self.update_intersection()
         return
       
       def recv2(self, src):
         for obj in src:
-          IterElement(self.frame, obj).connect(self.types2)
+          IterElement(self.frame, obj).connect(self.types2.recv)
         self.update_intersection()
         return
         
@@ -338,8 +345,8 @@ class SetObject(BuiltinSequenceObject):
         for obj1 in self.types1:
           for obj2 in self.types2:
             if obj1.get_type() == obj2.get_type():
-              obj1.connect(self.target.elemall)
-              obj2.connect(self.target.elemall)
+              obj1.connect(self.target.elemall.recv)
+              obj2.connect(self.target.elemall.recv)
         return
       
     def __init__(self, name, src1):
@@ -414,7 +421,7 @@ class SetType(BuiltinSequenceType):
 
   def create_sequence(self, frame, node):
     setobj = SetType.create_set()
-    IterElement(frame, node).connect(setobj.elemall)
+    IterElement(frame, node).connect(setobj.elemall.recv)
     return setobj
 
   def create_null(self):
@@ -472,7 +479,7 @@ class GeneratorObject(IterObject):
       return
     
     def accept_arg(self, frame, i, arg1):
-      arg1.connect(self.target.sent)
+      arg1.connect(self.target.sent.recv)
       return
 
   # GeneratorObject
@@ -481,7 +488,7 @@ class GeneratorObject(IterObject):
     if elements:
       for obj in elements:
         if isinstance(obj, GeneratorSlot):
-          self.sent.connect(obj.sent)
+          self.sent.connect(obj.sent.recv)
     IterObject.__init__(self, typeobj, elemall=elemall)
     return
 
@@ -490,7 +497,7 @@ class GeneratorObject(IterObject):
       return self.Send('generator.send', self, self.elemall, [ANY],
                        expts=[StopIterationType.maybe('might raise StopIteration')])
     if name == 'next':
-      NoneType.get_object().connect(self.sent)
+      NoneType.get_object().connect(self.sent.recv)
       return self.Send('generator.next', self, self.elemall,
                        expts=[StopIterationType.maybe('might raise StopIteration')])
     if name == 'throw':
@@ -542,14 +549,14 @@ class DictObject(BuiltinAggregateObject):
         if obj.is_type(TupleType.get_typeobj()) and obj.elements:
           if len(obj.elements) == 2:
             (k,v) = obj.elements
-            k.connect(self.target.key)
-            v.connect(self.target.value)
+            k.connect(self.target.key.recv)
+            v.connect(self.target.value.recv)
           else:
             self.frame.raise_expt(TypeErrorType.occur('cannot convert to dict: tuple length is not 2: %s' % obj))
           continue
         elem = IterElement(self.frame, obj)
-        elem.connect(self.target.key)
-        elem.connect(self.target.value)
+        elem.connect(self.target.key.recv)
+        elem.connect(self.target.value.recv)
         self.frame.raise_expt(TypeErrorType.maybe('might not be able to convert to dict: %s' % obj))
       return
     
@@ -564,7 +571,7 @@ class DictObject(BuiltinAggregateObject):
     
     def recv(self, src):
       for obj in src:
-        IterElement(self.frame, obj).connect(self.target.key)
+        IterElement(self.frame, obj).connect(self.target.key.recv)
       return
 
   # dict.fromkeys
@@ -578,14 +585,14 @@ class DictObject(BuiltinAggregateObject):
     
     def process_args(self, frame, args, kwargs):
       if 2 <= len(args):
-        args[1].connect(self.dictobj.value)
+        args[1].connect(self.dictobj.value.recv)
       else:
-        NoneType.get_object().connect(self.dictobj.value)
+        NoneType.get_object().connect(self.dictobj.value.recv)
       v = args[0]
       if v not in self.cache:
         converter = DictObject.DictConverterFromKeys(frame, self.dictobj)
         self.cache[v] = converter
-        v.connect(converter)
+        v.connect(converter.recv)
       return self.dictobj
     
   # dict.get
@@ -604,7 +611,7 @@ class DictObject(BuiltinAggregateObject):
     
     def accept_arg(self, frame, i, arg1):
       if i != 0:
-        arg1.connect(self.found)
+        arg1.connect(self.found.recv)
       return
 
   # dict.pop
@@ -623,7 +630,7 @@ class DictObject(BuiltinAggregateObject):
     
     def accept_arg(self, frame, i, arg1):
       if i != 0:
-        arg1.connect(self.found)
+        arg1.connect(self.found.recv)
       return
 
   # dict.setdefault
@@ -645,9 +652,9 @@ class DictObject(BuiltinAggregateObject):
     
     def accept_arg(self, frame, i, arg1):
       if i == 0:
-        arg1.connect(self.dictobj.value)
+        arg1.connect(self.dictobj.value.recv)
       else:
-        arg1.connect(self.found)
+        arg1.connect(self.found.recv)
       return
 
   # dict.update
@@ -664,7 +671,7 @@ class DictObject(BuiltinAggregateObject):
       if v not in self.cache:
         converter = DictObject.DictConverterFromKeys(frame, self.dictobj)
         self.cache[v] = converter
-        v.connect(converter)
+        v.connect(converter.recv)
       return NoneType.get_object()
 
   # DictObject
@@ -677,7 +684,7 @@ class DictObject(BuiltinAggregateObject):
       self.key = CompoundTypeNode(key)
       self.value = CompoundTypeNode(value)
     self.default = CompoundTypeNode([NoneType.get_object()])
-    self.value.connect(self.default)
+    self.value.connect(self.default.recv)
     self.iter = None
     BuiltinAggregateObject.__init__(self, typeobj)
     return
@@ -731,10 +738,9 @@ class DictObject(BuiltinAggregateObject):
       return DictObject.Update(self, 'dict.update')
     raise NodeAttrError(name)
 
-  def get_element(self, frame, subs, write=False):
-    key = subs[0]
+  def get_element(self, frame, key, write=False):
     if write:
-      key.connect(self.key)
+      key.connect(self.key.recv)
     else:
       frame.raise_expt(KeyErrorType.maybe('might not have the key: %r' % key))
     return self.value
@@ -770,7 +776,8 @@ class DictType(BuiltinAggregateType):
 
   def create_sequence(self, frame, node):
     dictobj = DictType.create_dict()
-    node.connect(DictObject.DictConverter(frame, dictobj))
+    converter = DictObject.DictConverter(frame, dictobj)
+    node.connect(converter.recv)
     return dictobj
 
   def create_null(self):

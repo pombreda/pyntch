@@ -37,7 +37,10 @@ def build_assign(reporter, frame, space, n, v, evals):
   elif isinstance(n, ast.Subscript):
     obj = build_expr(reporter, frame, space, n.expr, evals)
     subs = [ build_expr(reporter, frame, space, expr, evals) for expr in n.subs ]
-    SubAssign(ExecutionFrame(frame, n), obj, subs, v)
+    if len(subs) == 1:
+      SubAssign(ExecutionFrame(frame, n), obj, subs[0], v)
+    else:
+      SliceAssign(ExecutionFrame(frame, n), obj, subs, v)
   elif isinstance(n, ast.Slice):
     obj = build_expr(reporter, frame, space, n.expr, evals)
     lower = upper = None
@@ -45,9 +48,9 @@ def build_assign(reporter, frame, space, n, v, evals):
       lower = build_expr(reporter, frame, space, n.lower, evals)
     if n.upper:
       upper = build_expr(reporter, frame, space, n.upper, evals)
-    SliceAssign(ExecutionFrame(frame, n), obj, lower, upper, v)
+    SliceAssign(ExecutionFrame(frame, n), obj, [lower, upper], v)
   else:
-    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (n, n._module.get_loc(), n.lineno))
+    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (n, n._module.get_path(), n.lineno))
   return
 
 
@@ -90,8 +93,11 @@ def build_expr(reporter, frame, space, tree, evals):
   elif isinstance(tree, ast.Subscript):
     obj = build_expr(reporter, frame, space, tree.expr, evals)
     subs = [ build_expr(reporter, frame, space, sub, evals) for sub in tree.subs ]
-    expr = SubRef(ExecutionFrame(frame, tree), obj, subs)
-
+    if len(subs) == 1:
+      expr = SubRef(ExecutionFrame(frame, tree), obj, subs[0])
+    else:
+      expr = SliceRef(ExecutionFrame(frame, tree), obj, subs)
+      
   elif isinstance(tree, ast.Slice):
     obj = build_expr(reporter, frame, space, tree.expr, evals)
     lower = upper = None
@@ -99,7 +105,7 @@ def build_expr(reporter, frame, space, tree, evals):
       lower = build_expr(reporter, frame, space, tree.lower, evals)
     if tree.upper:
       upper = build_expr(reporter, frame, space, tree.upper, evals)
-    expr = SliceRef(ExecutionFrame(frame, tree), obj, lower, upper)
+    expr = SliceRef(ExecutionFrame(frame, tree), obj, [lower, upper])
 
   elif isinstance(tree, ast.Sliceobj):
     elements = [ build_expr(reporter, frame, space, node, evals) for node in tree.nodes ]
@@ -210,7 +216,7 @@ def build_expr(reporter, frame, space, tree, evals):
 
   else:
     # unsupported AST.
-    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._module.get_loc(), tree.lineno))
+    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._module.get_path(), tree.lineno))
 
   assert isinstance(expr, (TypeNode, tuple)), expr
   evals.append((None, expr))
@@ -239,8 +245,8 @@ def build_typecheck(reporter, frame, space, tree, msg, evals):
         blame = repr(a.name)
       else:
         blame = repr(a)
-      tc = TypeChecker(frame, [build_expr(reporter, frame, space, b, evals)], blame)
-      build_expr(reporter, frame, space, a, evals).connect(tc)
+      checker = TypeChecker(frame, [build_expr(reporter, frame, space, b, evals)], blame)
+      build_expr(reporter, frame, space, a, evals).connect(checker.recv)
   return
 
 
@@ -372,8 +378,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, (ast.Print, ast.Printnl)):
     for node in tree.nodes:
       value = build_expr(reporter, frame, space, node, evals)
-      locframe = ExecutionFrame(frame, node)
-      value.connect(StrType.StrConverter(locframe))
+      StrType.StrConverter(ExecutionFrame(frame, node), value)
 
   # discard
   elif isinstance(tree, ast.Discard):
@@ -421,6 +426,6 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
     ExecutionFrame(frame, tree).raise_expt(RuntimeErrorType.occur('exec is not supported.'))
   
   else:
-    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._module.get_loc(), tree.lineno))
+    raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._module.get_path(), tree.lineno))
 
   return
