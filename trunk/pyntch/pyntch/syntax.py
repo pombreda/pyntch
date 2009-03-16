@@ -70,7 +70,7 @@ def build_expr(reporter, frame, space, tree, evals):
     try:
       expr = space[tree.name]
     except KeyError:
-      ExecutionFrame(frame, tree).raise_expt(NameErrorType.occur('name %r is not defined.' % tree.name))
+      ExecutionFrame(frame, tree).raise_expt(ErrorConfig.NameUndefined(tree.name))
       expr = UndefinedTypeNode(tree.name)
 
   elif isinstance(tree, ast.CallFunc):
@@ -211,7 +211,7 @@ def build_expr(reporter, frame, space, tree, evals):
     expr = IfExpOp(ExecutionFrame(frame, tree), test, then, else_)
 
   elif isinstance(tree, ast.Backquote):
-    ExecutionFrame(frame, tree).raise_expt(RuntimeErrorType.occur('backquote is not supported.'))
+    ExecutionFrame(frame, tree).raise_expt(ErrorConfig.NotSupported('backquote notation'))
     expr = UndefinedTypeNode('backquote')
 
   else:
@@ -288,7 +288,8 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, ast.AugAssign):
     left = build_expr(reporter, frame, space, tree.node, evals)
     if isinstance(left, UndefinedTypeNode):
-      ExecutionFrame(frame, tree).raise_expt(NameErrorType.occur('cannot assign to an undefined variable.'))
+      # ignore an undefined variable.
+      pass
     else:
       right = build_expr(reporter, frame, space, tree.expr, evals)
       value = AssignOp(ExecutionFrame(frame, tree), tree.op, left, right)
@@ -423,7 +424,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
 
   # unsupported
   elif isinstance(tree, ast.Exec):
-    ExecutionFrame(frame, tree).raise_expt(RuntimeErrorType.occur('exec is not supported.'))
+    ExecutionFrame(frame, tree).raise_expt(ErrorConfig.NotSupported('exec'))
   
   else:
     raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._module.get_path(), tree.lineno))

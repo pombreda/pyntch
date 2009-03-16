@@ -283,7 +283,7 @@ class AbsFunc(BuiltinFunc):
     if kwargs:
       frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
       return UndefinedTypeNode()
-    checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg0')
+    checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 0')
     args[0].connect(checker.recv)
     return args[0]
 
@@ -300,9 +300,9 @@ class DivmodFunc(BuiltinFunc):
     if kwargs:
       frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
       return UndefinedTypeNode()
-    checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg0')
+    checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 0')
     args[0].connect(checker.recv)
-    checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg1')
+    checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 1')
     args[1].connect(checker.recv)
     obj = CompoundTypeNode(args)
     return TupleType.create_tuple([obj, obj])
@@ -320,12 +320,12 @@ class PowFunc(BuiltinFunc):
     if kwargs:
       frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
       return UndefinedTypeNode()
-    checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg0')
+    checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 0')
     args[0].connect(checker.recv)
-    checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg1')
+    checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 1')
     args[1].connect(checker.recv)
     if 3 <= len(args):
-      checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg2')
+      checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 2')
       args[2].connect(checker.recv)
     return CompoundTypeNode(args)
 
