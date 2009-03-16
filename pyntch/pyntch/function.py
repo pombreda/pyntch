@@ -3,7 +3,7 @@
 from typenode import CompoundTypeNode, \
      NodeTypeError, NodeAttrError, BuiltinType, BuiltinObject
 from namespace import Namespace, Variable
-from exception import TypeErrorType
+from config import ErrorConfig
 from module import TreeReporter
 from frame import ExecutionFrame
 
@@ -127,7 +127,7 @@ class FuncType(BuiltinType, TreeReporter):
         if self.kwarg:
           kwvalue.connect(varkwargs.recv)
         else:
-          frame.raise_expt(TypeErrorType.occur('invalid keyword argument for %s: %r' % (self.name, kwname)))
+          frame.raise_expt(ErrorConfig.InvalidKeywordArgs(kwname))
     # Handle standard arguments.
     #
     # assign(var1,arg1):
@@ -150,14 +150,14 @@ class FuncType(BuiltinType, TreeReporter):
       elif self.vararg:
         varargs.append(arg1)
       else:
-        frame.raise_expt(TypeErrorType.occur('too many argument for %s: at most %d' % (self.name, len(self.argvars))))
+        frame.raise_expt(ErrorConfig.InvalidNumOfArgs(len(self.argvars), len(args)))
     # Handle remaining arguments: kwargs and varargs.
     if self.kwarg:
       self.space[self.kwarg].bind(DictType.create_dict(key=StrType.get_object(), value=varkwargs))
     if self.vararg:
       self.space[self.vararg].bind(TupleType.create_tuple(CompoundTypeNode(varargs)))
     if len(self.defaults) < len(argvars):
-      frame.raise_expt(TypeErrorType.occur('too few argument for %s: %d or more' % (self.name, len(argvars))))
+      frame.raise_expt(ErrorConfig.InvalidNumOfArgs(len(self.defaults), len(args)))
     self.frame.connect(frame.recv)
     return self.body
 

@@ -63,8 +63,8 @@ class ExecutionFrame(CompoundTypeNode):
       return '<Frame at ???>'
 
   def set_reraise(self):
-    from exception import SyntaxErrorType
-    self.raise_expt(SyntaxErrorType.occur('raise with no argument outside try-except'))
+    from config import ErrorConfig
+    self.raise_expt(ErrorConfig.RaiseOutsideTry())
     return
 
   def getloc(self):
@@ -76,6 +76,7 @@ class ExecutionFrame(CompoundTypeNode):
     return loc
   
   def raise_expt(self, expt):
+    if not expt: return
     assert not isinstance(expt, CompoundTypeNode)
     if expt in self.raised: return
     self.raised.add(expt)
@@ -199,6 +200,7 @@ class ExceptionMaker(CompoundTypeNode):
 
   def recv_type(self, src):
     from klass import ClassType
+    from config import ErrorConfig
     for obj in src:
       if obj in self.processed: continue
       self.processed.add(obj)
@@ -208,7 +210,7 @@ class ExceptionMaker(CompoundTypeNode):
         try:
           result = obj.call(self.frame, self.excargs, {}, None, None)
         except NodeTypeError:
-          self.frame.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.exctype, obj)))
+          self.frame.raise_expt(ErrorConfig.NotCallable(self.exctype, obj))
           continue
         self.frame.raise_expt(result)
       else:

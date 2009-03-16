@@ -128,7 +128,7 @@ class TypeChecker(CompoundTypeNode):
 
   ANY = 'any'
   
-  def __init__(self, parent_frame, types, blame=None):
+  def __init__(self, parent_frame, types, blame):
     self.parent_frame = parent_frame
     self.blame = blame
     self.done = set()
@@ -144,6 +144,7 @@ class TypeChecker(CompoundTypeNode):
             (','.join(map(repr, self.types)), self.validtypes))
 
   def recv(self, src):
+    from config import ErrorConfig
     if self.validtypes == self.ANY: return
     for obj in src:
       if obj in self.done: continue
@@ -152,7 +153,7 @@ class TypeChecker(CompoundTypeNode):
         if obj.is_type(typeobj): break
       else:
         s = '|'.join( typeobj.get_name() for typeobj in self.validtypes )
-        self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be %s' % (self.blame, obj, s)))
+        self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError(self.blame, obj, s))
     return
 
 
@@ -160,7 +161,7 @@ class TypeChecker(CompoundTypeNode):
 ##
 class SequenceTypeChecker(TypeChecker):
   
-  def __init__(self, parent_frame, types, blame=None):
+  def __init__(self, parent_frame, types, blame):
     self.done = set()
     self.elemdone = set()
     TypeChecker.__init__(self, parent_frame, types, blame=blame)
@@ -175,6 +176,7 @@ class SequenceTypeChecker(TypeChecker):
     return
   
   def recv_elemobj(self, src):
+    from config import ErrorConfig
     if self.validtypes == self.ANY: return
     for obj in src:
       if obj in self.elemdone: continue
@@ -182,8 +184,8 @@ class SequenceTypeChecker(TypeChecker):
       for typeobj in self.validtypes:
         if obj.is_type(typeobj): break
       else:
-        s = '|'.join(map(repr, self.validtypes))
-        self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be [%s]' % (self.blame, obj, s)))
+        s = '[%s]' % ('|'.join(map(repr, self.validtypes)))
+        self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError(self.blame, obj, s))
     return
 
 
@@ -191,7 +193,7 @@ class SequenceTypeChecker(TypeChecker):
 ##
 class KeyValueTypeChecker(TypeChecker):
   
-  def __init__(self, parent_frame, keys, values, blame=None):
+  def __init__(self, parent_frame, keys, values, blame):
     self.validkeys = CompoundTypeNode(keys)
     self.keydone = set()
     self.valuedone = set()
@@ -199,6 +201,7 @@ class KeyValueTypeChecker(TypeChecker):
     return
     
   def recv(self, src):
+    from config import ErrorConfig
     from aggregate_types import DictObject
     for obj in src:
       if obj in self.done: continue
@@ -208,10 +211,11 @@ class KeyValueTypeChecker(TypeChecker):
         obj.value.connect(self.recv_value)
       else:
         if self.blame:
-          self.parent_frame.raise_expt(TypeErrorType.occur('%s (%s) must be dictionary' % (self.blame, obj)))
+          self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError(self.blame, obj, 'dict'))
     return
   
   def recv_key(self, src):
+    from config import ErrorConfig
     for obj in src:
       if obj in self.keydone: continue
       self.keydone.add(obj)
@@ -220,11 +224,12 @@ class KeyValueTypeChecker(TypeChecker):
           self.update_type(obj)
           break
       elif self.blame:
-        self.parent_frame.raise_expt(TypeErrorType.occur(
-          'key %s (%s) must be [%s]' % (self.blame, obj, '|'.join(map(repr, self.validkeys)))))
+        s = '|'.join(map(repr, self.validkeys))
+        self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError('key of %s' % self.blame, obj, s))
     return
 
   def recv_value(self, src):
+    from config import ErrorConfig
     for obj in src:
       if obj in self.valuedone: continue
       self.valuedone.add(obj)
@@ -233,8 +238,8 @@ class KeyValueTypeChecker(TypeChecker):
           self.update_type(obj)
           break
       elif self.blame:
-        self.parent_frame.raise_expt(TypeErrorType.occur(
-          'value %s (%s) must be [%s]' % (self.blame, obj, '|'.join(map(repr, self.validtypes)))))
+        s = '|'.join(map(repr, self.validtypes))
+        self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError('value of %s' % self.blame, obj, s))
     return
 
 
