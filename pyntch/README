@@ -110,7 +110,12 @@ How It Works
 The basic mechanism of Pyntch is based on the idea of "typeflow
 analysis."  This is similar to dataflow analysis, which gives the
 maximal set of possible data that are stored at each location
-(either variable or continuation) in a program.
+(either variable or continuation) in a program. First, it constructs
+a big connected graph that represents the entire Python program.
+Every expression or statement is converted to a "node", which is
+an abstraact place where certain type(s) of data is stored or
+passed. Then it tries to figure out what type of data goes from
+one node to another.
 
 One of the major drawbacks of typeflow analysis is its inability
 to take account of execution order (which is also true for
