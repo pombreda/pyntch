@@ -8,6 +8,20 @@ from module import TreeReporter
 from frame import ExecutionFrame
 
 
+# assign_arg(var1,arg1): Assign an argument to a local variable var1.
+def assign_arg(frame, var1, arg1):
+  from expression import TupleUnpack
+  assert not isinstance(var1, list), var1
+  assert not isinstance(arg1, list), arg1
+  if isinstance(var1, tuple):
+    tup = TupleUnpack(frame, arg1, len(var1))
+    for (i,v) in enumerate(var1):
+      assign_arg(frame, v, tup.get_nth(i))
+  else:
+    var1.bind(arg1)
+  return
+
+
 ##  FuncType
 ##
 class FuncType(BuiltinType, TreeReporter):
@@ -40,9 +54,8 @@ class FuncType(BuiltinType, TreeReporter):
       return
 
   def __init__(self, parent_reporter, parent_frame, parent_space,
-               name, argnames, defaults, varargs, kwargs, code, tree):
+               name, argnames, defaults, variargs, kwargs, code, tree):
     TreeReporter.__init__(self, parent_reporter, name)
-    from expression import TupleUnpack
     def maprec(func, x):
       if isinstance(x, tuple):
         return tuple( maprec(func, y) for y in x )
@@ -59,29 +72,19 @@ class FuncType(BuiltinType, TreeReporter):
       del argnames[-1]
       self.space.register_var(self.kwarg)
     # handle "*args".
-    self.vararg = None
-    if varargs:
-      self.vararg = argnames[-1]
+    self.variarg = None
+    if variargs:
+      self.variarg = argnames[-1]
       del argnames[-1]
-      self.space.register_var(self.vararg)
+      self.space.register_var(self.variarg)
     # handle normal args.
     self.argnames = tuple(argnames)
     maprec(lambda argname: self.space.register_var(argname), self.argnames)
     self.argvars = maprec(lambda argname: self.space[argname], self.argnames)
     # assign the default values.
     self.defaults = tuple(defaults)
-    def assign(var1, arg1):
-      assert not isinstance(var1, list), var1
-      assert not isinstance(arg1, list), arg1
-      if isinstance(var1, tuple):
-        tup = TupleUnpack(parent_frame, arg1, len(var1))
-        for (i,v) in enumerate(var1):
-          assign(v, tup.get_nth(i))
-      else:
-        arg1.connect(var1.recv)
-      return
     for (var1,arg1) in zip(self.argvars[-len(defaults):], self.defaults):
-      assign(var1, arg1)
+      assign_arg(parent_frame, var1, arg1)
     # build the function body.
     self.body = self.build_body(name, code)
     self.frames = set()
@@ -109,55 +112,52 @@ class FuncType(BuiltinType, TreeReporter):
   def call(self, frame, args, kwargs, star, dstar):
     from basic_types import StrType
     from aggregate_types import DictType, TupleType
-    from expression import TupleUnpack
-    assert isinstance(frame, ExecutionFrame)
-    self.frames.add(frame)
-    # Copy the list of argument variables.
-    argvars = list(self.argvars)
+    from expression import TupleUnpack, TupleSlice
     # Process keyword arguments first.
-    varkwargs = CompoundTypeNode()
+    varsleft = list(self.argvars)
+    varikwargs = CompoundTypeNode()
     for (kwname, kwvalue) in kwargs.iteritems():
-      for var1 in argvars:
+      for var1 in varsleft:
         if isinstance(var1, Variable) and var1.name == kwname:
-          kwvalue.connect(var1.recv)
+          var1.bind(kwvalue)
           # When a keyword argument is given, remove that name from the remaining arguments.
-          argvars.remove(var1)
+          varsleft.remove(var1)
           break
       else:
         if self.kwarg:
-          kwvalue.connect(varkwargs.recv)
+          kwvalue.connect(varikwargs.recv)
         else:
           frame.raise_expt(ErrorConfig.InvalidKeywordArgs(kwname))
-    # Handle standard arguments.
-    #
-    # assign(var1,arg1):
-    #  Assign a actual parameter arg1 to a local variable var1.
-    def assign(var1, arg1):
-      assert not isinstance(var1, list), var1
-      assert not isinstance(arg1, list), arg1
-      if isinstance(var1, tuple):
-        tup = TupleUnpack(frame, arg1, len(var1))
-        for (i,v) in enumerate(var1):
-          assign(v, tup.get_nth(i))
-      else:
-        arg1.connect(var1.recv)
-      return
-    varargs = []
+    # Process standard arguments.
+    variargs = []
     for arg1 in args:
-      if argvars:
-        var1 = argvars.pop(0)
-        assign(var1, arg1)
-      elif self.vararg:
-        varargs.append(arg1)
+      if varsleft:
+        var1 = varsleft.pop(0)
+        assign_arg(frame, var1, arg1)
+      elif self.variarg:
+        variargs.append(arg1)
       else:
+        # Too many arguments.
         frame.raise_expt(ErrorConfig.InvalidNumOfArgs(len(self.argvars), len(args)))
-    # Handle remaining arguments: kwargs and varargs.
-    if self.kwarg:
-      self.space[self.kwarg].bind(DictType.create_dict(key=StrType.get_object(), value=varkwargs))
-    if self.vararg:
-      self.space[self.vararg].bind(TupleType.create_tuple(CompoundTypeNode(varargs)))
-    if len(self.defaults) < len(argvars):
+    # Process a star.
+    if star:
+      tup = TupleUnpack(frame, star, len(varsleft), strict=not self.variarg)
+      for (i,var1) in enumerate(varsleft):
+        var1.bind(tup.get_nth(i))
+      if self.variarg:
+        left = TupleSlice(frame, star, len(varsleft))
+        self.space[self.variarg].bind(TupleType.create_tuple(elemall=left))
+    elif len(varsleft) - len(self.defaults):
+      # Too few arguments.
       frame.raise_expt(ErrorConfig.InvalidNumOfArgs(len(self.defaults), len(args)))
+    # Handle remaining arguments: kwargs and variargs.
+    if self.kwarg:
+      self.space[self.kwarg].bind(DictType.create_dict(key=StrType.get_object(), value=varikwargs))
+    if self.variarg:
+      self.space[self.variarg].bind(TupleType.create_tuple(CompoundTypeNode(variargs)))
+    # Remember where this is called from.
+    self.frames.add(frame)
+    # Propagate the exceptions upward.
     self.frame.connect(frame.recv)
     return self.body
 
@@ -177,8 +177,8 @@ class FuncType(BuiltinType, TreeReporter):
           yield '%s=%s' % (x, self.space[x].describe())
       return
     r = list(recjoin(', ', self.argnames))
-    if self.vararg:
-      r.append('*'+self.vararg)
+    if self.variarg:
+      r.append('*'+self.variarg)
     if self.kwarg:
       r.append('**'+self.kwarg)
     out.write('def %s(%s):' % (self.name, ', '.join(r)) )
@@ -200,10 +200,10 @@ class ClassMethodType(FuncType): pass
 class LambdaFuncType(FuncType):
   
   def __init__(self, parent_reporter, parent_frame, parent_space,
-               argnames, defaults, varargs, kwargs, code, tree):
+               argnames, defaults, variargs, kwargs, code, tree):
     name = '__lambda_%x' % id(code)
     FuncType.__init__(self, parent_reporter, parent_frame, parent_space,
-                      name, argnames, defaults, varargs, kwargs, code, tree)
+                      name, argnames, defaults, variargs, kwargs, code, tree)
     return
 
   def build_body(self, name, tree):

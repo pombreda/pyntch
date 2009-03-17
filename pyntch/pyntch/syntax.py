@@ -3,7 +3,8 @@
 from compiler import ast
 from typenode import TypeNode, UndefinedTypeNode, CompoundTypeNode
 from frame import ExecutionFrame, ExceptionCatcher, ExceptionMaker
-from exception import TypeChecker, NameErrorType, RuntimeErrorType
+from exception import TypeChecker
+from config import ErrorConfig
 from klass import PythonClassType
 from function import FuncType, LambdaFuncType
 from expression import ExpressionNode, AttrRef, SubRef, SliceRef, \
