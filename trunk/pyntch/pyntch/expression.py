@@ -658,9 +658,10 @@ def IterElement(frame0, target):
 ##
 class TupleUnpack(ExpressionNode):
 
-  def __init__(self, frame, tupobj, nelements):
+  def __init__(self, frame, tupobj, nelements, strict=True):
     self.tupobj = tupobj
     self.elements = [ CompoundTypeNode() for _ in xrange(nelements) ]
+    self.strict = strict
     self.done = set()
     ExpressionNode.__init__(self, frame)
     self.tupobj.connect(self.recv_tupobj)
@@ -679,7 +680,7 @@ class TupleUnpack(ExpressionNode):
       self.done.add(obj)
       if obj.is_type(TupleType.get_typeobj()) and obj.elements != None:
         # Unpack a fixed-length tuple.
-        if len(obj.elements) != len(self.elements):
+        if (self.strict and len(obj.elements) != len(self.elements)) or len(obj.elements) < len(self.elements):
           self.raise_expt(ValueErrorType.occur('tuple unpackable: len(%r) != %r' % (obj, len(self.elements))))
         else:
           for (src,dest) in zip(obj.elements, self.elements):
