@@ -115,7 +115,7 @@ class FuncType(BuiltinType, TreeReporter):
     from expression import TupleUnpack, TupleSlice
     # Process keyword arguments first.
     varsleft = list(self.argvars)
-    varikwargs = CompoundTypeNode()
+    varikwargs = []
     for (kwname, kwvalue) in kwargs.iteritems():
       for var1 in varsleft:
         if isinstance(var1, Variable) and var1.name == kwname:
@@ -125,7 +125,7 @@ class FuncType(BuiltinType, TreeReporter):
           break
       else:
         if self.kwarg:
-          kwvalue.connect(varikwargs.recv)
+          varikwargs.append(kwvalue)
         else:
           frame.raise_expt(ErrorConfig.InvalidKeywordArgs(kwname))
     # Process standard arguments.
@@ -151,10 +151,13 @@ class FuncType(BuiltinType, TreeReporter):
       # Too few arguments.
       frame.raise_expt(ErrorConfig.InvalidNumOfArgs(len(self.defaults), len(args)))
     # Handle remaining arguments: kwargs and variargs.
-    if self.kwarg:
-      self.space[self.kwarg].bind(DictType.create_dict(key=StrType.get_object(), value=varikwargs))
-    if self.variarg:
+    if self.variarg and variargs:
       self.space[self.variarg].bind(TupleType.create_tuple(CompoundTypeNode(variargs)))
+    if self.kwarg:
+      if varikwargs:
+        self.space[self.kwarg].bind(DictType.create_dict(key=StrType.get_object(), value=CompoundTypeNode(varikwargs)))
+      else:
+        self.space[self.kwarg].bind(DictType.create_null())
     # Remember where this is called from.
     self.frames.add(frame)
     # Propagate the exceptions upward.

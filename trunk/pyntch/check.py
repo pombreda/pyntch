@@ -29,18 +29,21 @@ def main(argv):
   #Namespace.debug = debug
   #Interpreter.debug = debug
   Interpreter.initialize(modpath)
+  MustBeDefinedNode.reset()
+  modules = []
   for name in args:
     print '===', name, '==='
-    MustBeDefinedNode.reset()
     if name.endswith('.py'):
       path = name
       (name,_) = os.path.splitext(os.path.basename(name))
       module = Interpreter.load_file(path, name)
     else:
       module = Interpreter.load_module(name)
-    MustBeDefinedNode.check()
-    module.showall(sys.stdout)
+    modules.append(module)
   TypeNode.showstat()
+  MustBeDefinedNode.check()
+  for module in modules:
+    module.showall(sys.stdout)
   return 0
 
 if __name__ == '__main__': sys.exit(main(sys.argv))

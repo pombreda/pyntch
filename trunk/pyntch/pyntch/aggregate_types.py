@@ -52,8 +52,9 @@ class BuiltinAggregateType(BuiltinCallable, BuiltinType):
     if not self.nullobj:
       self.nullobj = self.create_null()
     return self.nullobj
-  
-  def create_sequence(self, frame, node):
+
+  @classmethod
+  def create_sequence(klass, frame, node):
     raise NotImplementedError
 
 
@@ -245,12 +246,14 @@ class ListType(BuiltinSequenceType):
   def create_list(klass, elemall=None):
     return ListObject(klass.get_typeobj(), elemall=elemall)
 
-  def create_sequence(self, frame, node):
+  @classmethod
+  def create_sequence(klass, frame, node):
     listobj = ListType.create_list()
     IterElement(frame, node).connect(listobj.elemall.recv)
     return listobj
 
-  def create_null(self):
+  @classmethod
+  def create_null(klass):
     return ListType.create_list()
 
   
@@ -301,12 +304,14 @@ class TupleType(BuiltinSequenceType):
   def create_tuple(klass, elements=None, elemall=None):
     return TupleObject(klass.get_typeobj(), elements=elements, elemall=elemall)
 
-  def create_sequence(self, frame, node):
+  @classmethod
+  def create_sequence(klass, frame, node):
     tupleobj = TupleType.create_tuple()
     IterElement(frame, node).connect(tupleobj.elemall.recv)
     return tupleobj
   
-  def create_null(self):
+  @classmethod
+  def create_null(klass):
     return TupleType.create_tuple()
 
 
@@ -419,12 +424,14 @@ class SetType(BuiltinSequenceType):
   def create_set(klass, elemall=None):
     return SetObject(klass.get_typeobj(), elemall=elemall)
 
-  def create_sequence(self, frame, node):
+  @classmethod
+  def create_sequence(klass, frame, node):
     setobj = SetType.create_set()
     IterElement(frame, node).connect(setobj.elemall.recv)
     return setobj
 
-  def create_null(self):
+  @classmethod
+  def create_null(klass):
     return SetType.create_set()
 
 
@@ -761,6 +768,17 @@ class DictType(BuiltinAggregateType):
   def create_dict(klass, items=None, key=None, value=None):
     return DictObject(klass.get_typeobj(), items=items, key=key, value=value)
 
+  @classmethod
+  def create_sequence(klass, frame, node):
+    dictobj = DictType.create_dict()
+    converter = DictObject.DictConverter(frame, dictobj)
+    node.connect(converter.recv)
+    return dictobj
+
+  @classmethod
+  def create_null(klass):
+    return DictType.create_dict()
+
   def process_args(self, frame, args, kwargs):
     if kwargs:
       node = tuple(kwargs.values())
@@ -773,15 +791,6 @@ class DictType(BuiltinAggregateType):
     if args:
       return self.get_converted(frame, args[0])
     return self.get_null()
-
-  def create_sequence(self, frame, node):
-    dictobj = DictType.create_dict()
-    converter = DictObject.DictConverter(frame, dictobj)
-    node.connect(converter.recv)
-    return dictobj
-
-  def create_null(self):
-    return DictType.create_dict()
 
 
 ##  EnumerateType
