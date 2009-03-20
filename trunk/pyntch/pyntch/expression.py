@@ -281,14 +281,18 @@ class FunCall(ExpressionNode):
   
   def __init__(self, frame, func, args=None, kwargs=None, star=None, dstar=None):
     self.func = func
-    self.args = args or ()
+    self.args = tuple(args or ())
     self.kwargs = kwargs or {}
-    self.star = star
-    self.dstar = dstar
+    self.varargs = set([()])
     self.done = set()
     assert isinstance(frame, ExecutionFrame)
     ExpressionNode.__init__(self, frame)
     func.connect(self.recv_func)
+    if star:
+      star.connect(self.recv_tuple)
+    if dstar:
+      SequenceTypeChecker(self, dstar, 'keywords must be strings')
+      IterDictValue(self.frame, dstar).connect(self.recv_vararg)
     return
 
   def __repr__(self):
@@ -296,14 +300,34 @@ class FunCall(ExpressionNode):
             (self.func, ', '.join(map(repr, self.args) +
                                   [ '%s=%r' % (k,v) for (k,v) in self.kwargs.iteritems() ])))
 
-  def recv_func(self, src):
+  def recv_func(self, _):
+    for obj in self.func:
+      for varargs in self.varargs:
+        self.done.add((obj, varargs))
+        try:
+          obj.call(self.frame, self.args+varargs, self.kwargs).connect(self.recv)
+        except NodeTypeError:
+          self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.func, obj)))
+    return
+
+  def recv_tuple(self, src):
+    from aggregate_types import TupleType
     for obj in src:
       if obj in self.done: continue
       self.done.add(obj)
-      try:
-        obj.call(self.frame, self.args, self.kwargs, self.star, self.dstar).connect(self.recv)
-      except NodeTypeError:
-        self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.func, obj)))
+      if obj.is_type(TupleType.get_typeobj()):
+        if obj.elements:
+          self.varargs.add(tuple(obj.elements))
+        else:
+          self.varargs.add((obj.elemall,))
+      else:
+        self.varargs.add((IterElement(self.frame, obj),))
+    self.recv_func(None)
+    return
+
+  def recv_varargs(self, src):
+    self.varargs.add((src,))
+    self.recv_func(None)
     return
 
 
@@ -638,10 +662,9 @@ class IfExpOp(ExpressionNode):
 
 ##  MethodCall
 ##
-def MethodCall(frame, target, name, args=None, kwargs=None, star=None, dstar=None):
+def MethodCall(frame, target, name, args=None, kwargs=None):
   assert isinstance(frame, ExecutionFrame)
-  return FunCall(frame, OptAttrRef(frame, target, name),
-                 args=args, kwargs=kwargs, star=star, dstar=dstar)
+  return FunCall(frame, OptAttrRef(frame, target, name), args=args, kwargs=kwargs)
 
 
 ##  IterElement
@@ -652,6 +675,29 @@ def IterElement(frame0, target):
   frame1 = ExceptionCatcher(frame0)
   frame1.add_handler(StopIterationType.get_typeobj())
   return MethodCall(frame1, IterRef(frame0, target), 'next')
+
+
+##  IterDictValue
+##
+class IterDictValue(ExpressionNode):
+
+  def __init__(self, frame, target):
+    self.target = target
+    self.done = set()
+    ExpressionNode.__init__(self, frame)
+    self.target.connect(self.recv_target)
+    return
+
+  def recv_target(self, src):
+    from aggregate_types import DictType
+    for obj in src:
+      if obj in self.done: continue
+      self.done.add(obj)
+      if obj.is_type(DictType.get_typeobj()):
+        MethodCall(self, obj, 'iteritems').connect(self.recv)
+      else:
+        self.raise_expt(ErrorConfig.TypeCheckerError(src, obj, 'dict'))
+    return
 
 
 ##  TupleUnpack

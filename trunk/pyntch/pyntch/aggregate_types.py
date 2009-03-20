@@ -159,7 +159,7 @@ class ListObject(BuiltinSequenceObject):
       def recv_fkey(self, src):
         for obj in src:
           try:
-            obj.call(self.frame, [self.target.elemall], {}, None, None).connect(self.key.recv)
+            obj.call(self.frame, [self.target.elemall], {}).connect(self.key.recv)
           except NodeTypeError:
             self.frame.raise_expt(TypeErrorType.occur('key function not callable:' % obj))
         return
@@ -169,7 +169,7 @@ class ListObject(BuiltinSequenceObject):
           try:
             checker = TypeChecker(self.frame, IntType.get_typeobj(),
                                   'the return value of comparison function')
-            obj.call(self.frame, [self.key, self.key], {}, None, None).connect(checker.recv)
+            obj.call(self.frame, [self.key, self.key], {}).connect(checker.recv)
           except NodeTypeError:
             self.frame.raise_expt(TypeErrorType.occur('cmp function not callable:' % obj))
         return

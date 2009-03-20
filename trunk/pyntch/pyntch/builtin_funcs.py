@@ -397,7 +397,7 @@ class MapFunc(BuiltinFunc):
         if obj in self.done: continue
         self.done.add(obj)
         try:
-          obj.call(self.frame, self.args, {}, None, None).connect(self.listobj.elemall.recv)
+          obj.call(self.frame, self.args, {}).connect(self.listobj.elemall.recv)
         except NodeTypeError:
           self.frame.raise_expt(TypeErrorType.occur('function not callable:' % obj))
       return
@@ -406,7 +406,7 @@ class MapFunc(BuiltinFunc):
     BuiltinFunc.__init__(self, 'map', [ANY, ANY])
     return
 
-  def call(self, frame, args, kwargs, star, dstar):
+  def call(self, frame, args, kwargs):
     if kwargs:
       frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
       return UndefinedTypeNode()
@@ -442,7 +442,7 @@ class ReduceFunc(BuiltinFunc):
         if obj in self.done: continue
         self.done.add(obj)
         try:
-          result = obj.call(self.frame, self.args, {}, None, None)
+          result = obj.call(self.frame, self.args, {})
           result.connect(self.recv)
           result.connect(self.result.recv)
         except NodeTypeError:
@@ -453,7 +453,7 @@ class ReduceFunc(BuiltinFunc):
     BuiltinFunc.__init__(self, 'reduce', [ANY, ANY])
     return
 
-  def call(self, frame, args, kwargs, star, dstar):
+  def call(self, frame, args, kwargs):
     if kwargs:
       frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
       return UndefinedTypeNode()
@@ -487,7 +487,7 @@ class FilterFunc(BuiltinFunc):
         self.done.add(obj)
         if not isinstance(obj, NoneType):
           try:
-            obj.call(self.frame, [self.elem], {}, None, None)
+            obj.call(self.frame, [self.elem], {})
           except NodeTypeError:
             self.frame.raise_expt(TypeErrorType.occur('function not callable:' % obj))
       return
@@ -496,7 +496,7 @@ class FilterFunc(BuiltinFunc):
     BuiltinFunc.__init__(self, 'filter', [ANY, ANY])
     return
 
-  def call(self, frame, args, kwargs, star, dstar):
+  def call(self, frame, args, kwargs):
     if kwargs:
       frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
       return UndefinedTypeNode()
@@ -537,7 +537,7 @@ class SumFunc(BuiltinFunc):
     BuiltinFunc.__init__(self, 'sum', [ANY], [ANY])
     return
 
-  def call(self, frame, args, kwargs, star, dstar):
+  def call(self, frame, args, kwargs):
     if kwargs:
       frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
       return UndefinedTypeNode()
@@ -559,7 +559,7 @@ class SortedFunc(BuiltinFunc):
     BuiltinFunc.__init__(self, 'sorted', [ANY])
     return
 
-  def call(self, frame, args, kwargs, star, dstar):
+  def call(self, frame, args, kwargs):
     if len(args) < self.minargs:
       frame.raise_expt(TypeErrorType.occur(
         'too few argument for %s: %d or more.' % (self.name, self.minargs)))
@@ -577,7 +577,7 @@ class ZipFunc(BuiltinFunc):
     BuiltinFunc.__init__(self, 'zip')
     return
 
-  def call(self, frame, args, kwargs, star, dstar):
+  def call(self, frame, args, kwargs):
     if kwargs:
       frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
       return UndefinedTypeNode()

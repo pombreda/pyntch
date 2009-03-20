@@ -109,7 +109,7 @@ class FuncType(BuiltinType, TreeReporter):
   def get_type(self):
     return self
 
-  def call(self, frame, args, kwargs, star, dstar):
+  def call(self, frame, args, kwargs):
     from basic_types import StrType
     from aggregate_types import DictType, TupleType
     from expression import TupleUnpack, TupleSlice
@@ -139,17 +139,9 @@ class FuncType(BuiltinType, TreeReporter):
       else:
         # Too many arguments.
         frame.raise_expt(ErrorConfig.InvalidNumOfArgs(len(self.argvars), len(args)))
-    # Process a star.
-    if star:
-      tup = TupleUnpack(frame, star, len(varsleft), strict=not self.variarg)
-      for (i,var1) in enumerate(varsleft):
-        var1.bind(tup.get_nth(i))
-      if self.variarg:
-        left = TupleSlice(frame, star, len(varsleft))
-        self.space[self.variarg].bind(TupleType.create_tuple(elemall=left))
-    elif len(varsleft) - len(self.defaults):
+    if len(self.defaults) < len(varsleft):
       # Too few arguments.
-      frame.raise_expt(ErrorConfig.InvalidNumOfArgs(len(self.defaults), len(args)))
+      frame.raise_expt(ErrorConfig.InvalidNumOfArgs(len(self.argvars), len(args)))
     # Handle remaining arguments: kwargs and variargs.
     if self.variarg and variargs:
       self.space[self.variarg].bind(TupleType.create_tuple(CompoundTypeNode(variargs)))

@@ -69,7 +69,7 @@ class TypeNode(object):
     raise NodeTypeError('not subscriptable')
   def get_iter(self, frame):
     raise NodeTypeError('not iterator')
-  def call(self, frame, args, kwargs, star, dstar):
+  def call(self, frame, args, kwargs):
     raise NodeTypeError('not callable')
   
   def get_name(self):
@@ -175,7 +175,7 @@ class UndefinedTypeNode(TypeNode):
     return self
   def get_iter(self, frame):
     return self
-  def call(self, frame, args, kwargs, star, dstar):
+  def call(self, frame, args, kwargs):
     return self
 
 
@@ -244,7 +244,7 @@ class BuiltinType(BuiltinObject):
 
   # default methods
   class InitMethod(BuiltinObject):
-    def call(self, frame, args, kwargs, star, dstar):
+    def call(self, frame, args, kwargs):
       from basic_types import NoneType
       return NoneType.get_object()
 
@@ -263,5 +263,3 @@ class BuiltinBasicType(BuiltinType):
     if klass not in klass.OBJECTS:
       klass.OBJECTS[klass] = klass.TYPE_INSTANCE(klass.get_typeobj())
     return klass.OBJECTS[klass]
-
-
