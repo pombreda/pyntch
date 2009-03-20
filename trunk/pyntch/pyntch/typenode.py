@@ -68,7 +68,9 @@ class TypeNode(object):
   def get_slice(self, frame, subs, write=False):
     raise NodeTypeError('not subscriptable')
   def get_iter(self, frame):
-    raise NodeTypeError('not iterator')
+    raise NodeTypeError('not iterable')
+  def get_reversed(self, frame):
+    raise NodeTypeError('not reverse-iterable')
   def call(self, frame, args, kwargs):
     raise NodeTypeError('not callable')
   
@@ -174,6 +176,8 @@ class UndefinedTypeNode(TypeNode):
   def get_slice(self, frame, subs, write=False):
     return self
   def get_iter(self, frame):
+    return self
+  def get_reversed(self, frame):
     return self
   def call(self, frame, args, kwargs):
     return self

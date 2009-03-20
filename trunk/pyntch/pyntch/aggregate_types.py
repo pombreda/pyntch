@@ -4,7 +4,7 @@ from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, NodeAssignE
 from exception import TypeChecker, \
      TypeErrorType, IndexErrorType, ValueErrorType, KeyErrorType, StopIterationType
 from basic_types import BuiltinCallable, BuiltinConstMethod, BoolType, IntType, StrType, NoneType, ANY
-from expression import IterElement
+from expression import IterElement, MethodCall
 
 
 ##  BuiltinAggregateObject
@@ -105,6 +105,8 @@ class BuiltinSequenceObject(BuiltinAggregateObject):
     if not self.iter:
       self.iter = IterType.create_iter(self.elemall)
     return self.iter
+
+  get_reversed = get_iter
 
   def connect_element(self, seqobj):
     assert isinstance(seqobj, BuiltinSequenceObject)
@@ -485,6 +487,51 @@ class IterType(BuiltinType):
   def create_iter(klass, elemall=None):
     return IterObject(klass.get_typeobj(), elemall=elemall)
 
+
+##  ReversedType
+##
+class ReversedType(BuiltinCallable, IterType):
+
+  TYPE_NAME = 'reversed'
+
+  # convert
+  class ReversedIterConverter(CompoundTypeNode):
+    
+    def __init__(self, frame, target):
+      self.frame = frame
+      self.target = target
+      self.done = set()
+      CompoundTypeNode.__init__(self)
+      target.connect(self.recv_target)
+      return
+    
+    def __repr__(self):
+      return 'reversed(%r)' % self.target
+    
+    def recv_target(self, src):
+      for obj in src:
+        if obj in self.done: continue
+        self.done.add(obj)
+        try:
+          iterobj = obj.get_reversed(self.frame)
+          frame1 = ExceptionCatcher(self.frame)
+          frame1.add_handler(StopIterationType.get_typeobj())
+          MethodCall(frame1, iterobj, 'next').connect(self.recv)
+        except NodeTypeError:
+          self.frame.raise_expt(TypeErrorType.occur('not a sequence: %r' % obj))
+      return
+  
+  def __init__(self):
+    BuiltinType.__init__(self)
+    BuiltinCallable.__init__(self, self.TYPE_NAME, [ANY])
+    return
+
+  def process_args(self, frame, args, kwargs):
+    if kwargs:
+      frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
+      return UndefinedTypeNode()
+    return self.ReversedIterConverter(frame, args[0])
+  
 
 ##  GeneratorObject
 ##
