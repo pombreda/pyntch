@@ -339,7 +339,7 @@ class BuiltinTypesNamespace(Namespace):
     self.register_var('set').bind(aggregate_types.SetType.get_typeobj())
     self.register_var('dict').bind(aggregate_types.DictType.get_typeobj())
     self.register_var('enumerate').bind(aggregate_types.EnumerateType.get_typeobj())
-    #self.register_var('reversed').bind(aggregate_types.ReversedType.get_typeobj())
+    self.register_var('reversed').bind(aggregate_types.ReversedType.get_typeobj())
     
     self.register_var('InstanceType').bind(klass.InstanceType.get_typeobj())
     self.register_var('ModuleType').bind(module.ModuleType.get_typeobj())
