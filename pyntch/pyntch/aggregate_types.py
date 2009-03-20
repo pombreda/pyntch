@@ -248,13 +248,13 @@ class ListType(BuiltinSequenceType):
 
   @classmethod
   def create_sequence(klass, frame, node):
-    listobj = ListType.create_list()
+    listobj = klass.create_list()
     IterElement(frame, node).connect(listobj.elemall.recv)
     return listobj
 
   @classmethod
   def create_null(klass):
-    return ListType.create_list()
+    return klass.create_list()
 
   
 ##  TupleObject
@@ -306,18 +306,18 @@ class TupleType(BuiltinSequenceType):
 
   @classmethod
   def create_sequence(klass, frame, node):
-    tupleobj = TupleType.create_tuple()
+    tupleobj = klass.create_tuple()
     IterElement(frame, node).connect(tupleobj.elemall.recv)
     return tupleobj
   
   @classmethod
   def create_null(klass):
-    return TupleType.create_tuple()
+    return klass.create_tuple()
 
 
-##  SetObject
+##  FrozenSetObject
 ##
-class SetObject(BuiltinSequenceObject):
+class FrozenSetObject(BuiltinSequenceObject):
 
   # Intersection
   class Intersection(BuiltinConstMethod):
@@ -368,71 +368,91 @@ class SetObject(BuiltinSequenceObject):
       self.TypeMixer(frame, self.retobj, self.src1, args[0])
       return self.retobj
 
+  #
   def desc1(self, done):
     return '([%s])' % self.elemall.desc1(done)
 
   def copy(self):
-    return SetType.create_set(self.elemall)
+    return self.get_type().create_set(self.elemall)
   
+  def create_attr(self, name):
+    if name == 'copy':
+      return BuiltinConstMethod('set.copy', self.copy())
+    elif name == 'difference':
+      return BuiltinConstMethod('set.difference', self.copy(), [[ANY]])
+    elif name == 'intersection':
+      return SetObject.Intersection('set.intersection', self)
+    elif name == 'issubset':
+      return BuiltinConstMethod('set.issubset', BoolType.get_object(), [[ANY]])
+    elif name == 'issuperset':
+      return BuiltinConstMethod('set.issuperset', BoolType.get_object(), [[ANY]])
+    elif name == 'symmetric_difference':
+      setobj = self.copy()
+      return self.SequenceExtender('set.symmetric_difference', setobj, setobj, [ANY])
+    elif name == 'union':
+      setobj = self.copy()
+      return self.SequenceExtender('set.union', setobj, setobj, [ANY])
+    raise NodeAttrError(name)
+  
+
+##  FrozenSetType
+##
+class FrozenSetType(BuiltinSequenceType):
+
+  TYPE_NAME = 'frozenset'
+
+  @classmethod
+  def create_set(klass, elemall=None):
+    return FrozenSetObject(klass.get_typeobj(), elemall=elemall)
+
+  @classmethod
+  def create_sequence(klass, frame, node):
+    setobj = klass.create_set()
+    IterElement(frame, node).connect(setobj.elemall.recv)
+    return setobj
+
+  @classmethod
+  def create_null(klass):
+    return klass.create_set()
+
+
+##  SetObject
+##
+class SetObject(FrozenSetObject):
+
   def create_attr(self, name):
     if name == 'add':
       return self.SequenceAppender('set.add', self, args=[ANY])
     elif name == 'clear':
       return BuiltinConstMethod('set.clear', NoneType.get_object())
-    elif name == 'copy':
-      return BuiltinConstMethod('set.copy', self.copy())
-    elif name == 'difference':
-      return BuiltinConstMethod('set.difference', self.copy(), [[ANY]])
     elif name == 'difference_update':
       return BuiltinConstMethod('set.difference_update', NoneType.get_object(), [[ANY]])
     elif name == 'discard':
       return BuiltinConstMethod('set.discard', NoneType.get_object(), [ANY])
-    elif name == 'intersection':
-      return SetObject.Intersection('set.intersection', self)
     elif name == 'intersection_update':
       return BuiltinConstMethod('set.intersection_update', NoneType.get_object(), [[ANY]])
-    elif name == 'issubset':
-      return BuiltinConstMethod('set.issubset', BoolType.get_object(), [[ANY]])
-    elif name == 'issuperset':
-      return BuiltinConstMethod('set.issuperset', BoolType.get_object(), [[ANY]])
     elif name == 'pop':
       return BuiltinConstMethod('set.pop', NoneType.get_object(), 
                                   expts=[KeyErrorType.maybe('might not able to pop from an empty set.')])
     elif name == 'remove':
       return BuiltinConstMethod('set.remove', NoneType.get_object(), [ANY],
                                   expts=[KeyErrorType.maybe('might not have the value.')])
-    elif name == 'symmetric_difference':
-      setobj = self.copy()
-      return self.SequenceExtender('set.symmetric_difference', setobj, setobj, [ANY])
     elif name == 'symmetric_difference_update':
       return self.SequenceExtender('set.symmetric_difference_update', self, args=[ANY])
-    elif name == 'union':
-      setobj = self.copy()
-      return self.SequenceExtender('set.union', setobj, setobj, [ANY])
     elif name == 'update':
       return self.SequenceExtender('set.update', self, self, [ANY])
-    raise NodeAttrError(name)
+    return FrozenSetObject.create_attr(self, name)
   
 
 ##  SetType
 ##
-class SetType(BuiltinSequenceType):
+class SetType(FrozenSetType):
 
   TYPE_NAME = 'set'
 
   @classmethod
   def create_set(klass, elemall=None):
     return SetObject(klass.get_typeobj(), elemall=elemall)
-
-  @classmethod
-  def create_sequence(klass, frame, node):
-    setobj = SetType.create_set()
-    IterElement(frame, node).connect(setobj.elemall.recv)
-    return setobj
-
-  @classmethod
-  def create_null(klass):
-    return SetType.create_set()
 
 
 ##  IterObject
@@ -770,14 +790,14 @@ class DictType(BuiltinAggregateType):
 
   @classmethod
   def create_sequence(klass, frame, node):
-    dictobj = DictType.create_dict()
+    dictobj = klass.create_dict()
     converter = DictObject.DictConverter(frame, dictobj)
     node.connect(converter.recv)
     return dictobj
 
   @classmethod
   def create_null(klass):
-    return DictType.create_dict()
+    return klass.create_dict()
 
   def process_args(self, frame, args, kwargs):
     if kwargs:
