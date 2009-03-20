@@ -208,7 +208,7 @@ class ExceptionMaker(CompoundTypeNode):
       # Otherwise, just return the object given.
       if isinstance(obj, ClassType):
         try:
-          result = obj.call(self.frame, self.excargs, {}, None, None)
+          result = obj.call(self.frame, self.excargs, {})
         except NodeTypeError:
           self.frame.raise_expt(ErrorConfig.NotCallable(self.exctype, obj))
           continue

@@ -28,7 +28,7 @@ class BuiltinCallable(object):
     self.expts = (expts or [])
     return
   
-  def call(self, frame, args, kwargs, star, dstar):
+  def call(self, frame, args, kwargs):
     if len(args) < self.minargs:
       frame.raise_expt(ErrorConfig.InvalidNumOfArgs(self.minargs, len(args)))
       return UndefinedTypeNode()
@@ -345,11 +345,11 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
     self.StrConverter(frame, arg1)
     return
 
-  def call(self, frame, args, kwargs, star, dstar):
+  def call(self, frame, args, kwargs):
     if self.TYPE_NAME == 'basestring':
       frame.raise_expt(ErrorConfig.NotInstantiatable('basestring'))
       return UndefinedTypeNode()
-    return BuiltinConstCallable.call(self, frame, args, kwargs, star, dstar)
+    return BuiltinConstCallable.call(self, frame, args, kwargs)
 
   def __init__(self):
     BuiltinBasicType.__init__(self)

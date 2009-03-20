@@ -25,8 +25,8 @@ class BoundMethodType(BuiltinType):
   def get_type(self):
     return self
 
-  def call(self, frame, args, kwargs, star, dstar):
-    return self.func.call(frame, (self.arg0,)+tuple(args), kwargs, star, dstar)
+  def call(self, frame, args, kwargs):
+    return self.func.call(frame, (self.arg0,)+tuple(args), kwargs)
 
 
 ##  ClassType
@@ -104,11 +104,11 @@ class ClassType(BuiltinType, TreeReporter):
       method = self.boundmethods[func]
     return method
 
-  def call(self, frame, args, kwargs, star, dstar):
+  def call(self, frame, args, kwargs):
     from expression import MethodCall
     assert isinstance(frame, ExecutionFrame)
     self.frames.add(frame)
-    MethodCall(frame, self, '__init__', (self.instance,)+args, kwargs, star, dstar)
+    MethodCall(frame, self, '__init__', (self.instance,)+args, kwargs)
     return self.instance
   
 class PythonClassType(ClassType, TreeReporter):

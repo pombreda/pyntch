@@ -9,16 +9,16 @@ class ErrorConfig(object):
 
   # occur
   @classmethod
+  def RaiseOutsideTry(klass):
+    return SyntaxErrorType.occur('raise with no argument outside try-except')
+  
+  @classmethod
   def NameUndefined(klass, name):
     return NameErrorType.occur('undefined: %s' % name)
 
   @classmethod
   def NotSupported(klass, name):
     return RuntimeErrorType.occur('unsupported feature: %s' % name)
-  
-  @classmethod
-  def RaiseOutsideTry(klass):
-    return SyntaxErrorType.occur('raise with no argument outside try-except')
   
   @classmethod
   def NotCallable(klass, src, obj):
@@ -50,6 +50,10 @@ class ErrorConfig(object):
   @classmethod
   def TypeCheckerError(klass, src, obj, validtype):
     return TypeErrorType.occur('%s (%s) must be %s' % (src, obj ,validtype))
+
+  @classmethod
+  def AttributeNotFound(klass, obj, attrname):
+    return AttributeErrorType.occur('attribute not found: %r.%s' % (obj ,attrname))
   
   # maybe
   @classmethod
