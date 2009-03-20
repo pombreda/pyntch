@@ -335,11 +335,11 @@ class BuiltinTypesNamespace(Namespace):
     self.register_var('classmethod').bind(basic_types.ClassMethodType.get_typeobj())
     self.register_var('list').bind(aggregate_types.ListType.get_typeobj())
     self.register_var('tuple').bind(aggregate_types.TupleType.get_typeobj())
+    self.register_var('frozenset').bind(aggregate_types.FrozenSetType.get_typeobj())
     self.register_var('set').bind(aggregate_types.SetType.get_typeobj())
     self.register_var('dict').bind(aggregate_types.DictType.get_typeobj())
     self.register_var('enumerate').bind(aggregate_types.EnumerateType.get_typeobj())
     #self.register_var('reversed').bind(aggregate_types.ReversedType.get_typeobj())
-    #self.register_var('frozenset').bind(aggregate_types.FrozenSetType.get_typeobj())
     
     self.register_var('InstanceType').bind(klass.InstanceType.get_typeobj())
     self.register_var('ModuleType').bind(module.ModuleType.get_typeobj())
@@ -406,7 +406,7 @@ class BuiltinNamespace(Namespace):
     import builtin_funcs
     Namespace.__init__(self, parent, '__builtin__')
     self.register_var('abs').bind(builtin_funcs.AbsFunc())
-    #self.register_var('apply').bind(builtin_funcs.ApplyFunc())
+    self.register_var('apply').bind(builtin_funcs.ApplyFunc())
     self.register_var('all').bind(builtin_funcs.AllFunc())
     self.register_var('any').bind(builtin_funcs.AnyFunc())
     self.register_var('callable').bind(builtin_funcs.CallableFunc())
@@ -433,8 +433,8 @@ class BuiltinNamespace(Namespace):
     self.register_var('reduce').bind(builtin_funcs.ReduceFunc())
     self.register_var('repr').bind(builtin_funcs.ReprFunc())
     self.register_var('round').bind(builtin_funcs.RoundFunc())
-    self.register_var('sum').bind(builtin_funcs.SumFunc())
     self.register_var('sorted').bind(builtin_funcs.SortedFunc())
+    self.register_var('sum').bind(builtin_funcs.SumFunc())
     self.register_var('unichr').bind(builtin_funcs.UnichrFunc())
     self.register_var('zip').bind(builtin_funcs.ZipFunc())
 
