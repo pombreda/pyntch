@@ -71,6 +71,8 @@ class TypeNode(object):
     raise NodeTypeError('not iterable')
   def get_reversed(self, frame):
     raise NodeTypeError('not reverse-iterable')
+  def get_length(self, frame):
+    raise NodeTypeError('no len()')
   def call(self, frame, args, kwargs):
     raise NodeTypeError('not callable')
   
@@ -178,6 +180,8 @@ class UndefinedTypeNode(TypeNode):
   def get_iter(self, frame):
     return self
   def get_reversed(self, frame):
+    return self
+  def get_length(self, frame):
     return self
   def call(self, frame, args, kwargs):
     return self

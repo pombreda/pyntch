@@ -198,6 +198,9 @@ class BaseStringObject(BuiltinObject):
       self.iter = IterType.create_iter(self)
     return self.iter
 
+  def get_length(self, frame):
+    return IntType.get_object()
+
   def get_element(self, frame, sub, write=False):
     if write: raise NodeAssignError
     frame.raise_expt(ErrorConfig.MaybeOutOfRange())
