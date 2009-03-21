@@ -106,6 +106,9 @@ class BuiltinSequenceObject(BuiltinAggregateObject):
       self.iter = IterType.create_iter(self.elemall)
     return self.iter
 
+  def get_length(self, frame):
+    return IntType.get_object()
+
   get_reversed = get_iter
 
   def connect_element(self, seqobj):
@@ -459,7 +462,14 @@ class SetType(FrozenSetType):
 
 ##  IterObject
 ##
-class IterObject(BuiltinSequenceObject):
+class IterObject(BuiltinAggregateObject):
+
+  def __init__(self, typeobj, elemall=None):
+    self.elemall = CompoundTypeNode()
+    if elemall:
+      elemall.connect(self.elemall.recv)
+    BuiltinAggregateObject.__init__(self, typeobj)
+    return
   
   def __repr__(self):
     return '(%s, ...)' % self.elemall
@@ -823,6 +833,9 @@ class DictObject(BuiltinAggregateObject):
     if not self.iter:
       self.iter = IterType.create_iter(self.key)
     return self.iter
+
+  def get_length(self, frame):
+    return IntType.get_object()
 
 
 ##  DictType

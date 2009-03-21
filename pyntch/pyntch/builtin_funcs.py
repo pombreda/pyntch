@@ -303,10 +303,10 @@ class LenFunc(BuiltinFunc):
       for obj in src:
         if obj in self.done: continue
         self.done.add(obj)
-        if obj.is_type(ListType.get_typeobj(), TupleType.get_typeobj(), DictType.get_typeobj()):
-          obj.connect(self.recv)
-        elif isinstance(obj, InstanceObject):
-          MethodCall(self.frame, obj, '__len__').connect(self.recv)
+        try:
+          obj.get_length(self.frame).connect(self.recv)
+        except (NodeTypeError, NodeAttrError):
+          pass
       return
 
     def check_undefined(self):

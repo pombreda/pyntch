@@ -100,7 +100,7 @@ class ExecutionFrame(CompoundTypeNode):
     for expt in sorted(expts_here, key=lambda expt:expt.frame.getloc()):
       out.write('  raises %r' % expt)
     for expt in sorted(expts_there, key=lambda expt:expt.frame.getloc()):
-      out.write('  (raises %r)' % expt)
+      out.write('  [raises %r]' % expt)
     return
 
 

@@ -227,6 +227,11 @@ class InstanceObject(BuiltinObject):
     assert isinstance(frame, ExecutionFrame)
     return MethodCall(frame, self, '__reversed__')
 
+  def get_length(self, frame):
+    from expression import MethodCall
+    assert isinstance(frame, ExecutionFrame)
+    return MethodCall(frame, self, '__len__')
+
   def get_element(self, frame, sub, write=False):
     from expression import MethodCall
     if write:
