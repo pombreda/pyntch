@@ -224,10 +224,14 @@ def build_expr(reporter, frame, space, tree, evals):
   return expr
 
 
-##  build_typecheck(reporter, frame, space, tree, msg, evals)
+##  build_assert(reporter, frame, space, tree, arg, evals)
 ##
-def build_typecheck(reporter, frame, space, tree, msg, evals):
+def build_assert(reporter, frame, space, tree, arg, evals):
   # "assert isinstance() and isinstance() and ...
+  if isinstance(tree, ast.Const) and isinstance(tree.value, str):
+    obj = build_expr(reporter, frame, space, arg, [])
+    space[tree.value].setup(obj)
+    return
   if isinstance(tree, ast.CallFunc):
     tests = [ tree ]
   elif isinstance(tree, ast.And):
@@ -240,8 +244,8 @@ def build_typecheck(reporter, frame, space, tree, msg, evals):
         node.node.name == 'isinstance' and
         len(node.args) == 2):
       (a,b) = node.args
-      if msg and isinstance(msg, ast.Const):
-        blame = msg.value
+      if arg and isinstance(arg, ast.Const):
+        blame = arg.value
       elif isinstance(a, ast.Name):
         blame = repr(a.name)
       else:
@@ -418,7 +422,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
 
   elif isinstance(tree, ast.Assert):
     frame1 = ExecutionFrame(frame, tree)
-    build_typecheck(reporter, frame1, space, tree.test, tree.fail, evals)
+    build_assert(reporter, frame1, space, tree.test, tree.fail, evals)
     build_expr(reporter, frame, space, tree.test, evals)
     if tree.fail:
       build_expr(reporter, frame, space, tree.fail, evals)
