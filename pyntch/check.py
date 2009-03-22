@@ -6,15 +6,16 @@ from pyntch.frame import ExecutionFrame
 from pyntch.expression import MustBeDefinedNode
 from pyntch.namespace import Namespace
 from pyntch.module import Interpreter, IndentedStream
+from pyntch.config import ErrorConfig
 
 # main
 def main(argv):
   import getopt
   def usage():
-    print 'usage: %s [-d] [-p pythonpath] [file ...]' % argv[0]
+    print 'usage: %s [-d] [-c config] [-p pythonpath] [file ...]' % argv[0]
     return 100
   try:
-    (opts, args) = getopt.getopt(argv[1:], 'dp:')
+    (opts, args) = getopt.getopt(argv[1:], 'dc:p:')
   except getopt.GetoptError:
     return usage()
   debug = 0

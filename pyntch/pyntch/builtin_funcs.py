@@ -299,7 +299,7 @@ class LenFunc(BuiltinFuncNoKwd):
 
     def check_undefined(self):
       if not self.types:
-        self.raise_expt(ErrorCofnig.NoLength(self.target))
+        self.raise_expt(ErrorConfig.NoLength(self.target))
       return
 
   def process_args_nokwd(self, frame, args):
@@ -340,7 +340,7 @@ class MapFunc(BuiltinFuncNoKwd):
     BuiltinFunc.__init__(self, 'map', [ANY, ANY])
     return
 
-  def process_args_nokwd(self, frame, args, kwargs):
+  def process_args_nokwd(self, frame, args):
     return self.MapCaller(frame, args[0], args[1:])
 
 
