@@ -245,6 +245,10 @@ class InstanceObject(BuiltinObject):
       return OptMethodCall(frame, self, '__setslice__', subs)
     else:
       return OptMethodCall(frame, self, '__getslice__', subs)
+
+  def call(self, frame, args, kwargs):
+    from expression import OptMethodCall
+    return OptMethodCall(frame, self, '__call__', args, kwargs)
   
   def bind_func(self, func):
     if func not in self.boundmethods:

@@ -228,7 +228,7 @@ def build_expr(reporter, frame, space, tree, evals):
 ##
 def build_assert(reporter, frame, space, tree, arg, evals):
   # "assert isinstance() and isinstance() and ...
-  if isinstance(tree, ast.Const) and isinstance(tree.value, str):
+  if isinstance(tree, ast.Const) and isinstance(tree.value, str) and tree.value:
     obj = build_expr(reporter, frame, space, arg, [])
     space[tree.value].setup(obj)
     return
