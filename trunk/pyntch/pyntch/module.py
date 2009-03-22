@@ -162,23 +162,26 @@ class Interpreter(object):
   @classmethod
   def load_file(klass, path, modname):
     from compiler import parseFile
-    print >>stderr, 'loading: %r' % path
-    dirname = os.path.dirname(path)
-    if dirname not in klass.module_path:
-      klass.module_path.insert(0, dirname)
-    module = PythonModuleObject(modname, klass.DEFAULT_NAMESPACE, path)
-    klass.MODULE_CACHE[modname] = module
-    try:
-      tree = parseFile(path)
-    except IOError:
-      raise klass.ModuleNotFound(modname, path)
-    def rec(n):
-      n._module = module
-      for c in n.getChildNodes():
-        rec(c)
-      return
-    rec(tree)
-    module.load(tree)
+    if modname in klass.MODULE_CACHE:
+      module = klass.MODULE_CACHE[modname]
+    else:
+      print >>stderr, 'loading: %r' % path
+      dirname = os.path.dirname(path)
+      if dirname not in klass.module_path:
+        klass.module_path.insert(0, dirname)
+      module = PythonModuleObject(modname, klass.DEFAULT_NAMESPACE, path)
+      klass.MODULE_CACHE[modname] = module
+      try:
+        tree = parseFile(path)
+      except IOError:
+        raise klass.ModuleNotFound(modname, path)
+      def rec(n):
+        n._module = module
+        for c in n.getChildNodes():
+          rec(c)
+        return
+      rec(tree)
+      module.load(tree)
     return module
 
   # load_module
