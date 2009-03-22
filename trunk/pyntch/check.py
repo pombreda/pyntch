@@ -5,7 +5,7 @@ from pyntch.typenode import TypeNode, CompoundTypeNode
 from pyntch.frame import ExecutionFrame
 from pyntch.expression import MustBeDefinedNode
 from pyntch.namespace import Namespace
-from pyntch.module import Interpreter
+from pyntch.module import Interpreter, IndentedStream
 
 # main
 def main(argv):
@@ -43,7 +43,7 @@ def main(argv):
   TypeNode.showstat()
   MustBeDefinedNode.check()
   for module in modules:
-    module.showall(sys.stdout)
+    module.showrec(IndentedStream(sys.stdout))
   return 0
 
 if __name__ == '__main__': sys.exit(main(sys.argv))

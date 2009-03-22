@@ -210,7 +210,7 @@ class ExceptionMaker(CompoundTypeNode):
         try:
           result = obj.call(self.frame, self.excargs, {})
         except NodeTypeError:
-          self.frame.raise_expt(ErrorConfig.NotCallable(self.exctype, obj))
+          self.frame.raise_expt(ErrorConfig.NotCallable(obj))
           continue
         self.frame.raise_expt(result)
       else:

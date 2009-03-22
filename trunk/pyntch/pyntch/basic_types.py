@@ -3,8 +3,8 @@
 ##  This module should not be imported as toplevel,
 ##  as it causes circular imports!
 
-from typenode import TypeNode, CompoundTypeNode, NodeAttrError, NodeAssignError, \
-     BuiltinType, BuiltinBasicType, BuiltinObject, UndefinedTypeNode
+from typenode import TypeNode, CompoundTypeNode, NodeAttrError, NodeAssignError, UndefinedTypeNode
+from typenode import BuiltinObject, BuiltinType, BuiltinCallable, BuiltinConstCallable, BuiltinConstMethod
 from exception import TypeChecker, SequenceTypeChecker
 from config import ErrorConfig
 from klass import InstanceObject
@@ -12,86 +12,20 @@ from klass import InstanceObject
 ANY = TypeChecker.ANY
 
 
-##  BuiltinCallable
+##  BuiltinBasicType
 ##
-##  A helper class to augment builtin objects (mostly type objects)
-##  for behaving like a function.
-##
-class BuiltinCallable(object):
+class BuiltinBasicType(BuiltinType):
 
-  def __init__(self, name, args=None, optargs=None, expts=None):
-    args = (args or [])
-    optargs = (optargs or [])
-    self.name = name
-    self.minargs = len(args)
-    self.args = args+optargs
-    self.expts = (expts or [])
-    return
-  
-  def call(self, frame, args, kwargs):
-    if len(args) < self.minargs:
-      frame.raise_expt(ErrorConfig.InvalidNumOfArgs(self.minargs, len(args)))
-      return UndefinedTypeNode()
-    if len(self.args) < len(args):
-      frame.raise_expt(ErrorConfig.InvalidNumOfArgs(len(self.args), len(args)))
-      return UndefinedTypeNode()
-    return self.process_args(frame, args, kwargs)
+  TYPE_INSTANCE = None
+  OBJECTS = {}
 
-  def process_args(self, frame, args, kwargs):
-    raise NotImplementedError
-
-
-##  BuiltinConstCallable
-##
-class BuiltinConstCallable(BuiltinCallable):
-  
-  def __init__(self, name, retobj, args=None, optargs=None, expts=None):
-    self.retobj = retobj
-    BuiltinCallable.__init__(self, name, args=args, optargs=optargs, expts=expts)
-    return
-
-  def process_args(self, frame, args, kwargs):
-    if kwargs:
-      frame.raise_expt(ErrorCofnig.NoKeywordArgs())
-    for (i,arg1) in enumerate(args):
-      assert isinstance(arg1, TypeNode)
-      self.accept_arg(frame, i, arg1)
-    for expt in self.expts:
-      frame.raise_expt(expt)
-    return self.retobj
-
-  def accept_arg(self, frame, i, arg1):
-    s = 'arg %d' % i
-    spec = self.args[i]
-    if isinstance(spec, list):
-      if spec == [ANY]:
-        checker = SequenceTypeChecker(frame, ANY, s)
-      else:
-        checker = SequenceTypeChecker(frame, [ x.get_typeobj() for x in spec ], s)
-    elif isinstance(spec, tuple):
-      checker = TypeChecker(frame, [ x.get_typeobj() for x in spec ], s)
-    elif spec == ANY:
-      checker = TypeChecker(frame, ANY, s)
-    else:
-      checker = TypeChecker(frame, [spec.get_typeobj()], s)
-    arg1.connect(checker.recv)
-    return
-
-
-##  BuiltinConstMethod
-##
-class BuiltinMethodType(BuiltinType):
-  TYPE_NAME = 'builtin_method'
-  
-class BuiltinConstMethod(BuiltinConstCallable, BuiltinObject):
-
-  def __init__(self, name, retobj, args=None, optargs=None, expts=None):
-    BuiltinObject.__init__(self, BuiltinMethodType.get_typeobj())
-    BuiltinConstCallable.__init__(self, name, retobj, args=args, optargs=optargs, expts=expts)
-    return
-
-  def __repr__(self):
-    return '<callable %s>' % self.name
+  # get_object()
+  @classmethod
+  def get_object(klass):
+    assert klass.TYPE_INSTANCE
+    if klass not in klass.OBJECTS:
+      klass.OBJECTS[klass] = klass.TYPE_INSTANCE(klass.get_typeobj())
+    return klass.OBJECTS[klass]
 
 
 ##  TypeType
@@ -329,16 +263,16 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
       return
     
     def recv(self, src):
-      from expression import MethodCall
+      from expression import OptMethodCall
       for obj in src:
         if obj in self.done: continue
         self.done.add(obj)
         if isinstance(obj, InstanceObject):
-          value = MethodCall(self.frame, obj, '__str__')
+          value = OptMethodCall(self.frame, obj, '__str__')
           checker = TypeChecker(self.frame, BaseStringType.get_typeobj(), 
                                 'the return value of __str__ method')
           value.connect(checker.recv)
-          value = MethodCall(self.frame, obj, '__repr__')
+          value = OptMethodCall(self.frame, obj, '__repr__')
           checker = TypeChecker(self.frame, BaseStringType.get_typeobj(), 
                                 'the return value of __repr__ method')
           value.connect(checker.recv)

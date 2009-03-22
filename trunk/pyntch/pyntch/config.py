@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 from exception import SyntaxErrorType, TypeErrorType, ValueErrorType, \
-     IndexErrorType, IOErrorType, EOFErrorType, \
-     NameErrorType, RuntimeErrorType, OSErrorType, \
+     AttributeErrorType, IndexErrorType, IOErrorType, EOFErrorType, \
+     KeyErrorType, NameErrorType, RuntimeErrorType, OSErrorType, \
      UnicodeDecodeErrorType, UnicodeEncodeErrorType
 
 class ErrorConfig(object):
@@ -21,8 +21,8 @@ class ErrorConfig(object):
     return RuntimeErrorType.occur('unsupported feature: %s' % name)
   
   @classmethod
-  def NotCallable(klass, src, obj):
-    return TypeErrorType.occur('not callable: %r might be %r' % (src, obj))
+  def NotCallable(klass, obj):
+    return TypeErrorType.occur('not callable: %r' % obj)
   
   @classmethod
   def NotInstantiatable(klass, typename):
@@ -31,6 +31,10 @@ class ErrorConfig(object):
   @classmethod
   def NoKeywordArgs(klass):
     return TypeErrorType.occur('cannot take a keyword argument')
+  
+  @classmethod
+  def NoKeywordArg1(klass, kwd):
+    return TypeErrorType.occur('cannot take keyword: %s' % kwd)
   
   @classmethod
   def InvalidKeywordArgs(klass, kwd):
@@ -48,13 +52,44 @@ class ErrorConfig(object):
     return ValueErrorType.occur('not convertable to %s' % typename)
 
   @classmethod
+  def NotIterable(klass, obj):
+    return TypeErrorType.occur('not iterable: %r' % obj)
+  
+  @classmethod
+  def NotSubscriptable(klass, obj):
+    return TypeErrorType.occur('not subscriptable: %r' % obj)
+  
+  @classmethod
+  def NotAssignable(klass, obj):
+    return TypeErrorType.occur('cannot assign item: %r' % obj)
+  
+  @classmethod
+  def NoLength(klass, obj):
+    return TypeErrorType.occur('length not defined' % obj)
+  
+  @classmethod
+  def AttributeNotFound(klass, obj, attrname):
+    return AttributeErrorType.occur('attribute not found: %r.%s' % (obj, attrname))
+  
+  @classmethod
+  def AttributeNotAssignable(klass, obj, attrname):
+    return AttributeErrorType.occur('attribute cannot be assigned: %r.%s' % (obj, attrname))
+  
+  @classmethod
+  def NotUnpackable(klass, obj):
+    return ValueErrorType.occur('tuple cannot be unpacked: %r' % obj)
+  
+  @classmethod
+  def NotSupportedOperand(klass, op, left, right=None):
+    if right:
+      return TypeErrorType.occur('unsupported operand %s(%s, %s)' % (op, left.describe(), right.describe()))
+    else:
+      return TypeErrorType.occur('unsupported operand %s(%s)' % (op, left.describe()))
+
+  @classmethod
   def TypeCheckerError(klass, src, obj, validtype):
     return TypeErrorType.occur('%s (%s) must be %s' % (src, obj ,validtype))
 
-  @classmethod
-  def AttributeNotFound(klass, obj, attrname):
-    return AttributeErrorType.occur('attribute not found: %r.%s' % (obj ,attrname))
-  
   # maybe
   @classmethod
   def MaybeNotConvertable(klass, typename):
@@ -62,6 +97,9 @@ class ErrorConfig(object):
   @classmethod
   def MaybeOutOfRange(klass):
     return IndexErrorType.maybe('index out of range')
+  @classmethod
+  def MaybeKeyNotFound(klass):
+    return KeyErrorType.maybe('key not found')
   @classmethod
   def MaybeNotDecodable(klass):
     return UnicodeDecodeErrorType.maybe('unicode not decodable')

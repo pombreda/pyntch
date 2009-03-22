@@ -210,8 +210,7 @@ class KeyValueTypeChecker(TypeChecker):
         obj.key.connect(self.recv_key)
         obj.value.connect(self.recv_value)
       else:
-        if self.blame:
-          self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError(self.blame, obj, 'dict'))
+        self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError(self.blame, obj, 'dict'))
     return
   
   def recv_key(self, src):
@@ -219,11 +218,11 @@ class KeyValueTypeChecker(TypeChecker):
     for obj in src:
       if obj in self.keydone: continue
       self.keydone.add(obj)
-      if typeobj in self.validkeys:
+      for typeobj in self.validkeys:
         if obj.is_type(typeobj):
           self.update_type(obj)
           break
-      elif self.blame:
+      else:
         s = '|'.join(map(repr, self.validkeys))
         self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError('key of %s' % self.blame, obj, s))
     return
@@ -233,11 +232,11 @@ class KeyValueTypeChecker(TypeChecker):
     for obj in src:
       if obj in self.valuedone: continue
       self.valuedone.add(obj)
-      if typeobj in self.validtypes:
+      for typeobj in self.validtypes:
         if obj.is_type(typeobj):
           self.update_type(obj)
           break
-      elif self.blame:
+      else:
         s = '|'.join(map(repr, self.validtypes))
         self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError('value of %s' % self.blame, obj, s))
     return

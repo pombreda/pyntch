@@ -105,10 +105,10 @@ class ClassType(BuiltinType, TreeReporter):
     return method
 
   def call(self, frame, args, kwargs):
-    from expression import MethodCall
+    from expression import OptMethodCall
     assert isinstance(frame, ExecutionFrame)
     self.frames.add(frame)
-    MethodCall(frame, self, '__init__', (self.instance,)+args, kwargs)
+    OptMethodCall(frame, self, '__init__', (self.instance,)+args, kwargs)
     return self.instance
   
 class PythonClassType(ClassType, TreeReporter):
@@ -218,33 +218,33 @@ class InstanceObject(BuiltinObject):
     return attr
 
   def get_iter(self, frame):
-    from expression import MethodCall
+    from expression import OptMethodCall
     assert isinstance(frame, ExecutionFrame)
-    return MethodCall(frame, self, '__iter__')
+    return OptMethodCall(frame, self, '__iter__')
 
   def get_reversed(self, frame):
-    from expression import MethodCall
+    from expression import OptMethodCall
     assert isinstance(frame, ExecutionFrame)
-    return MethodCall(frame, self, '__reversed__')
+    return OptMethodCall(frame, self, '__reversed__')
 
   def get_length(self, frame):
-    from expression import MethodCall
+    from expression import OptMethodCall
     assert isinstance(frame, ExecutionFrame)
-    return MethodCall(frame, self, '__len__')
+    return OptMethodCall(frame, self, '__len__')
 
   def get_element(self, frame, sub, write=False):
-    from expression import MethodCall
+    from expression import OptMethodCall
     if write:
-      return MethodCall(frame, self, '__setelem__', sub)
+      return OptMethodCall(frame, self, '__setelem__', sub)
     else:
-      return MethodCall(frame, self, '__getelem__', sub)
+      return OptMethodCall(frame, self, '__getelem__', sub)
     
   def get_slice(self, frame, subs, write=False):
-    from expression import MethodCall
+    from expression import OptMethodCall
     if write:
-      return MethodCall(frame, self, '__setslice__', sub)
+      return OptMethodCall(frame, self, '__setslice__', subs)
     else:
-      return MethodCall(frame, self, '__getslice__', sub)
+      return OptMethodCall(frame, self, '__getslice__', subs)
   
   def bind_func(self, func):
     if func not in self.boundmethods:
