@@ -313,7 +313,7 @@ class Namespace(object):
 
     # Assert
     elif isinstance(tree, ast.Assert):
-      if isinstance(tree.test, ast.Const) and isinstance(tree.test.value, str):
+      if isinstance(tree.test, ast.Const) and isinstance(tree.test.value, str) and tree.test.value:
         self.register_fixed(tree.test.value)
     
     else:

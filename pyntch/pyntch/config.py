@@ -7,6 +7,8 @@ from exception import SyntaxErrorType, TypeErrorType, ValueErrorType, \
 
 class ErrorConfig(object):
 
+  raise_uncertain = False
+
   # occur
   @classmethod
   def RaiseOutsideTry(klass):
@@ -93,42 +95,67 @@ class ErrorConfig(object):
   # maybe
   @classmethod
   def MaybeNotConvertable(klass, typename):
+    if not klass.raise_uncertain: return None
     return ValueErrorType.maybe('not convertable to %s' % typename)
+  
   @classmethod
   def MaybeOutOfRange(klass):
+    if not klass.raise_uncertain: return None
     return IndexErrorType.maybe('index out of range')
+  
   @classmethod
   def MaybeKeyNotFound(klass):
+    if not klass.raise_uncertain: return None
     return KeyErrorType.maybe('key not found')
+  
   @classmethod
   def MaybeElementNotFound(klass):
+    if not klass.raise_uncertain: return None
     return ValueErrorType.maybe('element not found')
+  
   @classmethod
   def MaybeElementNotRemovable(klass):
+    if not klass.raise_uncertain: return None
     return ValueErrorType.maybe('empty container')
+  
   @classmethod
   def MaybeNotRemovable(klass):
+    if not klass.raise_uncertain: return None
     return ValueErrorType.maybe('cannot remove an entry')
+  
   @classmethod
   def MaybeNotDecodable(klass):
+    if not klass.raise_uncertain: return None
     return UnicodeDecodeErrorType.maybe('unicode not decodable')
+  
   @classmethod
   def MaybeNotEncodable(klass):
+    if not klass.raise_uncertain: return None
     return UnicodeEncodeErrorType.maybe('unicode not encodable')
+  
   @classmethod
   def MaybeSubstringNotFound(klass):
+    if not klass.raise_uncertain: return None
     return ValueErrorType.maybe('substring not found')
+  
   @classmethod
   def MaybeTableInvalid(klass):
+    if not klass.raise_uncertain: return None
     return ValueErrorType.maybe('translate table invalid')
+  
   @classmethod
   def MaybeFileCannotOpen(klass):
+    if not klass.raise_uncertain: return None
     return IOErrorType.maybe('cannot open a file')
+  
   @classmethod
   def MaybeFileIllegalSeek(klass):
+    if not klass.raise_uncertain: return None
     return IOErrorType.maybe('illegal seek')
+  
   @classmethod
   def MaybeEOFError(klass):
+    if not klass.raise_uncertain: return None
     return EOFErrorType.maybe('end of file')
   
   def __init__(self):
