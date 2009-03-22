@@ -67,10 +67,6 @@ class ModuleObject(BuiltinObject):
 
   def get_attr(self, name, write=False):
     return self.space.register_var(name)
-
-  def showall(self, fp, width=2):
-    self.showrec(IndentedStream(fp, width=width))
-    return
   
   
 class ModuleType(BuiltinType):

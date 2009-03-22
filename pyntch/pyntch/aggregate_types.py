@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, NodeAssignError, \
-     BuiltinType, BuiltinObject
-from exception import TypeChecker, \
-     TypeErrorType, IndexErrorType, ValueErrorType, KeyErrorType, StopIterationType
-from basic_types import BuiltinCallable, BuiltinConstMethod, BoolType, IntType, StrType, NoneType, ANY
+from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, NodeAssignError, UndefinedTypeNode
+from typenode import BuiltinObject, BuiltinType, BuiltinCallable, BuiltinConstMethod
+from exception import TypeChecker, StopIterationType
+from basic_types import BoolType, IntType, StrType, NoneType, ANY
 from expression import IterElement, MethodCall
+from config import ErrorConfig
 
 
 ##  BuiltinAggregateObject
@@ -122,7 +122,7 @@ class BuiltinSequenceType(BuiltinAggregateType):
   
   def process_args(self, frame, args, kwargs):
     if kwargs:
-      frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
+      frame.raise_expt(ErrorConfig.NoKeywordArgs())
       return UndefinedTypeNode()
     if args:
       return self.get_converted(frame, args[0])
@@ -166,7 +166,7 @@ class ListObject(BuiltinSequenceObject):
           try:
             obj.call(self.frame, [self.target.elemall], {}).connect(self.key.recv)
           except NodeTypeError:
-            self.frame.raise_expt(TypeErrorType.occur('key function not callable:' % obj))
+            self.frame.raise_expt(ErrorConfig.NotCallable(obj))
         return
       
       def recv_fcmp(self, src):
@@ -176,7 +176,7 @@ class ListObject(BuiltinSequenceObject):
                                   'the return value of comparison function')
             obj.call(self.frame, [self.key, self.key], {}).connect(checker.recv)
           except NodeTypeError:
-            self.frame.raise_expt(TypeErrorType.occur('cmp function not callable:' % obj))
+            self.frame.raise_expt(ErrorConfig.NotCallable(obj))
         return
 
     def __init__(self, name, target):
@@ -196,11 +196,11 @@ class ListObject(BuiltinSequenceObject):
       for (k,v) in kwargs.iteritems():
         if k in params:
           if params[k] != None:
-            frame.raise_expt(TypeErrorType.occur('%s: keyword %r was already given' % (self.name, k)))
+            frame.raise_expt(ErrorConfig.NoKeywordArg1(k))
           else:
             params[k] = v
         else:
-          frame.raise_expt(TypeErrorType.occur('%s cannot take keyword: %s' % (self.name, k)))
+          frame.raise_expt(ErrorConfig.NoKeywordArg1(k))
       self.FuncChecker(frame, self.target, params['cmp'], params['key'])
       return NoneType.get_object()
 
@@ -209,11 +209,11 @@ class ListObject(BuiltinSequenceObject):
     return '[%s]' % self.elemall.desc1(done)
 
   def get_element(self, frame, sub, write=False):
-    frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
+    frame.raise_expt(ErrorConfig.MaybeOutOfRange())
     return self.elemall
 
   def get_slice(self, frame, subs, write=False):
-    frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
+    frame.raise_expt(ErrorConfig.MaybeOutOfRange())
     return self
   
   def create_attr(self, name):
@@ -287,12 +287,12 @@ class TupleObject(BuiltinSequenceObject):
 
   def get_element(self, frame, sub, write=False):
     if write: raise NodeAssignError
-    frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
+    frame.raise_expt(ErrorConfig.MaybeOutOfRange())
     return self.elemall
 
   def get_slice(self, frame, subs, write=False):
     if write: raise NodeAssignError
-    frame.raise_expt(IndexErrorType.maybe('%r index might be out of range.' % self))
+    frame.raise_expt(ErrorConfig.MaybeOutOfRange())
     return self
   
   def create_attr(self, name):
@@ -528,7 +528,7 @@ class ReversedType(BuiltinCallable, IterType):
           frame1.add_handler(StopIterationType.get_typeobj())
           MethodCall(frame1, iterobj, 'next').connect(self.recv)
         except NodeTypeError:
-          self.frame.raise_expt(TypeErrorType.occur('not a sequence: %r' % obj))
+          self.frame.raise_expt(ErrorConfig.NotIterable(obj))
       return
   
   def __init__(self):
@@ -538,7 +538,7 @@ class ReversedType(BuiltinCallable, IterType):
 
   def process_args(self, frame, args, kwargs):
     if kwargs:
-      frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
+      frame.raise_expt(ErrorConfig.NoKeywordArgs())
       return UndefinedTypeNode()
     return self.ReversedIterConverter(frame, args[0])
   
@@ -636,12 +636,12 @@ class DictObject(BuiltinAggregateObject):
             k.connect(self.target.key.recv)
             v.connect(self.target.value.recv)
           else:
-            self.frame.raise_expt(TypeErrorType.occur('cannot convert to dict: tuple length is not 2: %s' % obj))
+            self.frame.raise_expt(ErrorConfig.NotConvertable('(key,value)'))
           continue
         elem = IterElement(self.frame, obj)
         elem.connect(self.target.key.recv)
         elem.connect(self.target.value.recv)
-        self.frame.raise_expt(TypeErrorType.maybe('might not be able to convert to dict: %s' % obj))
+        self.frame.raise_expt(ErrorConfig.NotConvertable('dict'))
       return
     
   # fromkeys
@@ -709,7 +709,7 @@ class DictObject(BuiltinAggregateObject):
     
     def process_args(self, frame, args, kwargs):
       if len(args) == 1:
-        frame.raise_expt(KeyErrorType.maybe('might not have the key: %r' % args[0]))
+        frame.raise_expt(ErrorConfig.MaybeKeyNotFound())
       return BuiltinConstMethod.process_args(self, frame, args, kwargs)
     
     def accept_arg(self, frame, i, arg1):
@@ -826,7 +826,7 @@ class DictObject(BuiltinAggregateObject):
     if write:
       key.connect(self.key.recv)
     else:
-      frame.raise_expt(KeyErrorType.maybe('might not have the key: %r' % key))
+      frame.raise_expt(ErrorConfig.MaybeKeyNotFound())
     return self.value
 
   def get_iter(self, frame):
@@ -884,7 +884,7 @@ class EnumerateType(BuiltinCallable, BuiltinType):
 
   def process_args(self, frame, args, kwargs):
     if kwargs:
-      frame.raise_expt(TypeErrorType.occur('%s cannot take a keyword argument' % (self.name)))
+      frame.raise_expt(ErrorConfig.NoKeywordArgs())
       return UndefinedTypeNode()
     elemall = TupleType.create_tuple([IntType.get_object(), IterElement(frame, args[0])])
     return IterObject(self.get_typeobj(), elemall=elemall)

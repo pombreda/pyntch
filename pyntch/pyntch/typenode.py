@@ -227,7 +227,7 @@ class BuiltinType(BuiltinObject):
     return TypeType.get_typeobj()
   
   @classmethod
-  def is_type(self, *typeobjs):
+  def is_type(klass, *typeobjs):
     from basic_types import TypeType
     return TypeType.get_typeobj() in typeobjs
 
@@ -257,17 +257,89 @@ class BuiltinType(BuiltinObject):
       return NoneType.get_object()
 
 
-##  BuiltinBasicType
+##  BuiltinCallable
 ##
-class BuiltinBasicType(BuiltinType):
+##  A helper class to augment builtin objects (mostly type objects)
+##  for behaving like a function.
+##
+class BuiltinCallable(object):
 
-  TYPE_INSTANCE = None
-  OBJECTS = {}
+  def __init__(self, name, args=None, optargs=None, expts=None):
+    args = (args or [])
+    optargs = (optargs or [])
+    self.name = name
+    self.minargs = len(args)
+    self.args = args+optargs
+    self.expts = (expts or [])
+    return
+  
+  def call(self, frame, args, kwargs):
+    from config import ErrorConfig
+    if len(args) < self.minargs:
+      frame.raise_expt(ErrorConfig.InvalidNumOfArgs(self.minargs, len(args)))
+      return UndefinedTypeNode()
+    if len(self.args) < len(args):
+      frame.raise_expt(ErrorConfig.InvalidNumOfArgs(len(self.args), len(args)))
+      return UndefinedTypeNode()
+    return self.process_args(frame, args, kwargs)
 
-  # get_object()
-  @classmethod
-  def get_object(klass):
-    assert klass.TYPE_INSTANCE
-    if klass not in klass.OBJECTS:
-      klass.OBJECTS[klass] = klass.TYPE_INSTANCE(klass.get_typeobj())
-    return klass.OBJECTS[klass]
+  def process_args(self, frame, args, kwargs):
+    raise NotImplementedError
+
+
+##  BuiltinConstCallable
+##
+class BuiltinConstCallable(BuiltinCallable):
+  
+  def __init__(self, name, retobj, args=None, optargs=None, expts=None):
+    self.retobj = retobj
+    BuiltinCallable.__init__(self, name, args=args, optargs=optargs, expts=expts)
+    return
+
+  def process_args(self, frame, args, kwargs):
+    from config import ErrorConfig
+    if kwargs:
+      frame.raise_expt(ErrorConfig.NoKeywordArgs())
+    for (i,arg1) in enumerate(args):
+      assert isinstance(arg1, TypeNode)
+      self.accept_arg(frame, i, arg1)
+    for expt in self.expts:
+      frame.raise_expt(expt)
+    return self.retobj
+
+  def accept_arg(self, frame, i, arg1):
+    from exception import TypeChecker, SequenceTypeChecker
+    s = 'arg %d' % i
+    spec = self.args[i]
+    if isinstance(spec, list):
+      if spec == [TypeChecker.ANY]:
+        checker = SequenceTypeChecker(frame, TypeChecker.ANY, s)
+      else:
+        checker = SequenceTypeChecker(frame, [ x.get_typeobj() for x in spec ], s)
+    elif isinstance(spec, tuple):
+      checker = TypeChecker(frame, [ x.get_typeobj() for x in spec ], s)
+    elif spec == TypeChecker.ANY:
+      checker = TypeChecker(frame, TypeChecker.ANY, s)
+    else:
+      checker = TypeChecker(frame, [spec.get_typeobj()], s)
+    arg1.connect(checker.recv)
+    return
+
+
+##  BuiltinMethod
+##
+class BuiltinMethodType(BuiltinType):
+  TYPE_NAME = 'builtin_method'
+
+
+##  BuiltinConstMethod
+##
+class BuiltinConstMethod(BuiltinConstCallable, BuiltinObject):
+
+  def __init__(self, name, retobj, args=None, optargs=None, expts=None):
+    BuiltinObject.__init__(self, BuiltinMethodType.get_typeobj())
+    BuiltinConstCallable.__init__(self, name, retobj, args=args, optargs=optargs, expts=expts)
+    return
+
+  def __repr__(self):
+    return '<callable %s>' % self.name

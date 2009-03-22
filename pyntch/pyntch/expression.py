@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
 from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, NodeAssignError
-from exception import TypeErrorType, AttributeErrorType, ValueErrorType
-from frame import ExecutionFrame
+from exception import SequenceTypeChecker, StopIterationType
+from frame import ExecutionFrame, ExceptionCatcher
+from config import ErrorConfig
 
 
 ##  ExpressionNode
@@ -70,15 +71,17 @@ class AttrRef(MustBeDefinedNode):
       try:
         obj.get_attr(self.attrname).connect(self.recv)
       except NodeAttrError:
-        self.raise_expt(AttributeErrorType.occur('attribute not allowed: %r.%s.' % (obj, self.attrname)))
+        pass
     return
 
   def check_undefined(self):
     if not self.types:
-      self.raise_expt(AttributeErrorType.occur('attribute not defined: %r.%s.' % (self.target, self.attrname)))
+      self.raise_expt(ErrorConfig.AttributeNotFound(self.target, self.attrname))
     return
 
 
+##  OptAttrRef
+##
 class OptAttrRef(ExpressionNode):
   
   def __init__(self, frame, target, attrname):
@@ -99,7 +102,7 @@ class OptAttrRef(ExpressionNode):
       try:
         obj.get_attr(self.attrname).connect(self.recv)
       except NodeAttrError:
-        self.raise_expt(AttributeErrorType.occur('attribute not defined: %r.%s.' % (obj, self.attrname)))
+        self.raise_expt(ErrorConfig.AttributeNotFound(obj, self.attrname))
     return
 
 
@@ -124,7 +127,7 @@ class IterRef(ExpressionNode):
       try:
         obj.get_iter(self.frame).connect(self.recv)
       except NodeTypeError:
-        self.raise_expt(TypeErrorType.occur('%r is not iterable: %r' % (src, obj)))
+        self.raise_expt(ErrorConfig.NotIterable(obj))
     return
 
 
@@ -150,7 +153,7 @@ class SubRef(ExpressionNode):
       try:
         obj.get_element(self.frame, self.subs).connect(self.recv)
       except NodeTypeError:
-        self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
+        self.raise_expt(ErrorConfig.NotSubscriptable(obj))
     return
 
 
@@ -176,7 +179,7 @@ class SliceRef(ExpressionNode):
       try:
         obj.get_slice(self.frame, self.subs).connect(self.recv)
       except NodeTypeError:
-        self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
+        self.raise_expt(ErrorConfig.NotSubscriptable(obj))
     return
 
 
@@ -205,11 +208,8 @@ class AttrAssign(ExpressionNode):
       self.done.add(obj)
       try:
         self.value.connect(obj.get_attr(self.attrname, write=True).recv)
-      except (NodeAttrError, NodeTypeError):
-        self.raise_expt(AttributeErrorType.occur(
-          'cannot assign attribute: %r might be %r, no attr %s' % (self.target, obj, self.attrname)))
-      except NodeAssignError:
-        self.raise_expt(AttributeErrorType.occur('cannot assign attribute: %r' % obj))
+      except (NodeAttrError, NodeTypeError, NodeAssignError):
+        self.raise_expt(ErrorConfig.AttributeNotAssignable(obj, self.attrname))
     return
 
 
@@ -236,9 +236,9 @@ class SubAssign(ExpressionNode):
       try:
         self.value.connect(obj.get_element(self.frame, self.sub, write=True).recv)
       except NodeTypeError:
-        self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
+        self.raise_expt(ErrorConfig.NotSubscriptable(obj))
       except NodeAssignError:
-        self.raise_expt(TypeErrorType.occur('cannot assign item: %r' % obj))
+        self.raise_expt(ErrorConfig.NotAssignable(obj))
     return
 
 
@@ -266,9 +266,9 @@ class SliceAssign(ExpressionNode):
         seq = obj.get_slice(self.frame, self.subs, write=True)
         self.elemall.connect(seq.elemall.recv)
       except (NodeTypeError, NodeAttrError):
-        self.raise_expt(TypeErrorType.occur('unsubscriptable object: %r' % obj))
+        self.raise_expt(ErrorConfig.NotSubscriptable(obj))
       except NodeAssignError:
-        self.raise_expt(TypeErrorType.occur('cannot assign item: %r' % obj))
+        self.raise_expt(ErrorConfig.NotAssignable(obj))
     return
 
 
@@ -307,7 +307,7 @@ class FunCall(ExpressionNode):
         try:
           obj.call(self.frame, self.args+varargs, self.kwargs).connect(self.recv)
         except NodeTypeError:
-          self.raise_expt(TypeErrorType.occur('cannot call: %r might be %r' % (self.func, obj)))
+          self.raise_expt(ErrorConfig.NotCallable(obj))
     return
 
   def recv_tuple(self, src):
@@ -325,7 +325,7 @@ class FunCall(ExpressionNode):
     self.recv_func(None)
     return
 
-  def recv_varargs(self, src):
+  def recv_vararg(self, src):
     self.varargs.add((src,))
     self.recv_func(None)
     return
@@ -483,10 +483,10 @@ class BinaryOp(MustBeDefinedNode):
       return
     # Handle optional methods.
     if isinstance(lobj, InstanceObject):
-      result = MethodCall(self.frame, lobj, self.LMETHOD[self.op], [robj])
+      result = OptMethodCall(self.frame, lobj, self.LMETHOD[self.op], [robj])
       result.connect(lambda src: self.recv_result(src, (lobj, robj)))
     if isinstance(robj, InstanceObject):
-      result = MethodCall(self.frame, robj, self.RMETHOD[self.op], [lobj])
+      result = OptMethodCall(self.frame, robj, self.RMETHOD[self.op], [lobj])
       result.connect(lambda src: self.recv_result(src, (lobj, robj)))
     return
 
@@ -497,8 +497,7 @@ class BinaryOp(MustBeDefinedNode):
   def check_undefined(self):
     for (lobj,robj) in self.received:
       if (lobj,robj) not in self.computed:
-        self.raise_expt(TypeErrorType.occur('unsupported operand %s for %s and %s' %
-                                            (self.op, lobj.describe(), lobj.describe())))
+        self.raise_expt(ErrorConfig.NotSupportedOperand(self.op, lobj, robj))
     return
 
 
@@ -557,7 +556,7 @@ class UnaryOp(MustBeDefinedNode):
       if obj.is_type(NumberType.get_typeobj()):
         obj.connect(self.recv)
       elif isinstance(obj, InstanceObject):
-        MethodCall(self.frame, obj, self.METHOD[self.op]).connect(self.recv)
+        OptMethodCall(self.frame, obj, self.METHOD[self.op]).connect(self.recv)
     return
 
 
@@ -597,7 +596,7 @@ class CompareOp(ExpressionNode):
       if lobj in self.done: continue
       self.done.add(lobj)
       if isinstance(lobj, InstanceObject):
-        MethodCall(self.frame, lobj, self.LMETHOD[self.op], [self.right])
+        OptMethodCall(self.frame, lobj, self.LMETHOD[self.op], [self.right])
     return
 
 
@@ -664,14 +663,16 @@ class IfExpOp(ExpressionNode):
 ##
 def MethodCall(frame, target, name, args=None, kwargs=None):
   assert isinstance(frame, ExecutionFrame)
+  return FunCall(frame, AttrRef(frame, target, name), args=args, kwargs=kwargs)
+
+def OptMethodCall(frame, target, name, args=None, kwargs=None):
+  assert isinstance(frame, ExecutionFrame)
   return FunCall(frame, OptAttrRef(frame, target, name), args=args, kwargs=kwargs)
 
 
 ##  IterElement
 ##
 def IterElement(frame0, target):
-  from frame import ExceptionCatcher
-  from exception import StopIterationType
   frame1 = ExceptionCatcher(frame0)
   frame1.add_handler(StopIterationType.get_typeobj())
   return MethodCall(frame1, IterRef(frame0, target), 'next')
@@ -694,7 +695,7 @@ class IterDictValue(ExpressionNode):
       if obj in self.done: continue
       self.done.add(obj)
       if obj.is_type(DictType.get_typeobj()):
-        MethodCall(self, obj, 'iteritems').connect(self.recv)
+        MethodCall(self.frame, obj, 'iteritems').connect(self.recv)
       else:
         self.raise_expt(ErrorConfig.TypeCheckerError(src, obj, 'dict'))
     return
@@ -727,7 +728,7 @@ class TupleUnpack(ExpressionNode):
       if obj.is_type(TupleType.get_typeobj()) and obj.elements != None:
         # Unpack a fixed-length tuple.
         if (self.strict and len(obj.elements) != len(self.elements)) or len(obj.elements) < len(self.elements):
-          self.raise_expt(ValueErrorType.occur('tuple unpackable: len(%r) != %r' % (obj, len(self.elements))))
+          self.raise_expt(ErrorConfig.NotUnpackable(obj))
         else:
           for (src,dest) in zip(obj.elements, self.elements):
             src.connect(dest.recv)
@@ -770,7 +771,7 @@ class TupleSlice(ExpressionNode):
         # Unpack a fixed-length tuple.
         if self.length:
           if self.length != len(obj.elements):
-            self.raise_expt(ValueErrorType.occur('tuple unpackable: len(%r) != %r' % (obj, self.length)))
+            self.raise_expt(ErrorConfig.NotUnpackable(obj))
           else:
             for i in xrange(self.length):
               obj.elements[self.start+i].connect(self.recv)

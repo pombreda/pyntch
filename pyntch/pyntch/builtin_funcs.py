@@ -3,16 +3,14 @@
 ##  This module should not be imported as toplevel,
 ##  as it causes circular imports!
 
-from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, BuiltinType
+from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, UndefinedTypeNode
+from typenode import BuiltinType, BuiltinCallable, BuiltinConstCallable
 from exception import TypeChecker, SequenceTypeChecker
-from exception import TypeErrorType
-from namespace import Namespace
-from klass import InstanceObject
-from basic_types import TypeType, NoneType, NumberType, BoolType, IntType, LongType, FloatType, \
-     BaseStringType, StrType, UnicodeType, ANY, \
-     BuiltinCallable, BuiltinConstCallable
+from basic_types import TypeType, NoneType, NumberType, BoolType, IntType, LongType, \
+     FloatType, BaseStringType, StrType, UnicodeType, ANY
 from aggregate_types import ListType, TupleType, DictType, IterType, ListObject
-from expression import IterElement, BinaryOp, MustBeDefinedNode, FunCall
+from expression import IterElement, IterRef, BinaryOp, MustBeDefinedNode, FunCall
+from config import ErrorConfig
 
 
 ##  BuiltinFunc
@@ -27,6 +25,19 @@ class BuiltinFunc(BuiltinCallable, BuiltinType):
   
   def __repr__(self):
     return '<builtin %s>' % self.name
+
+
+##  BuiltinFuncNoKwd
+class BuiltinFuncNoKwd(BuiltinFunc):
+
+  def process_args(self, frame, args, kwargs):
+    if kwargs:
+      frame.raise_expt(ErrorConfig.NoKeywordArgs())
+      return UndefinedTypeNode()
+    return self.process_args_nokwd(frame, args)
+
+  def process_args_nokwd(self, frame, args):
+    raise NotImplementedError
 
 
 ##  BuiltinConstFunc
@@ -58,22 +69,19 @@ class IterFuncChecker(CompoundTypeNode):
       try:
         obj.call(self.frame, [self.target.elemall])
       except NodeTypeError:
-        self.frame.raise_expt(TypeErrorType.occur('function not callable:' % obj))
+        self.frame.raise_expt(ErrorConfig.NotCallable(obj))
     return
 
 
 ##  AbsFunc
 ##
-class AbsFunc(BuiltinFunc):
+class AbsFunc(BuiltinFuncNoKwd):
 
   def __init__(self):
     BuiltinFunc.__init__(self, 'abs', [NumberType])
     return
 
-  def process_args(self, frame, args, kwargs):
-    if kwargs:
-      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
-      return UndefinedTypeNode()
+  def process_args_nokwd(self, frame, args):
     checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 0')
     args[0].connect(checker.recv)
     return args[0]
@@ -81,20 +89,13 @@ class AbsFunc(BuiltinFunc):
 
 ##  ApplyFunc
 ##
-class ApplyFunc(BuiltinFunc):
+class ApplyFunc(BuiltinFuncNoKwd):
 
   def __init__(self):
     BuiltinFunc.__init__(self, 'apply', [ANY])
     return
 
-  def call(self, frame, args, kwargs):
-    if kwargs:
-      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
-      return UndefinedTypeNode()
-    if len(args) < self.minargs:
-      frame.raise_expt(TypeErrorType.occur(
-        'too few argument for %s: %d or more.' % (self.name, self.minargs)))
-      return UndefinedTypeNode()
+  def process_args_nokwd(self, frame, args):
     star = dstar = None
     if 1 <= len(args):
       star = args[1]
@@ -112,7 +113,6 @@ class AllFunc(BuiltinConstFunc):
     return
 
   def accept_arg(self, frame, i, arg1):
-    from expression import IterElement
     IterElement(frame, arg1)
     return 
 
@@ -162,16 +162,13 @@ class DirFunc(BuiltinConstFunc):
 
 ##  DivmodFunc
 ##
-class DivmodFunc(BuiltinFunc):
+class DivmodFunc(BuiltinFuncNoKwd):
 
   def __init__(self):
     BuiltinFunc.__init__(self, 'divmod', [NumberType, NumberType])
     return
 
-  def process_args(self, frame, args, kwargs):
-    if kwargs:
-      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
-      return UndefinedTypeNode()
+  def process_args_nokwd(self, frame, args):
     checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 0')
     args[0].connect(checker.recv)
     checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 1')
@@ -182,7 +179,7 @@ class DivmodFunc(BuiltinFunc):
 
 ##  FilterFunc
 ##
-class FilterFunc(BuiltinFunc):
+class FilterFunc(BuiltinFuncNoKwd):
 
   class FilterCaller(CompoundTypeNode):
     
@@ -202,21 +199,14 @@ class FilterFunc(BuiltinFunc):
           try:
             obj.call(self.frame, [self.elem], {})
           except NodeTypeError:
-            self.frame.raise_expt(TypeErrorType.occur('function not callable:' % obj))
+            self.frame.raise_expt(ErrorConfig.NotCallable(obj))
       return
       
   def __init__(self):
     BuiltinFunc.__init__(self, 'filter', [ANY, ANY])
     return
 
-  def call(self, frame, args, kwargs):
-    if kwargs:
-      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
-      return UndefinedTypeNode()
-    if len(args) < self.minargs:
-      frame.raise_expt(TypeErrorType.occur(
-        'too few argument for %s: %d or more.' % (self.name, self.minargs)))
-      return UndefinedTypeNode()
+  def process_args_nokwd(self, frame, args):
     return self.FilterCaller(frame, args[0], args[1])
 
 
@@ -267,10 +257,9 @@ class IsSubclassFunc(BuiltinConstFunc):
 
 ##  IterFunc
 ##
-class IterFunc(BuiltinFunc):
+class IterFunc(BuiltinFuncNoKwd):
 
-  def process_args(self, frame, args, kwargs):
-    from expression import IterRef
+  def process_args_nokwd(self, frame, args):
     v = args[0]
     if v in self.cache:
       iterobj = self.cache[v]
@@ -287,7 +276,7 @@ class IterFunc(BuiltinFunc):
 
 ##  LenFunc
 ##
-class LenFunc(BuiltinFunc):
+class LenFunc(BuiltinFuncNoKwd):
 
   class LengthChecker(MustBeDefinedNode):
     
@@ -299,7 +288,6 @@ class LenFunc(BuiltinFunc):
       return
 
     def recv_target(self, src):
-      from expression import MethodCall
       for obj in src:
         if obj in self.done: continue
         self.done.add(obj)
@@ -311,10 +299,10 @@ class LenFunc(BuiltinFunc):
 
     def check_undefined(self):
       if not self.types:
-        self.raise_expt(TypeErrorType.occur('__len__ not defined: %r' % (self.target)))
+        self.raise_expt(ErrorCofnig.NoLength(self.target))
       return
 
-  def process_args(self, frame, args, kwargs):
+  def process_args_nokwd(self, frame, args):
     self.LengthChecker(frame, args[0])
     return IntType.get_object()
   
@@ -325,7 +313,7 @@ class LenFunc(BuiltinFunc):
 
 ##  MapFunc
 ##
-class MapFunc(BuiltinFunc):
+class MapFunc(BuiltinFuncNoKwd):
 
   class MapCaller(CompoundTypeNode):
     
@@ -345,21 +333,14 @@ class MapFunc(BuiltinFunc):
         try:
           obj.call(self.frame, self.args, {}).connect(self.listobj.elemall.recv)
         except NodeTypeError:
-          self.frame.raise_expt(TypeErrorType.occur('function not callable:' % obj))
+          self.frame.raise_expt(ErrorConfig.NotCallable(obj))
       return
       
   def __init__(self):
     BuiltinFunc.__init__(self, 'map', [ANY, ANY])
     return
 
-  def call(self, frame, args, kwargs):
-    if kwargs:
-      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
-      return UndefinedTypeNode()
-    if len(args) < self.minargs:
-      frame.raise_expt(TypeErrorType.occur(
-        'too few argument for %s: %d or more.' % (self.name, self.minargs)))
-      return UndefinedTypeNode()
+  def process_args_nokwd(self, frame, args, kwargs):
     return self.MapCaller(frame, args[0], args[1:])
 
 
@@ -372,7 +353,6 @@ class MinFunc(BuiltinFunc):
     return
 
   def process_args(self, frame, args, kwargs):
-    from expression import IterElement
     retobj = CompoundTypeNode()
     if len(args) == 1:
       IterElement(frame, args[0]).connect(retobj.recv)
@@ -411,16 +391,13 @@ class OrdFunc(BuiltinConstFunc):
 
 ##  PowFunc
 ##
-class PowFunc(BuiltinFunc):
+class PowFunc(BuiltinFuncNoKwd):
 
   def __init__(self):
     BuiltinFunc.__init__(self, 'pow', [NumberType, NumberType], [NumberType])
     return
 
-  def process_args(self, frame, args, kwargs):
-    if kwargs:
-      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
-      return UndefinedTypeNode()
+  def process_args_nokwd(self, frame, args):
     checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 0')
     args[0].connect(checker.recv)
     checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 1')
@@ -453,7 +430,7 @@ class RawInputFunc(BuiltinConstFunc):
 
 ##  ReduceFunc
 ##
-class ReduceFunc(BuiltinFunc):
+class ReduceFunc(BuiltinFuncNoKwd):
 
   class ReduceCaller(CompoundTypeNode):
     
@@ -480,21 +457,14 @@ class ReduceFunc(BuiltinFunc):
           result.connect(self.recv)
           result.connect(self.result.recv)
         except NodeTypeError:
-          self.frame.raise_expt(TypeErrorType.occur('function not callable:' % obj))
+          self.frame.raise_expt(ErrorConfig.NotCallable(obj))
       return
       
   def __init__(self):
     BuiltinFunc.__init__(self, 'reduce', [ANY, ANY])
     return
 
-  def call(self, frame, args, kwargs):
-    if kwargs:
-      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
-      return UndefinedTypeNode()
-    if len(args) < self.minargs:
-      frame.raise_expt(TypeErrorType.occur(
-        'too few argument for %s: %d or more.' % (self.name, self.minargs)))
-      return UndefinedTypeNode()
+  def process_args_nokwd(self, frame, args):
     initial = None
     if 3 <= len(args):
       initial = args[2]
@@ -529,11 +499,7 @@ class SortedFunc(BuiltinFunc):
     BuiltinFunc.__init__(self, 'sorted', [ANY])
     return
 
-  def call(self, frame, args, kwargs):
-    if len(args) < self.minargs:
-      frame.raise_expt(TypeErrorType.occur(
-        'too few argument for %s: %d or more.' % (self.name, self.minargs)))
-      return UndefinedTypeNode()
+  def process_args(self, frame, args, kwargs):
     seq = ListType.create_list(elemall=IterElement(frame, args[0]))
     ListObject.SortMethod('sorted', seq).process_args(frame, args[1:], kwargs)
     return seq
@@ -541,7 +507,7 @@ class SortedFunc(BuiltinFunc):
 
 ##  SumFunc
 ##
-class SumFunc(BuiltinFunc):
+class SumFunc(BuiltinFuncNoKwd):
 
   class SumCaller(CompoundTypeNode):
     
@@ -569,14 +535,7 @@ class SumFunc(BuiltinFunc):
     BuiltinFunc.__init__(self, 'sum', [ANY], [ANY])
     return
 
-  def call(self, frame, args, kwargs):
-    if kwargs:
-      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
-      return UndefinedTypeNode()
-    if len(args) < self.minargs:
-      frame.raise_expt(TypeErrorType.occur(
-        'too few argument for %s: %d or more.' % (self.name, self.minargs)))
-      return UndefinedTypeNode()
+  def process_args_nokwd(self, frame, args):
     initial = None
     if 2 <= len(args):
       initial = args[1]
@@ -595,16 +554,13 @@ class UnichrFunc(BuiltinConstFunc):
 
 ##  ZipFunc
 ##
-class ZipFunc(BuiltinFunc):
+class ZipFunc(BuiltinFuncNoKwd):
 
   def __init__(self):
     BuiltinFunc.__init__(self, 'zip')
     return
 
-  def call(self, frame, args, kwargs):
-    if kwargs:
-      frame.raise_expt(TypeErrorType.occur('cannot take keyword argument.'))
-      return UndefinedTypeNode()
+  def process_args_nokwd(self, frame, args):
     elems = [ CompoundTypeNode() for arg1 in args ]
     zipelem = TupleType.create_tuple(elements=elems)
     seq = ListType.create_list(elemall=zipelem)
