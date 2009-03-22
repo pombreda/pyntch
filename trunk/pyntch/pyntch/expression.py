@@ -302,7 +302,7 @@ class FunCall(ExpressionNode):
 
   def recv_func(self, _):
     for obj in self.func:
-      for varargs in self.varargs:
+      for varargs in list(self.varargs):
         self.done.add((obj, varargs))
         try:
           obj.call(self.frame, self.args+varargs, self.kwargs).connect(self.recv)

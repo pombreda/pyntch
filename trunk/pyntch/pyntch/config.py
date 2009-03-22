@@ -101,6 +101,15 @@ class ErrorConfig(object):
   def MaybeKeyNotFound(klass):
     return KeyErrorType.maybe('key not found')
   @classmethod
+  def MaybeElementNotFound(klass):
+    return ValueErrorType.maybe('element not found')
+  @classmethod
+  def MaybeElementNotRemovable(klass):
+    return ValueErrorType.maybe('empty container')
+  @classmethod
+  def MaybeNotRemovable(klass):
+    return ValueErrorType.maybe('cannot remove an entry')
+  @classmethod
   def MaybeNotDecodable(klass):
     return UnicodeDecodeErrorType.maybe('unicode not decodable')
   @classmethod

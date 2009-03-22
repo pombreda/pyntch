@@ -225,15 +225,15 @@ class ListObject(BuiltinSequenceObject):
       return self.SequenceExtender('list.extend', self, args=[ANY])
     elif name == 'index':
       return BuiltinConstMethod('list.index', IntType.get_object(), [ANY], [IntType, IntType],
-                                  expts=[ValueErrorType.maybe('might not able to find the element.')])
+                                expts=[ErrorConfig.MaybeElementNotFound()])
     elif name == 'insert':
       return self.InsertMethod('list.insert', self, [IntType, ANY])
     elif name == 'pop':
       return BuiltinConstMethod('list.pop', self.elemall, [], [IntType],
-                                  expts=[ValueErrorType.maybe('might be empty list or out of range.')])
+                                expts=[ErrorConfig.MaybeElementNotRemovable()])
     elif name == 'remove':
       return BuiltinConstMethod('list.remove', NoneType.get_object(), [ANY],
-                                  expts=[ValueErrorType.maybe('might not able to remove the element.')])
+                                expts=[ErrorConfig.MaybeElementNotRemovable()])
     elif name == 'reverse':
       return BuiltinConstMethod('list.remove', NoneType.get_object())
     elif name == 'sort':
@@ -438,10 +438,10 @@ class SetObject(FrozenSetObject):
       return BuiltinConstMethod('set.intersection_update', NoneType.get_object(), [[ANY]])
     elif name == 'pop':
       return BuiltinConstMethod('set.pop', NoneType.get_object(), 
-                                  expts=[KeyErrorType.maybe('might not able to pop from an empty set.')])
+                                expts=[ErrorConfig.MaybeElementNotRemovable()])
     elif name == 'remove':
       return BuiltinConstMethod('set.remove', NoneType.get_object(), [ANY],
-                                  expts=[KeyErrorType.maybe('might not have the value.')])
+                                expts=[ErrorConfig.MaybeElementNotFound()])
     elif name == 'symmetric_difference_update':
       return self.SequenceExtender('set.symmetric_difference_update', self, args=[ANY])
     elif name == 'update':
@@ -815,7 +815,7 @@ class DictObject(BuiltinAggregateObject):
       return DictObject.Pop(self, 'dict.pop')
     elif name == 'popitem':
       return BuiltinConstMethod('dict.popitem', TupleType.create_tuple([self.key, self.value]),
-                                  expts=[KeyErrorType.maybe('might not able to pop from an empty dict.')])
+                                expts=[ErrorConfig.MaybeElementNotFound()])
     elif name == 'setdefault':
       return DictObject.SetDefault(self, 'dict.setdefault')
     elif name == 'update':
