@@ -101,6 +101,10 @@ The output shows several things:
  * Line 9 says that this function returns an integer.
  * Line 10 says that this function might raise a TypeError exception caused at line 2.
 
+Adding a module path
+
+Creating a stub module
+
 
 How It Works
 
