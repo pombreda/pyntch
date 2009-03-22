@@ -2,7 +2,6 @@ Pyntch
 README
 
 # TODO:
-#  variable type spec.
 #  control errors and warnings.
 #  automatic coercion for builtin functions.
 #  test cases.

@@ -24,7 +24,17 @@ class Variable(CompoundTypeNode):
     obj.connect(self.recv)
     return
 
+
+class FixedVariable(Variable):
   
+  def bind(self, _):
+    return
+  
+  def setup(self, obj):
+    obj.connect(self.recv)
+    return
+
+
 ##  Namespace
 ##
 class Namespace(object):
@@ -73,6 +83,10 @@ class Namespace(object):
     else:
       var = self.vars[name]
     return var
+  
+  def register_fixed(self, name):
+    self.vars[name] = FixedVariable(self, name)
+    return
   
   # register_names
   def register_names(self, tree):
@@ -210,8 +224,6 @@ class Namespace(object):
       pass
     elif isinstance(tree, ast.Continue):
       pass
-    elif isinstance(tree, ast.Assert):
-      pass
     elif isinstance(tree, ast.Print):
       pass
     elif isinstance(tree, ast.Yield):
@@ -298,6 +310,11 @@ class Namespace(object):
         self.register_names(qual.assign)
         for qif in qual.ifs:
           self.register_names(qif.test)
+
+    # Assert
+    elif isinstance(tree, ast.Assert):
+      if isinstance(tree.test, ast.Const) and isinstance(tree.test.value, str):
+        self.register_fixed(tree.test.value)
     
     else:
       raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._module.get_path(), tree.lineno))
