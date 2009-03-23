@@ -113,7 +113,7 @@ class ExceptionHandler(ExecutionFrame):
     self.expt = expt
     self.reraise = False
     self.catchtypes = set()
-    self.done = set()
+    self.received = set()
     ExecutionFrame.__init__(self, parent, None)
     if expt:
       expt.connect(self.recv_expt)
@@ -125,8 +125,8 @@ class ExceptionHandler(ExecutionFrame):
   def recv_expt(self, src):
     from aggregate_types import TupleType
     for obj in src:
-      if obj in self.done: continue
-      self.done.add(obj)
+      if obj in self.received: continue
+      self.received.add(obj)
       if obj.is_type(TupleType.get_typeobj()):
         self.recv_expt(obj.elemall)
       else:
@@ -150,7 +150,7 @@ class ExceptionCatcher(ExecutionFrame):
 
   def __init__(self, parent):
     self.handlers = []
-    self.done = set()
+    self.received = set()
     ExecutionFrame.__init__(self, parent, None)
     return
 
@@ -170,8 +170,8 @@ class ExceptionCatcher(ExecutionFrame):
 
   def recv(self, src):
     for obj in src:
-      if obj in self.done: continue
-      self.done.add(obj)
+      if obj in self.received: continue
+      self.received.add(obj)
       assert isinstance(obj, TracebackObject), obj
       for frame in self.handlers:
         if frame.handle_expt(obj.expt): break

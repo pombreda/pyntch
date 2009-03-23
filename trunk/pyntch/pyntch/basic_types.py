@@ -5,7 +5,7 @@
 
 from typenode import TypeNode, CompoundTypeNode, NodeAttrError, NodeAssignError, UndefinedTypeNode
 from typenode import BuiltinObject, BuiltinType, BuiltinCallable, BuiltinConstCallable, BuiltinConstMethod
-from exception import TypeChecker, SequenceTypeChecker
+from exception import TypeChecker, SequenceTypeChecker, KeyValueTypeChecker
 from config import ErrorConfig
 from klass import InstanceObject
 
@@ -70,14 +70,14 @@ class IntType(BuiltinConstCallable, NumberType):
     
     def __init__(self, frame, value):
       self.frame = frame
-      self.done = set()
+      self.received = set()
       CompoundTypeNode.__init__(self, [value])
       return
     
     def recv(self, src):
       for obj in src:
-        if obj in self.done: continue
-        self.done.add(obj)
+        if obj in self.received: continue
+        self.received.add(obj)
         if obj.is_type(BaseStringType.get_typeobj()):
           self.frame.raise_expt(ErrorConfig.MaybeNotConvertable('int'))
         elif obj.is_type(NumberType.get_typeobj(), BoolType.get_typeobj()):
@@ -122,14 +122,12 @@ class ComplexType(NumberType):
 class BaseStringObject(BuiltinObject):
 
   def __init__(self, typeobj):
-    self.iter = None
+    from aggregate_types import IterType
     BuiltinObject.__init__(self, typeobj)
+    self.iter = IterType.create_iter(self)
     return
   
   def get_iter(self, frame):
-    from aggregate_types import IterType
-    if not self.iter:
-      self.iter = IterType.create_iter(self)
     return self.iter
 
   def get_length(self, frame):
@@ -258,15 +256,15 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
     
     def __init__(self, frame, value):
       self.frame = frame
-      self.done = set()
+      self.received = set()
       CompoundTypeNode.__init__(self, [value])
       return
     
     def recv(self, src):
       from expression import OptMethodCall
       for obj in src:
-        if obj in self.done: continue
-        self.done.add(obj)
+        if obj in self.received: continue
+        self.received.add(obj)
         if isinstance(obj, InstanceObject):
           value = OptMethodCall(self.frame, obj, '__str__')
           checker = TypeChecker(self.frame, BaseStringType.get_typeobj(), 
@@ -289,6 +287,7 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
     return BuiltinConstCallable.call(self, frame, args, kwargs)
 
   def __init__(self):
+    from aggregate_types import ListType
     BuiltinBasicType.__init__(self)
     BuiltinConstCallable.__init__(self, 'basestring', None)
     return
@@ -335,7 +334,7 @@ class UnicodeType(BaseStringType):
 
   def __init__(self):
     BuiltinBasicType.__init__(self)
-    BuiltinConstCallable.__init__(self, 'unicode', self.get_object(), [], [ANY])
+    BuiltinConstCallable.__init__(self, 'unicode', self.get_object(), [], [ANY, StrType, StrType])
     return
   
 
@@ -344,14 +343,12 @@ class UnicodeType(BaseStringType):
 class FileObject(BuiltinObject):
 
   def __init__(self, typeobj):
-    self.iter = None
+    from aggregate_types import IterType
     BuiltinObject.__init__(self, typeobj)
+    self.iter = IterType.create_iter(StrType.get_object())
     return
   
   def get_iter(self, frame):
-    from aggregate_types import IterType
-    if not self.iter:
-      self.iter = IterType.create_iter(StrType.get_object())
     return self.iter
   
 class FileType(BuiltinConstCallable, BuiltinBasicType):
@@ -496,14 +493,14 @@ class StaticMethodType(BuiltinCallable, BuiltinType):
     def __init__(self, typeobj, wrapper, obj):
       self.typeobj = typeobj
       self.wrapper = wrapper
-      self.done = set()
+      self.received = set()
       CompoundTypeNode.__init__(self, [obj])
       return
     
     def recv(self, src):
       for obj in src:
-        if obj in self.done: continue
-        self.done.add(obj)
+        if obj in self.received: continue
+        self.received.add(obj)
         self.update_type(self.wrapper(self.typeobj, obj))
       return
 

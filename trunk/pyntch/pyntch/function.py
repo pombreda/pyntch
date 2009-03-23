@@ -144,11 +144,14 @@ class FuncType(BuiltinType, TreeReporter):
       frame.raise_expt(ErrorConfig.InvalidNumOfArgs(len(self.argvars), len(args)))
     # Handle remaining arguments: kwargs and variargs.
     if self.variarg and variargs:
+      #XXX
       self.space[self.variarg].bind(TupleType.create_tuple(CompoundTypeNode(variargs)))
     if self.kwarg:
       if varikwargs:
+        #XXX
         self.space[self.kwarg].bind(DictType.create_dict(key=StrType.get_object(), value=CompoundTypeNode(varikwargs)))
       else:
+        #XXX
         self.space[self.kwarg].bind(DictType.create_null())
     # Remember where this is called from.
     self.frames.add(frame)

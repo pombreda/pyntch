@@ -185,7 +185,7 @@ class FilterFunc(BuiltinFuncNoKwd):
     
     def __init__(self, frame, func, seq):
       self.frame = frame
-      self.done = set()
+      self.received = set()
       self.elem = IterElement(frame, seq)
       CompoundTypeNode.__init__(self, [seq])
       func.connect(self.recv_func)
@@ -193,8 +193,8 @@ class FilterFunc(BuiltinFuncNoKwd):
 
     def recv_func(self, src):
       for obj in src:
-        if obj in self.done: continue
-        self.done.add(obj)
+        if obj in self.received: continue
+        self.received.add(obj)
         if not isinstance(obj, NoneType):
           try:
             obj.call(self.frame, [self.elem], {})
@@ -281,7 +281,7 @@ class LenFunc(BuiltinFuncNoKwd):
   class LengthChecker(MustBeDefinedNode):
     
     def __init__(self, frame, target):
-      self.done = set()
+      self.received = set()
       self.target = target
       MustBeDefinedNode.__init__(self, frame)
       self.target.connect(self.recv_target)
@@ -289,8 +289,8 @@ class LenFunc(BuiltinFuncNoKwd):
 
     def recv_target(self, src):
       for obj in src:
-        if obj in self.done: continue
-        self.done.add(obj)
+        if obj in self.received: continue
+        self.received.add(obj)
         try:
           obj.get_length(self.frame).connect(self.recv)
         except (NodeTypeError, NodeAttrError):
@@ -298,8 +298,9 @@ class LenFunc(BuiltinFuncNoKwd):
       return
 
     def check_undefined(self):
-      if not self.types:
-        self.raise_expt(ErrorConfig.NoLength(self.target))
+      if not self.received: return
+      if self.types: return
+      self.raise_expt(ErrorConfig.NoLength(self.target))
       return
 
   def process_args_nokwd(self, frame, args):
@@ -319,7 +320,7 @@ class MapFunc(BuiltinFunc):
     
     def __init__(self, frame, func, objs):
       self.frame = frame
-      self.done = set()
+      self.received = set()
       self.args = [ IterElement(frame, obj) for obj in objs ]
       self.listobj = ListType.create_list()
       CompoundTypeNode.__init__(self, [self.listobj])
@@ -328,8 +329,8 @@ class MapFunc(BuiltinFunc):
 
     def recv_func(self, src):
       for obj in src:
-        if obj in self.done: continue
-        self.done.add(obj)
+        if obj in self.received: continue
+        self.received.add(obj)
         try:
           obj.call(self.frame, self.args, {}).connect(self.listobj.elemall.recv)
         except NodeTypeError:
@@ -445,7 +446,7 @@ class ReduceFunc(BuiltinFuncNoKwd):
     
     def __init__(self, frame, func, seq, initial):
       self.frame = frame
-      self.done = set()
+      self.received = set()
       self.elem = IterElement(frame, seq)
       self.result = CompoundTypeNode()
       if initial:
@@ -459,8 +460,8 @@ class ReduceFunc(BuiltinFuncNoKwd):
 
     def recv_func(self, src):
       for obj in src:
-        if obj in self.done: continue
-        self.done.add(obj)
+        if obj in self.received: continue
+        self.received.add(obj)
         try:
           result = obj.call(self.frame, self.args, {})
           result.connect(self.recv)
@@ -509,6 +510,7 @@ class SortedFunc(BuiltinFunc):
     return
 
   def process_args(self, frame, args, kwargs):
+    # XXX
     seq = ListType.create_list(elemall=IterElement(frame, args[0]))
     ListObject.SortMethod('sorted', seq).process_args(frame, args[1:], kwargs)
     return seq
@@ -522,7 +524,7 @@ class SumFunc(BuiltinFuncNoKwd):
     
     def __init__(self, frame, seq, initial):
       self.frame = frame
-      self.done = set()
+      self.received = set()
       self.elem = IterElement(frame, seq)
       self.result = CompoundTypeNode()
       if initial:
@@ -535,8 +537,8 @@ class SumFunc(BuiltinFuncNoKwd):
 
     def recv_elem(self, src):
       for obj in src:
-        if obj in self.done: continue
-        self.done.add(obj)
+        if obj in self.received: continue
+        self.received.add(obj)
         BinaryOp(self.frame, 'Add', obj, self.result).connect(self.result.recv)
       return
   
@@ -574,6 +576,7 @@ class ZipFunc(BuiltinFunc):
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
       return UndefinedTypeNode()
     elems = [ CompoundTypeNode() for arg1 in args ]
+    # XXX
     zipelem = TupleType.create_tuple(elements=elems)
     seq = ListType.create_list(elemall=zipelem)
     for (i,arg1) in enumerate(args):
