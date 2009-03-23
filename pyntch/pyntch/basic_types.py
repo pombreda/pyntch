@@ -146,7 +146,7 @@ class BaseStringObject(BuiltinObject):
 class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
   TYPE_NAME = 'basestring'
 
-  def get_attr(self, name, write=False):
+  def get_attr(self, node, name, write=False):
     from aggregate_types import TupleType, ListType
     if name == 'capitalize':
       return BuiltinConstMethod('str.capitalize', self.get_object())
@@ -297,12 +297,12 @@ class StrType(BaseStringType):
   TYPE_NAME = 'str'
   TYPE_INSTANCE = StrObject
   
-  def get_attr(self, name, write=False):
+  def get_attr(self, node, name, write=False):
     if name == 'translate':
       return BuiltinConstMethod('str.translate', self.get_object(),
                                 [BaseStringType], [BaseStringType],
                                 [ErrorConfig.MaybeTableInvalid()])
-    return BaseStringType.get_attr(self, name, write=write)
+    return BaseStringType.get_attr(self, node, name, write=write)
     
   def __init__(self):
     BuiltinBasicType.__init__(self)
@@ -322,7 +322,7 @@ class UnicodeType(BaseStringType):
       arg1.connect(checker.recv)
       return
 
-  def get_attr(self, name, write=False):
+  def get_attr(self, node, name, write=False):
     if name == 'isdecimal':
       return BuiltinConstMethod('unicode.isdecimal', BoolType.get_object())
     elif name == 'isnumeric':
@@ -330,7 +330,7 @@ class UnicodeType(BaseStringType):
     elif name == 'translate':
       return self.TranslateFunc('unicode.translate', self.get_object(),
                                 [ANY])
-    return BaseStringType.get_attr(self, name, write=write)
+    return BaseStringType.get_attr(self, node, name, write=write)
 
   def __init__(self):
     BuiltinBasicType.__init__(self)
@@ -362,7 +362,7 @@ class FileType(BuiltinConstCallable, BuiltinBasicType):
                                   [ErrorConfig.MaybeFileCannotOpen()])
     return
 
-  def get_attr(self, name, write=False):
+  def get_attr(self, node, name, write=False):
     from aggregate_types import ListType
     if name == 'close':
       return BuiltinConstMethod('file.close', NoneType.get_object())

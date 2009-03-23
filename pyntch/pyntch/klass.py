@@ -56,7 +56,7 @@ class ClassType(BuiltinType, TreeReporter):
         if klass in self.received_base: continue
         self.received_base.add(klass)
         try:
-          klass.get_attr(self.name).connect(self.recv)
+          klass.get_attr(src, self.name).connect(self.recv)
         except NodeAttrError:
           pass
       return
@@ -85,7 +85,7 @@ class ClassType(BuiltinType, TreeReporter):
         if klass.is_subclass(klassobj): return True
     return False
 
-  def get_attr(self, name, write=False):
+  def get_attr(self, node, name, write=False):
     if name not in self.attrs:
       attr = self.ClassAttr(name, self, self.baseklass)
       self.attrs[name] = attr
@@ -192,7 +192,7 @@ class InstanceObject(BuiltinObject):
     self.boundmethods = {}
     BuiltinObject.__init__(self, klass)
     for (name, value) in klass.attrs.iteritems():
-      value.connect(self.get_attr(name).recv)
+      value.connect(self.get_attr(None, name).recv)
     return
   
   def __repr__(self):
@@ -206,7 +206,7 @@ class InstanceObject(BuiltinObject):
       if self.klass.is_subclass(typeobj): return True
     return False
 
-  def get_attr(self, name, write=False):
+  def get_attr(self, node, name, write=False):
     if name not in self.attrs:
       attr = self.InstanceAttr(name, self)
       self.attrs[name] = attr
