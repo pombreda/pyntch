@@ -36,10 +36,10 @@ class ExceptionType(ClassType):
     ClassType.__init__(self, self.TYPE_NAME, [])
     return
 
-  def get_attr(self, name, write=False):
+  def get_attr(self, node, name, write=False):
     if name == '__init__':
       return self.InitMethod(self)
-    return ClassType.get_attr(self, name, write=write)
+    return ClassType.get_attr(self, node, name, write=write)
 
   @classmethod
   def occur(klass, message):

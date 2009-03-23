@@ -61,7 +61,7 @@ class TypeNode(object):
     self.sendto.append(receiver)
     return receiver(self)
 
-  def get_attr(self, name, write=False):
+  def get_attr(self, node, name, write=False):
     raise NodeAttrError(name)
   def get_element(self, frame, sub, write=False):
     raise NodeTypeError('not subscriptable')
@@ -171,7 +171,7 @@ class UndefinedTypeNode(TypeNode):
 
   def recv(self, src):
     return
-  def get_attr(self, name, write=False):
+  def get_attr(self, node, name, write=False):
     return self
   def get_element(self, frame, sub, write=False):
     return self
@@ -194,8 +194,8 @@ class BuiltinObject(SimpleTypeNode):
   def get_type(self):
     return self.typeobj
   
-  def get_attr(self, name, write=False):
-    return self.get_type().get_attr(name, write=write)
+  def get_attr(self, node, name, write=False):
+    return self.get_type().get_attr(node, name, write=write)
   
   def is_type(self, *typeobjs):
     for typeobj in typeobjs:
@@ -218,7 +218,7 @@ class BuiltinType(BuiltinObject):
   def __repr__(self):
     return '<type %s>' % self.get_name()
 
-  def get_attr(self, name, write=False):
+  def get_attr(self, node, name, write=False):
     raise NodeAttrError(name)
   
   @classmethod
@@ -331,6 +331,18 @@ class BuiltinConstCallable(BuiltinCallable):
 class BuiltinMethodType(BuiltinType):
   TYPE_NAME = 'builtin_method'
 
+
+##  BuiltinMethod
+##
+class BuiltinMethod(BuiltinCallable, BuiltinObject):
+  
+  def __init__(self, name, args=None, optargs=None, expts=None):
+    BuiltinObject.__init__(self, BuiltinMethodType.get_typeobj())
+    BuiltinCallable.__init__(self, name, args=args, optargs=optargs, expts=expts)
+    return
+
+  def __repr__(self):
+    return '<callable %s>' % self.name
 
 ##  BuiltinConstMethod
 ##

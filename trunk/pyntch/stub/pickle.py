@@ -73,6 +73,6 @@ def load(fp):
   assert isinstance(fp, file)
   return
 
-def loads(data)
+def loads(data):
   assert isinstance(data, str)
   return ''

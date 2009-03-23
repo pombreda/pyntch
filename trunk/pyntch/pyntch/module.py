@@ -65,7 +65,7 @@ class ModuleObject(BuiltinObject):
   def __repr__(self):
     return '<Module %s>' % (self.name,)
 
-  def get_attr(self, name, write=False):
+  def get_attr(self, node, name, write=False):
     return self.space.register_var(name)
   
   

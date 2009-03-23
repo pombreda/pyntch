@@ -69,7 +69,7 @@ class AttrRef(MustBeDefinedNode):
       if obj in self.received: continue
       self.received.add(obj)
       try:
-        obj.get_attr(self.attrname).connect(self.recv)
+        obj.get_attr(src, self.attrname).connect(self.recv)
       except NodeAttrError:
         pass
     return
@@ -101,7 +101,7 @@ class OptAttrRef(ExpressionNode):
       if obj in self.received: continue
       self.received.add(obj)
       try:
-        obj.get_attr(self.attrname).connect(self.recv)
+        obj.get_attr(src, self.attrname).connect(self.recv)
       except NodeAttrError:
         self.raise_expt(ErrorConfig.AttributeNotFound(obj, self.attrname))
     return
@@ -208,7 +208,7 @@ class AttrAssign(ExpressionNode):
       if obj in self.received: continue
       self.received.add(obj)
       try:
-        self.value.connect(obj.get_attr(self.attrname, write=True).recv)
+        self.value.connect(obj.get_attr(src, self.attrname, write=True).recv)
       except (NodeAttrError, NodeTypeError, NodeAssignError):
         self.raise_expt(ErrorConfig.AttributeNotAssignable(obj, self.attrname))
     return
