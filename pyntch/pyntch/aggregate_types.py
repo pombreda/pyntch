@@ -510,7 +510,7 @@ class ReversedType(BuiltinCallable, IterType):
     def __init__(self, frame, target):
       self.frame = frame
       self.target = target
-      self.done = set()
+      self.received = set()
       CompoundTypeNode.__init__(self)
       target.connect(self.recv_target)
       return
@@ -520,8 +520,8 @@ class ReversedType(BuiltinCallable, IterType):
     
     def recv_target(self, src):
       for obj in src:
-        if obj in self.done: continue
-        self.done.add(obj)
+        if obj in self.received: continue
+        self.received.add(obj)
         try:
           iterobj = obj.get_reversed(self.frame)
           frame1 = ExceptionCatcher(self.frame)

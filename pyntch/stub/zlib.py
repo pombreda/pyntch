@@ -31,7 +31,7 @@ def compress(data, level=0):
   assert isinstance(level, int)
   return ''
 
-def decompress(data, wbits, bufsize):
+def decompress(data, wbits=0, bufsize=0):
   assert isinstance(data, str)
   assert isinstance(wbits, int)
   assert isinstance(bufsize, int)

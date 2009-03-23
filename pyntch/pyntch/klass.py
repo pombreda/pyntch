@@ -42,7 +42,7 @@ class ClassType(BuiltinType, TreeReporter):
     def __init__(self, name, klass, baseklass=None):
       self.name = name
       self.klass = klass
-      self.done = set()
+      self.received_base = set()
       CompoundTypeNode.__init__(self)
       if baseklass:
         baseklass.connect(self.recv_baseklass)
@@ -53,15 +53,12 @@ class ClassType(BuiltinType, TreeReporter):
 
     def recv_baseklass(self, src):
       for klass in src:
-        if klass in self.done: continue
-        self.done.add(klass)
+        if klass in self.received_base: continue
+        self.received_base.add(klass)
         try:
           klass.get_attr(self.name).connect(self.recv)
         except NodeAttrError:
           pass
-      return
-
-    def check_undefined(self):
       return
 
   def __init__(self, name, bases):

@@ -56,11 +56,11 @@ class Pattern(object):
   def findall(self, string, flags=0):
     assert isinstance(string, basestring)
     assert isinstance(flags, int)
-    return [Match()]
+    return ['']
   def finditer(self, string, flags=0):
     assert isinstance(string, basestring)
     assert isinstance(flags, int)
-    return ['']
+    return [Match()]
 
 compile = Pattern
 def match(pattern, string, flags=0):
