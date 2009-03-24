@@ -65,6 +65,9 @@ class ModuleObject(BuiltinObject):
   def __repr__(self):
     return '<Module %s>' % (self.name,)
 
+  def get_name(self):
+    return self.name
+
   def get_attr(self, node, name, write=False):
     return self.space.register_var(name)
   
@@ -117,7 +120,8 @@ class Interpreter(object):
   debug = 0
   
   module_path = None
-  MODULE_CACHE = None
+  PATH2MODULE = None
+  NAME2MODULE = None
   DEFAULT_NAMESPACE = None
 
   @classmethod
@@ -133,11 +137,12 @@ class Interpreter(object):
     builtin.import_all(exceptions)
     default.import_all(builtin)
     klass.DEFAULT_NAMESPACE = default
-    klass.MODULE_CACHE = {
+    klass.NAME2MODULE = {
       '__builtin__': ModuleObject('__builtin__', builtin),
       'types': ModuleObject('types', types),
       'exceptions': ModuleObject('exceptions', exceptions),
       }
+    klass.PATH2MODULE = {}
     return
 
   # find_module(name)
@@ -162,15 +167,17 @@ class Interpreter(object):
   @classmethod
   def load_file(klass, path, modname):
     from compiler import parseFile
-    if modname in klass.MODULE_CACHE:
-      module = klass.MODULE_CACHE[modname]
+    path = os.path.normpath(path)
+    if path in klass.PATH2MODULE:
+      module = klass.PATH2MODULE[path]
     else:
       print >>stderr, 'loading: %r' % path
       dirname = os.path.dirname(path)
       if dirname not in klass.module_path:
         klass.module_path.insert(0, dirname)
       module = PythonModuleObject(modname, klass.DEFAULT_NAMESPACE, path)
-      klass.MODULE_CACHE[modname] = module
+      klass.PATH2MODULE[path] = module
+      klass.NAME2MODULE[modname] = module
       try:
         tree = parseFile(path)
       except IOError:
@@ -189,8 +196,8 @@ class Interpreter(object):
   def load_module(klass, fullname):
     if klass.debug:
       print >>stderr, 'load_module: %r...' % fullname
-    if fullname in klass.MODULE_CACHE:
-      module = klass.MODULE_CACHE[fullname]
+    if fullname in klass.NAME2MODULE:
+      module = klass.NAME2MODULE[fullname]
     else:
       modpath = klass.module_path
       modname = fullname

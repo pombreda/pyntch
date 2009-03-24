@@ -145,14 +145,16 @@ class TypeChecker(CompoundTypeNode):
 
   def recv(self, src):
     from config import ErrorConfig
+    from basic_types import TypeType
     if self.validtypes == self.ANY: return
     for obj in src:
       if obj in self.received: continue
       self.received.add(obj)
       for typeobj in self.validtypes:
-        if obj.is_type(typeobj): break
+        if typeobj.is_type(TypeType.get_typeobj()) and obj.is_type(typeobj): break
       else:
-        s = '|'.join( typeobj.get_name() for typeobj in self.validtypes )
+        s = '|'.join( typeobj.get_name() for typeobj in self.validtypes
+                      if typeobj.is_type(TypeType.get_typeobj()) )
         self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError(self.blame, obj, s))
     return
 
@@ -240,5 +242,3 @@ class KeyValueTypeChecker(TypeChecker):
         s = '|'.join(map(repr, self.validtypes))
         self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError('value of %s' % self.blame, obj, s))
     return
-
-
