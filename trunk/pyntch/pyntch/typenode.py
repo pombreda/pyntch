@@ -35,7 +35,7 @@ class TypeNode(object):
   
   @classmethod  
   def showstat(klass):
-    if not klass.debug: return
+    if not klass.verbose: return
     print >>sys.stderr, '%d nodes' % klass.N
     return
 
@@ -77,9 +77,9 @@ class TypeNode(object):
     raise NodeTypeError('not callable')
   
   def get_name(self):
-    raise NotImplementedError, self
+    raise NotImplementedError, self.__class__
   def desc1(self, _):
-    raise NotImplementedError, self
+    raise NotImplementedError, self.__class__
   def describe(self):
     return self.desc1(set())
   def signature(self):
@@ -284,7 +284,7 @@ class BuiltinCallable(object):
     return self.process_args(frame, args, kwargs)
 
   def process_args(self, frame, args, kwargs):
-    raise NotImplementedError
+    raise NotImplementedError, self.__class__
 
 
 ##  BuiltinConstCallable

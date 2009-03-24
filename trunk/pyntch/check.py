@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, os.path
+import sys, os
 from pyntch.typenode import TypeNode, CompoundTypeNode
 from pyntch.frame import ExecutionFrame
 from pyntch.expression import MustBeDefinedNode
@@ -33,7 +33,6 @@ def main(argv):
   MustBeDefinedNode.reset()
   modules = []
   for name in args:
-    print '===', name, '==='
     if name.endswith('.py'):
       path = name
       (name,_) = os.path.splitext(os.path.basename(name))
@@ -41,9 +40,10 @@ def main(argv):
     else:
       module = Interpreter.load_module(name)
     modules.append(module)
-  TypeNode.showstat()
   MustBeDefinedNode.check()
+  TypeNode.showstat()
   for module in modules:
+    print '===', module.get_name(), '==='
     module.showrec(IndentedStream(sys.stdout))
   return 0
 
