@@ -55,18 +55,8 @@ class BoolType(BuiltinBasicType):
 class NumberType(BuiltinBasicType):
   TYPE_NAME = 'number'
   RANK = 0
-  # get_rank()
-  @classmethod
-  def get_rank(klass):
-    return klass.RANK
   
-class IntObject(BuiltinObject): pass
-class IntType(BuiltinConstCallable, NumberType):
-  TYPE_NAME = 'int'
-  TYPE_INSTANCE = IntObject
-  RANK = 1
-
-  class IntConverter(CompoundTypeNode):
+  class NumberConverter(CompoundTypeNode):
     
     def __init__(self, frame, value):
       self.frame = frame
@@ -79,22 +69,35 @@ class IntType(BuiltinConstCallable, NumberType):
         if obj in self.received: continue
         self.received.add(obj)
         if obj.is_type(BaseStringType.get_typeobj()):
-          self.frame.raise_expt(ErrorConfig.MaybeNotConvertable('int'))
-        elif obj.is_type(NumberType.get_typeobj(), BoolType.get_typeobj()):
+          self.frame.raise_expt(ErrorConfig.MaybeNotConvertable(self.TYPE_NAME))
+        elif obj.is_type(SimpleNumberType.get_typeobj(), BoolType.get_typeobj()):
           pass
         else:
-          self.frame.raise_expt(ErrorConfig.NotConvertable('int'))
+          self.frame.raise_expt(ErrorConfig.NotConvertable(self.TYPE_NAME))
       return
 
   def accept_arg(self, frame, i, arg1):
     if i == 0:
-      IntType.IntConverter(frame, arg1)
+      self.NumberConverter(frame, arg1)
     else:
       BuiltinConstCallable.accept_arg(self, frame, i, arg1)
     return
 
+  # get_rank()
+  @classmethod
+  def get_rank(klass):
+    return klass.RANK
+
+class SimpleNumberType(NumberType): pass
+
+class IntObject(BuiltinObject): pass
+class IntType(BuiltinConstCallable, SimpleNumberType):
+  TYPE_NAME = 'int'
+  TYPE_INSTANCE = IntObject
+  RANK = 1
+
   def __init__(self):
-    BuiltinBasicType.__init__(self)
+    SimpleNumberType.__init__(self)
     BuiltinConstCallable.__init__(self, 'int', self.get_object(), [], [ANY, IntType])
     return
   
@@ -105,16 +108,26 @@ class LongType(IntType):
   RANK = 2
 
 class FloatObject(BuiltinObject): pass
-class FloatType(NumberType):
+class FloatType(BuiltinConstCallable, SimpleNumberType):
   TYPE_NAME = 'float'
   TYPE_INSTANCE = FloatObject
   RANK = 3
-  
+
+  def __init__(self):
+    SimpleNumberType.__init__(self)
+    BuiltinConstCallable.__init__(self, 'float', self.get_object(), [], [ANY])
+    return
+
 class ComplexObject(BuiltinObject): pass
-class ComplexType(NumberType):
+class ComplexType(BuiltinConstCallable, NumberType):
   TYPE_NAME = 'complex'
   TYPE_INSTANCE = ComplexObject
   RANK = 4
+
+  def __init__(self):
+    NumberType.__init__(self)
+    BuiltinConstCallable.__init__(self, 'complex', self.get_object(), [], [ANY])
+    return
 
 
 ##  Strings
@@ -465,20 +478,8 @@ class XRangeType(BuiltinConstCallable, BuiltinBasicType):
 ##  StaticMethodType
 ##
 class StaticMethodObject(BuiltinObject):
-  
-  def __init__(self, typeobj, realobj):
-    self.typeobj = typeobj
-    self.realobj = realobj
-    BuiltinObject.__init__(self, typeobj)
-    return
 
-  def get_object(self):
-    return self.realobj
-
-class ClassMethodObject(BuiltinObject):
-  
   def __init__(self, typeobj, realobj):
-    self.typeobj = typeobj
     self.realobj = realobj
     BuiltinObject.__init__(self, typeobj)
     return
@@ -488,6 +489,8 @@ class ClassMethodObject(BuiltinObject):
 
 class StaticMethodType(BuiltinCallable, BuiltinType):
 
+  TYPE_NAME = 'staticmethod'
+  
   class MethodConverter(CompoundTypeNode):
 
     def __init__(self, typeobj, wrapper, obj):
@@ -516,7 +519,19 @@ class StaticMethodType(BuiltinCallable, BuiltinType):
       return UndefinedTypeNode()
     return self.MethodConverter(self.get_typeobj(), self.wrapper, args[0])
 
+class ClassMethodObject(BuiltinObject):
+  
+  def __init__(self, typeobj, realobj):
+    self.realobj = realobj
+    BuiltinObject.__init__(self, typeobj)
+    return
+
+  def get_object(self):
+    return self.realobj
+
 class ClassMethodType(StaticMethodType):
+
+  TYPE_NAME = 'classmethod'
 
   def __init__(self):
     StaticMethodType.__init__(self, 'classmethod', wrapper=ClassMethodObject)
