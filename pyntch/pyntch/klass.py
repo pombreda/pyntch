@@ -43,6 +43,7 @@ class ClassType(BuiltinType, TreeReporter):
       self.name = name
       self.klass = klass
       self.received_base = set()
+      self.processed = set()
       CompoundTypeNode.__init__(self)
       if baseklass:
         baseklass.connect(self.recv_baseklass)
@@ -61,6 +62,18 @@ class ClassType(BuiltinType, TreeReporter):
           pass
       return
 
+    def recv(self, src):
+      from basic_types import StaticMethodObject, ClassMethodObject
+      for obj in src:
+        if obj in self.processed: continue
+        self.processed.add(obj)
+        if isinstance(obj, StaticMethodObject):
+          obj = obj.get_object()
+        elif isinstance(obj, ClassMethodObject):
+          obj = self.klass.bind_func(obj.get_object())
+        self.update_type(obj)
+      return
+    
   def __init__(self, name, bases):
     self.name = name
     self.bases = bases
