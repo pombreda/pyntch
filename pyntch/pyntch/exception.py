@@ -36,10 +36,10 @@ class ExceptionType(ClassType):
     ClassType.__init__(self, self.TYPE_NAME, [])
     return
 
-  def get_attr(self, node, name, write=False):
+  def get_attr(self, frame, anchor, name, write=False):
     if name == '__init__':
       return self.InitMethod(self)
-    return ClassType.get_attr(self, node, name, write=write)
+    return ClassType.get_attr(self, frame, anchor, name, write=write)
 
   @classmethod
   def occur(klass, message):
@@ -163,7 +163,8 @@ class TypeChecker(CompoundTypeNode):
 ##
 class SequenceTypeChecker(TypeChecker):
   
-  def __init__(self, parent_frame, types, blame):
+  def __init__(self, parent_frame, anchor, types, blame):
+    self.anchor = anchor
     self.received = set()
     self.received_elem = set()
     TypeChecker.__init__(self, parent_frame, types, blame=blame)
@@ -174,7 +175,7 @@ class SequenceTypeChecker(TypeChecker):
     for obj in src:
       if obj in self.received: continue
       self.received.add(obj)
-      IterElement(self.parent_frame, obj).connect(self.recv_elemobj)
+      IterElement(self.parent_frame, self.anchor, obj).connect(self.recv_elemobj)
     return
   
   def recv_elemobj(self, src):

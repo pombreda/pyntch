@@ -68,7 +68,7 @@ class ModuleObject(BuiltinObject):
   def get_name(self):
     return self.name
 
-  def get_attr(self, node, name, write=False):
+  def get_attr(self, frame, anchor, name, write=False):
     return self.space.register_var(name)
   
   

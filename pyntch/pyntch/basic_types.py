@@ -5,7 +5,7 @@
 
 from typenode import TypeNode, CompoundTypeNode, NodeAttrError, NodeAssignError, UndefinedTypeNode
 from typenode import BuiltinObject, BuiltinType, BuiltinCallable, BuiltinConstCallable, BuiltinConstMethod
-from exception import TypeChecker, SequenceTypeChecker, KeyValueTypeChecker
+from exception import TypeChecker, KeyValueTypeChecker
 from config import ErrorConfig
 from klass import InstanceObject
 
@@ -76,11 +76,11 @@ class NumberType(BuiltinBasicType):
           self.frame.raise_expt(ErrorConfig.NotConvertable(self.TYPE_NAME))
       return
 
-  def accept_arg(self, frame, i, arg1):
+  def accept_arg(self, frame, anchor, i, arg1):
     if i == 0:
       self.NumberConverter(frame, arg1)
     else:
-      BuiltinConstCallable.accept_arg(self, frame, i, arg1)
+      BuiltinConstCallable.accept_arg(self, frame, anchor, i, arg1)
     return
 
   # get_rank()
@@ -140,18 +140,18 @@ class BaseStringObject(BuiltinObject):
     self.iter = IterType.create_iter(self)
     return
   
-  def get_iter(self, frame):
+  def get_iter(self, frame, anchor):
     return self.iter
 
-  def get_length(self, frame):
+  def get_length(self, frame, anchor):
     return IntType.get_object()
 
-  def get_element(self, frame, sub, write=False):
+  def get_element(self, frame, anchor, sub, write=False):
     if write: raise NodeAssignError
     frame.raise_expt(ErrorConfig.MaybeOutOfRange())
     return self
 
-  def get_slice(self, frame, subs, write=False):
+  def get_slice(self, frame, anchor, subs, write=False):
     if write: raise NodeAssignError
     frame.raise_expt(ErrorConfig.MaybeOutOfRange())
     return self
@@ -159,7 +159,7 @@ class BaseStringObject(BuiltinObject):
 class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
   TYPE_NAME = 'basestring'
 
-  def get_attr(self, node, name, write=False):
+  def get_attr(self, frame, anchor, name, write=False):
     from aggregate_types import TupleType, ListType
     if name == 'capitalize':
       return BuiltinConstMethod('str.capitalize', self.get_object())
@@ -267,8 +267,9 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
 
   class StrConverter(CompoundTypeNode):
     
-    def __init__(self, frame, value):
+    def __init__(self, frame, anchor, value):
       self.frame = frame
+      self.anchor = anchor
       self.received = set()
       CompoundTypeNode.__init__(self, [value])
       return
@@ -279,25 +280,25 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
         if obj in self.received: continue
         self.received.add(obj)
         if isinstance(obj, InstanceObject):
-          value = OptMethodCall(self.frame, obj, '__str__')
+          value = OptMethodCall(self.frame, self.anchor, obj, '__str__')
           checker = TypeChecker(self.frame, BaseStringType.get_typeobj(), 
                                 'the return value of __str__ method')
           value.connect(checker.recv)
-          value = OptMethodCall(self.frame, obj, '__repr__')
+          value = OptMethodCall(self.frame, self.anchor, obj, '__repr__')
           checker = TypeChecker(self.frame, BaseStringType.get_typeobj(), 
                                 'the return value of __repr__ method')
           value.connect(checker.recv)
       return
 
-  def accept_arg(self, frame, i, arg1):
-    self.StrConverter(frame, arg1)
+  def accept_arg(self, frame, anchor, i, arg1):
+    self.StrConverter(frame, anchor, arg1)
     return
 
-  def call(self, frame, args, kwargs):
+  def call(self, frame, anchor, args, kwargs):
     if self.TYPE_NAME == 'basestring':
       frame.raise_expt(ErrorConfig.NotInstantiatable('basestring'))
       return UndefinedTypeNode()
-    return BuiltinConstCallable.call(self, frame, args, kwargs)
+    return BuiltinConstCallable.call(self, frame, anchor, args, kwargs)
 
   def __init__(self):
     from aggregate_types import ListType
@@ -310,12 +311,12 @@ class StrType(BaseStringType):
   TYPE_NAME = 'str'
   TYPE_INSTANCE = StrObject
   
-  def get_attr(self, node, name, write=False):
+  def get_attr(self, frame, anchor, name, write=False):
     if name == 'translate':
       return BuiltinConstMethod('str.translate', self.get_object(),
                                 [BaseStringType], [BaseStringType],
                                 [ErrorConfig.MaybeTableInvalid()])
-    return BaseStringType.get_attr(self, node, name, write=write)
+    return BaseStringType.get_attr(self, frame, anchor, name, write=write)
     
   def __init__(self):
     BuiltinBasicType.__init__(self)
@@ -328,14 +329,14 @@ class UnicodeType(BaseStringType):
   TYPE_INSTANCE = UnicodeObject
 
   class TranslateFunc(BuiltinConstMethod):
-    def accept_arg(self, frame, i, arg1):
+    def accept_arg(self, frame, anchor, i, arg1):
       checker = KeyValueTypeChecker(frame, [IntType.get_typeobj()],
                                     [IntType.get_typeobj(), UnicodeType.get_typeobj(), NoneType.get_typeobj()],
                                     'arg %d' % i)
       arg1.connect(checker.recv)
       return
 
-  def get_attr(self, node, name, write=False):
+  def get_attr(self, frame, anchor, name, write=False):
     if name == 'isdecimal':
       return BuiltinConstMethod('unicode.isdecimal', BoolType.get_object())
     elif name == 'isnumeric':
@@ -343,7 +344,7 @@ class UnicodeType(BaseStringType):
     elif name == 'translate':
       return self.TranslateFunc('unicode.translate', self.get_object(),
                                 [ANY])
-    return BaseStringType.get_attr(self, node, name, write=write)
+    return BaseStringType.get_attr(self, frame, anchor, name, write=write)
 
   def __init__(self):
     BuiltinBasicType.__init__(self)
@@ -361,7 +362,7 @@ class FileObject(BuiltinObject):
     self.iter = IterType.create_iter(StrType.get_object())
     return
   
-  def get_iter(self, frame):
+  def get_iter(self, frame, anchor):
     return self.iter
   
 class FileType(BuiltinConstCallable, BuiltinBasicType):
@@ -375,7 +376,7 @@ class FileType(BuiltinConstCallable, BuiltinBasicType):
                                   [ErrorConfig.MaybeFileCannotOpen()])
     return
 
-  def get_attr(self, node, name, write=False):
+  def get_attr(self, frame, anchor, name, write=False):
     from aggregate_types import ListType
     if name == 'close':
       return BuiltinConstMethod('file.close', NoneType.get_object())
@@ -454,14 +455,12 @@ BUILTIN_OBJECT = dict(
 class XRangeObject(BuiltinObject):
   
   def __init__(self, typeobj):
-    self.iter = None
+    from aggregate_types import IterType
     BuiltinObject.__init__(self, typeobj)
+    self.iter = IterType.create_iter(IntType.get_object())
     return
   
-  def get_iter(self, frame):
-    from aggregate_types import IterType
-    if not self.iter:
-      self.iter = IterType.create_iter(IntType.get_object())
+  def get_iter(self, frame, anchor):
     return self.iter
 
 class XRangeType(BuiltinConstCallable, BuiltinBasicType):
@@ -513,7 +512,7 @@ class StaticMethodType(BuiltinCallable, BuiltinType):
     BuiltinCallable.__init__(self, name, [ANY])
     return
 
-  def process_args(self, frame, args, kwargs):
+  def process_args(self, frame, anchor, args, kwargs):
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
       return UndefinedTypeNode()

@@ -61,19 +61,19 @@ class TypeNode(object):
     self.sendto.append(receiver)
     return receiver(self)
 
-  def get_attr(self, node, name, write=False):
+  def get_attr(self, frame, anchor, name, write=False):
     raise NodeAttrError(name)
-  def get_element(self, frame, sub, write=False):
+  def get_element(self, frame, anchor, sub, write=False):
     raise NodeTypeError('not subscriptable')
-  def get_slice(self, frame, subs, write=False):
+  def get_slice(self, frame, anchor, subs, write=False):
     raise NodeTypeError('not subscriptable')
-  def get_iter(self, frame):
+  def get_iter(self, frame, anchor):
     raise NodeTypeError('not iterable')
-  def get_reversed(self, frame):
+  def get_reversed(self, frame, anchor):
     raise NodeTypeError('not reverse-iterable')
-  def get_length(self, frame):
+  def get_length(self, frame, anchor):
     raise NodeTypeError('no len()')
-  def call(self, frame, args, kwargs):
+  def call(self, frame, anchor, args, kwargs):
     raise NodeTypeError('not callable')
   
   def get_name(self):
@@ -171,19 +171,19 @@ class UndefinedTypeNode(TypeNode):
 
   def recv(self, src):
     return
-  def get_attr(self, node, name, write=False):
+  def get_attr(self, frame, anchor, name, write=False):
     return self
-  def get_element(self, frame, sub, write=False):
+  def get_element(self, frame, anchor, sub, write=False):
     return self
-  def get_slice(self, frame, subs, write=False):
+  def get_slice(self, frame, anchor, subs, write=False):
     return self
-  def get_iter(self, frame):
+  def get_iter(self, frame, anchor):
     return self
-  def get_reversed(self, frame):
+  def get_reversed(self, frame, anchor):
     return self
-  def get_length(self, frame):
+  def get_length(self, frame, anchor):
     return self
-  def call(self, frame, args, kwargs):
+  def call(self, frame, anchor, args, kwargs):
     return self
 
 
@@ -194,8 +194,8 @@ class BuiltinObject(SimpleTypeNode):
   def get_type(self):
     return self.typeobj
   
-  def get_attr(self, node, name, write=False):
-    return self.get_type().get_attr(node, name, write=write)
+  def get_attr(self, frame, anchor, name, write=False):
+    return self.get_type().get_attr(frame, anchor, name, write=write)
   
   def is_type(self, *typeobjs):
     for typeobj in typeobjs:
@@ -217,9 +217,6 @@ class BuiltinType(BuiltinObject):
 
   def __repr__(self):
     return '<type %s>' % self.get_name()
-
-  def get_attr(self, node, name, write=False):
-    raise NodeAttrError(name)
   
   @classmethod
   def get_type(klass):
@@ -252,9 +249,12 @@ class BuiltinType(BuiltinObject):
 
   # default methods
   class InitMethod(BuiltinObject):
-    def call(self, frame, args, kwargs):
+    def call(self, frame, anchor, args, kwargs):
       from basic_types import NoneType
       return NoneType.get_object()
+
+  def get_attr(self, frame, anchor, name, write=False):
+    raise NodeAttrError(name)
 
 
 ##  BuiltinCallable
@@ -273,7 +273,7 @@ class BuiltinCallable(object):
     self.expts = (expts or [])
     return
   
-  def call(self, frame, args, kwargs):
+  def call(self, frame, anchor, args, kwargs):
     from config import ErrorConfig
     if len(args) < self.minargs:
       frame.raise_expt(ErrorConfig.InvalidNumOfArgs(self.minargs, len(args)))
@@ -281,9 +281,9 @@ class BuiltinCallable(object):
     if len(self.args) < len(args):
       frame.raise_expt(ErrorConfig.InvalidNumOfArgs(len(self.args), len(args)))
       return UndefinedTypeNode()
-    return self.process_args(frame, args, kwargs)
+    return self.process_args(frame, anchor, args, kwargs)
 
-  def process_args(self, frame, args, kwargs):
+  def process_args(self, frame, anchor, args, kwargs):
     raise NotImplementedError, self.__class__
 
 
@@ -296,26 +296,26 @@ class BuiltinConstCallable(BuiltinCallable):
     BuiltinCallable.__init__(self, name, args=args, optargs=optargs, expts=expts)
     return
 
-  def process_args(self, frame, args, kwargs):
+  def process_args(self, frame, anchor, args, kwargs):
     from config import ErrorConfig
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
     for (i,arg1) in enumerate(args):
       assert isinstance(arg1, TypeNode)
-      self.accept_arg(frame, i, arg1)
+      self.accept_arg(frame, anchor, i, arg1)
     for expt in self.expts:
       frame.raise_expt(expt)
     return self.retobj
 
-  def accept_arg(self, frame, i, arg1):
+  def accept_arg(self, frame, anchor, i, arg1):
     from exception import TypeChecker, SequenceTypeChecker
     s = 'arg %d' % i
     spec = self.args[i]
     if isinstance(spec, list):
       if spec == [TypeChecker.ANY]:
-        checker = SequenceTypeChecker(frame, TypeChecker.ANY, s)
+        checker = SequenceTypeChecker(frame, anchor, TypeChecker.ANY, s)
       else:
-        checker = SequenceTypeChecker(frame, [ x.get_typeobj() for x in spec ], s)
+        checker = SequenceTypeChecker(frame, anchor, [ x.get_typeobj() for x in spec ], s)
     elif isinstance(spec, tuple):
       checker = TypeChecker(frame, [ x.get_typeobj() for x in spec ], s)
     elif spec == TypeChecker.ANY:
