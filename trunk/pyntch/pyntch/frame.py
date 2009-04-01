@@ -186,8 +186,9 @@ class ExceptionCatcher(ExecutionFrame):
 ##
 class ExceptionMaker(CompoundTypeNode):
   
-  def __init__(self, frame, exctype, excargs):
+  def __init__(self, frame, anchor, exctype, excargs):
     self.frame = frame
+    self.anchor = anchor
     self.exctype = exctype
     self.excargs = excargs
     self.processed = set()
@@ -208,7 +209,7 @@ class ExceptionMaker(CompoundTypeNode):
       # Otherwise, just return the object given.
       if isinstance(obj, ClassType):
         try:
-          result = obj.call(self.frame, self.excargs, {})
+          result = obj.call(self.frame, self.anchor, self.excargs, {})
         except NodeTypeError:
           self.frame.raise_expt(ErrorConfig.NotCallable(obj))
           continue

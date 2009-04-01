@@ -25,8 +25,8 @@ class BoundMethodType(BuiltinType):
   def get_type(self):
     return self
 
-  def call(self, frame, args, kwargs):
-    return self.func.call(frame, (self.arg0,)+tuple(args), kwargs)
+  def call(self, frame, anchor, args, kwargs):
+    return self.func.call(frame, anchor, (self.arg0,)+tuple(args), kwargs)
 
 
 ##  ClassType
@@ -39,7 +39,9 @@ class ClassType(BuiltinType, TreeReporter):
   ##
   class ClassAttr(CompoundTypeNode):
 
-    def __init__(self, name, klass, baseklass=None):
+    def __init__(self, frame, anchor, name, klass, baseklass=None):
+      self.frame = frame
+      self.anchor = anchor
       self.name = name
       self.klass = klass
       self.received_base = set()
@@ -57,7 +59,7 @@ class ClassType(BuiltinType, TreeReporter):
         if klass in self.received_base: continue
         self.received_base.add(klass)
         try:
-          klass.get_attr(src, self.name).connect(self.recv)
+          klass.get_attr(self.frame, self.anchor, self.name).connect(self.recv)
         except NodeAttrError:
           pass
       return
@@ -98,9 +100,9 @@ class ClassType(BuiltinType, TreeReporter):
         if klass.is_subclass(klassobj): return True
     return False
 
-  def get_attr(self, node, name, write=False):
+  def get_attr(self, frame, anchor, name, write=False):
     if name not in self.attrs:
-      attr = self.ClassAttr(name, self, self.baseklass)
+      attr = self.ClassAttr(frame, anchor, name, self, self.baseklass)
       self.attrs[name] = attr
     else:
       attr = self.attrs[name]
@@ -114,19 +116,20 @@ class ClassType(BuiltinType, TreeReporter):
       method = self.boundmethods[func]
     return method
 
-  def call(self, frame, args, kwargs):
+  def call(self, frame, anchor, args, kwargs):
     from expression import OptMethodCall
     assert isinstance(frame, ExecutionFrame)
     self.frames.add(frame)
-    OptMethodCall(frame, self, '__init__', (self.instance,)+args, kwargs)
+    OptMethodCall(frame, anchor, self, '__init__', (self.instance,)+args, kwargs)
     return self.instance
   
 class PythonClassType(ClassType, TreeReporter):
   
-  def __init__(self, parent_reporter, parent_frame, parent_space, name, bases, code, evals, tree):
+  def __init__(self, parent_reporter, parent_frame, parent_space, anchor, name, bases, code, evals, tree):
     TreeReporter.__init__(self, parent_reporter, name)
     ClassType.__init__(self, name, bases)
     from syntax import build_stmt
+    self.anchor = anchor
     self.loc = (tree._module, tree.lineno)
     self.space = Namespace(parent_space, name)
     if code:
@@ -135,7 +138,7 @@ class PythonClassType(ClassType, TreeReporter):
     for (name,var) in self.space:
       # Do not consider the values of attributes inherited from the base class
       # if they are explicitly overriden.
-      attr = self.ClassAttr(name, self)
+      attr = self.ClassAttr(parent_frame, anchor, name, self)
       var.connect(attr.recv)
       self.attrs[name] = attr
     return
@@ -173,10 +176,10 @@ class InstanceObject(BuiltinObject):
   ##
   class InstanceAttr(ClassType.ClassAttr):
 
-    def __init__(self, name, instance):
+    def __init__(self, frame, anchor, name, instance):
       self.instance = instance
       self.processed = set()
-      ClassType.ClassAttr.__init__(self, name, instance.klass, instance.klass.baseklass)
+      ClassType.ClassAttr.__init__(self, frame, anchor, name, instance.klass, instance.klass.baseklass)
       instance.klass.connect(self.recv_baseklass)
       return
 
@@ -205,7 +208,7 @@ class InstanceObject(BuiltinObject):
     self.boundmethods = {}
     BuiltinObject.__init__(self, klass)
     for (name, value) in klass.attrs.iteritems():
-      value.connect(self.get_attr(None, name).recv)
+      value.connect(self.get_attr(None, None, name).recv)
     return
   
   def __repr__(self):
@@ -219,46 +222,46 @@ class InstanceObject(BuiltinObject):
       if self.klass.is_subclass(typeobj): return True
     return False
 
-  def get_attr(self, node, name, write=False):
+  def get_attr(self, frame, anchor, name, write=False):
     if name not in self.attrs:
-      attr = self.InstanceAttr(name, self)
+      attr = self.InstanceAttr(frame, anchor, name, self)
       self.attrs[name] = attr
     else:
       attr = self.attrs[name]
     return attr
 
-  def get_iter(self, frame):
+  def get_iter(self, frame, anchor):
     from expression import OptMethodCall
     assert isinstance(frame, ExecutionFrame)
-    return OptMethodCall(frame, self, '__iter__')
+    return OptMethodCall(frame, anchor, self, '__iter__')
 
-  def get_reversed(self, frame):
+  def get_reversed(self, frame, anchor):
     from expression import OptMethodCall
     assert isinstance(frame, ExecutionFrame)
-    return OptMethodCall(frame, self, '__reversed__')
+    return OptMethodCall(frame, anchor, self, '__reversed__')
 
-  def get_length(self, frame):
+  def get_length(self, frame, anchor):
     from expression import OptMethodCall
     assert isinstance(frame, ExecutionFrame)
-    return OptMethodCall(frame, self, '__len__')
+    return OptMethodCall(frame, anchor, self, '__len__')
 
-  def get_element(self, frame, sub, write=False):
+  def get_element(self, frame, anchor, sub, write=False):
     from expression import OptMethodCall
     if write:
-      return OptMethodCall(frame, self, '__setelem__', sub)
+      return OptMethodCall(frame, anchor, self, '__setelem__', sub)
     else:
-      return OptMethodCall(frame, self, '__getelem__', sub)
+      return OptMethodCall(frame, anchor, self, '__getelem__', sub)
     
-  def get_slice(self, frame, subs, write=False):
+  def get_slice(self, frame, anchor, subs, write=False):
     from expression import OptMethodCall
     if write:
-      return OptMethodCall(frame, self, '__setslice__', subs)
+      return OptMethodCall(frame, anchor, self, '__setslice__', subs)
     else:
-      return OptMethodCall(frame, self, '__getslice__', subs)
+      return OptMethodCall(frame, anchor, self, '__getslice__', subs)
 
-  def call(self, frame, args, kwargs):
+  def call(self, frame, anchor, args, kwargs):
     from expression import OptMethodCall
-    return OptMethodCall(frame, self, '__call__', args, kwargs)
+    return OptMethodCall(frame, anchor, self, '__call__', args, kwargs)
   
   def bind_func(self, func):
     if func not in self.boundmethods:

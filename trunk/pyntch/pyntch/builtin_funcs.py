@@ -5,7 +5,7 @@
 
 from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, UndefinedTypeNode
 from typenode import BuiltinType, BuiltinCallable, BuiltinConstCallable
-from exception import TypeChecker, SequenceTypeChecker
+from exception import TypeChecker
 from basic_types import TypeType, NoneType, NumberType, BoolType, IntType, LongType, \
      FloatType, BaseStringType, StrType, UnicodeType, ANY
 from aggregate_types import ListType, TupleType, DictType, IterType, ListObject
@@ -30,13 +30,13 @@ class BuiltinFunc(BuiltinCallable, BuiltinType):
 ##  BuiltinFuncNoKwd
 class BuiltinFuncNoKwd(BuiltinFunc):
 
-  def process_args(self, frame, args, kwargs):
+  def process_args(self, frame, anchor, args, kwargs):
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
       return UndefinedTypeNode()
-    return self.process_args_nokwd(frame, args)
+    return self.process_args_nokwd(frame, anchor, args)
 
-  def process_args_nokwd(self, frame, args):
+  def process_args_nokwd(self, frame, anchor, args):
     raise NotImplementedError
 
 
@@ -57,8 +57,9 @@ class BuiltinConstFunc(BuiltinConstCallable, BuiltinType):
 ##  IterFuncChecker
 class IterFuncChecker(CompoundTypeNode):
 
-  def __init__(self, frame, target, func):
+  def __init__(self, frame, anchor, target, func):
     self.frame = frame
+    self.anchor = anchor
     self.target = target
     CompoundTypeNode.__init__(self)
     func.connect(self.recv_func)
@@ -67,7 +68,7 @@ class IterFuncChecker(CompoundTypeNode):
   def recv_func(self, src):
     for obj in src:
       try:
-        obj.call(self.frame, [self.target.elemall])
+        obj.call(self.frame, self.anchor, [self.target.elemall])
       except NodeTypeError:
         self.frame.raise_expt(ErrorConfig.NotCallable(obj))
     return
@@ -81,7 +82,7 @@ class AbsFunc(BuiltinFuncNoKwd):
     BuiltinFunc.__init__(self, 'abs', [NumberType])
     return
 
-  def process_args_nokwd(self, frame, args):
+  def process_args_nokwd(self, frame, anchor, args):
     checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 0')
     args[0].connect(checker.recv)
     return args[0]
@@ -95,13 +96,13 @@ class ApplyFunc(BuiltinFuncNoKwd):
     BuiltinFunc.__init__(self, 'apply', [ANY], [ANY, ANY])
     return
 
-  def process_args_nokwd(self, frame, args):
+  def process_args_nokwd(self, frame, anchor, args):
     star = dstar = None
     if 1 <= len(args):
       star = args[1]
     if 2 <= len(args):
       dstar = args[2]
-    return FunCall(frame, args[0], star=star, dstar=dstar)
+    return FunCall(frame, anchor, args[0], star=star, dstar=dstar)
 
 
 ##  AllFunc, AnyFunc
@@ -112,8 +113,8 @@ class AllFunc(BuiltinConstFunc):
     BuiltinConstFunc.__init__(self, name, BoolType.get_object(), [ANY])
     return
 
-  def accept_arg(self, frame, i, arg1):
-    IterElement(frame, arg1)
+  def accept_arg(self, frame, anchor, i, arg1):
+    IterElement(frame, anchor, arg1)
     return 
 
 class AnyFunc(AllFunc):
@@ -168,7 +169,7 @@ class DivmodFunc(BuiltinFuncNoKwd):
     BuiltinFunc.__init__(self, 'divmod', [NumberType, NumberType])
     return
 
-  def process_args_nokwd(self, frame, args):
+  def process_args_nokwd(self, frame, anchor, args):
     checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 0')
     args[0].connect(checker.recv)
     checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 1')
@@ -183,10 +184,11 @@ class FilterFunc(BuiltinFuncNoKwd):
 
   class FilterCaller(CompoundTypeNode):
     
-    def __init__(self, frame, func, seq):
+    def __init__(self, frame, anchor, func, seq):
       self.frame = frame
+      self.anchor = anchor
       self.received = set()
-      self.elem = IterElement(frame, seq)
+      self.elem = IterElement(frame, anchor, seq)
       CompoundTypeNode.__init__(self, [seq])
       func.connect(self.recv_func)
       return
@@ -197,7 +199,7 @@ class FilterFunc(BuiltinFuncNoKwd):
         self.received.add(obj)
         if not isinstance(obj, NoneType):
           try:
-            obj.call(self.frame, [self.elem], {})
+            obj.call(self.frame, self.anchor, [self.elem], {})
           except NodeTypeError:
             self.frame.raise_expt(ErrorConfig.NotCallable(obj))
       return
@@ -206,8 +208,8 @@ class FilterFunc(BuiltinFuncNoKwd):
     BuiltinFunc.__init__(self, 'filter', [ANY, ANY])
     return
 
-  def process_args_nokwd(self, frame, args):
-    return self.FilterCaller(frame, args[0], args[1])
+  def process_args_nokwd(self, frame, anchor, args):
+    return self.FilterCaller(frame, anchor, args[0], args[1])
 
 
 ##  HashFunc
@@ -259,12 +261,12 @@ class IsSubclassFunc(BuiltinConstFunc):
 ##
 class IterFunc(BuiltinFuncNoKwd):
 
-  def process_args_nokwd(self, frame, args):
+  def process_args_nokwd(self, frame, anchor, args):
     v = args[0]
     if v in self.cache:
       iterobj = self.cache[v]
     else:
-      iterobj = IterRef(frame, v)
+      iterobj = IterRef(frame, anchor, v)
       self.cache[v] = iterobj
     return iterobj
 
@@ -280,10 +282,10 @@ class LenFunc(BuiltinFuncNoKwd):
 
   class LengthChecker(MustBeDefinedNode):
     
-    def __init__(self, frame, target):
+    def __init__(self, frame, anchor, target):
       self.received = set()
       self.target = target
-      MustBeDefinedNode.__init__(self, frame)
+      MustBeDefinedNode.__init__(self, frame, anchor)
       self.target.connect(self.recv_target)
       return
 
@@ -292,7 +294,7 @@ class LenFunc(BuiltinFuncNoKwd):
         if obj in self.received: continue
         self.received.add(obj)
         try:
-          obj.get_length(self.frame).connect(self.recv)
+          obj.get_length(self.frame, self.anchor).connect(self.recv)
         except (NodeTypeError, NodeAttrError):
           pass
       return
@@ -303,8 +305,8 @@ class LenFunc(BuiltinFuncNoKwd):
       self.raise_expt(ErrorConfig.NoLength(self.target))
       return
 
-  def process_args_nokwd(self, frame, args):
-    self.LengthChecker(frame, args[0])
+  def process_args_nokwd(self, frame, anchor, args):
+    self.LengthChecker(frame, anchor, args[0])
     return IntType.get_object()
   
   def __init__(self):
@@ -318,10 +320,11 @@ class MapFunc(BuiltinFunc):
 
   class MapCaller(CompoundTypeNode):
     
-    def __init__(self, frame, func, objs):
+    def __init__(self, frame, anchor, func, objs):
       self.frame = frame
+      self.anchor = anchor
       self.received = set()
-      self.args = [ IterElement(frame, obj) for obj in objs ]
+      self.args = [ IterElement(frame, anchor, obj) for obj in objs ]
       self.listobj = ListType.create_list()
       CompoundTypeNode.__init__(self, [self.listobj])
       func.connect(self.recv_func)
@@ -332,7 +335,7 @@ class MapFunc(BuiltinFunc):
         if obj in self.received: continue
         self.received.add(obj)
         try:
-          obj.call(self.frame, self.args, {}).connect(self.listobj.elemall.recv)
+          obj.call(self.frame, self.anchor, self.args, {}).connect(self.listobj.elemall.recv)
         except NodeTypeError:
           self.frame.raise_expt(ErrorConfig.NotCallable(obj))
       return
@@ -341,14 +344,14 @@ class MapFunc(BuiltinFunc):
     BuiltinFunc.__init__(self, 'map', [ANY, ANY])
     return
 
-  def call(self, frame, args, kwargs):
+  def call(self, frame, anchor, args, kwargs):
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
       return UndefinedTypeNode()
     if len(args) < self.minargs:
       frame.raise_expt(ErrorConfig.InvalidNumOfArgs(self.minargs, len(args)))
       return UndefinedTypeNode()
-    return self.MapCaller(frame, args[0], args[1:])
+    return self.MapCaller(frame, anchor, args[0], args[1:])
 
 
 ##  MinFunc, MaxFunc
@@ -359,18 +362,18 @@ class MinFunc(BuiltinFunc):
     BuiltinFunc.__init__(self, name, [ANY])
     return
 
-  def call(self, frame, args, kwargs):
+  def call(self, frame, anchor, args, kwargs):
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
       return UndefinedTypeNode()
     retobj = CompoundTypeNode()
     if len(args) == 1:
-      IterElement(frame, args[0]).connect(retobj.recv)
+      IterElement(frame, anchor, args[0]).connect(retobj.recv)
     else:
       for arg1 in args:
         arg1.connect(retobj.recv)
     if 'key' in kwargs:
-      IterFuncChecker(frame, retobj, kwargs['key'])
+      IterFuncChecker(frame, anchor, retobj, kwargs['key'])
     return retobj
   
 class MaxFunc(MinFunc):
@@ -407,7 +410,7 @@ class PowFunc(BuiltinFuncNoKwd):
     BuiltinFunc.__init__(self, 'pow', [NumberType, NumberType], [NumberType])
     return
 
-  def process_args_nokwd(self, frame, args):
+  def process_args_nokwd(self, frame, anchor, args):
     checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 0')
     args[0].connect(checker.recv)
     checker = TypeChecker(frame, [NumberType.get_typeobj()], 'arg 1')
@@ -444,10 +447,11 @@ class ReduceFunc(BuiltinFuncNoKwd):
 
   class ReduceCaller(CompoundTypeNode):
     
-    def __init__(self, frame, func, seq, initial):
+    def __init__(self, frame, anchor, func, seq, initial):
       self.frame = frame
+      self.anchor = anchor
       self.received = set()
-      self.elem = IterElement(frame, seq)
+      self.elem = IterElement(frame, anchor, seq)
       self.result = CompoundTypeNode()
       if initial:
         initial.connect(self.result.recv)
@@ -463,7 +467,7 @@ class ReduceFunc(BuiltinFuncNoKwd):
         if obj in self.received: continue
         self.received.add(obj)
         try:
-          result = obj.call(self.frame, self.args, {})
+          result = obj.call(self.frame, self.anchor, self.args, {})
           result.connect(self.recv)
           result.connect(self.result.recv)
         except NodeTypeError:
@@ -474,11 +478,11 @@ class ReduceFunc(BuiltinFuncNoKwd):
     BuiltinFunc.__init__(self, 'reduce', [ANY, ANY])
     return
 
-  def process_args_nokwd(self, frame, args):
+  def process_args_nokwd(self, frame, anchor, args):
     initial = None
     if 3 <= len(args):
       initial = args[2]
-    return self.ReduceCaller(frame, args[0], args[1], initial)
+    return self.ReduceCaller(frame, anchor, args[0], args[1], initial)
 
 
 ##  ReprFunc
@@ -509,10 +513,9 @@ class SortedFunc(BuiltinFunc):
     BuiltinFunc.__init__(self, 'sorted', [ANY])
     return
 
-  def process_args(self, frame, args, kwargs):
-    # XXX
-    seq = ListType.create_list(elemall=IterElement(frame, args[0]))
-    ListObject.SortMethod('sorted', seq).process_args(frame, args[1:], kwargs)
+  def process_args(self, frame, anchor, args, kwargs):
+    seq = ListType.create_list(elemall=IterElement(frame, anchor, args[0]))
+    ListObject.SortMethod('sorted', seq).process_args(frame, anchor, args[1:], kwargs)
     return seq
 
 
@@ -522,17 +525,17 @@ class SumFunc(BuiltinFuncNoKwd):
 
   class SumCaller(CompoundTypeNode):
     
-    def __init__(self, frame, seq, initial):
+    def __init__(self, frame, anchor, seq, initial):
       self.frame = frame
       self.received = set()
-      self.elem = IterElement(frame, seq)
+      self.elem = IterElement(frame, anchor, seq)
       self.result = CompoundTypeNode()
       if initial:
         initial.connect(self.result.recv)
       else:
         self.elem.connect(self.result.recv)
       CompoundTypeNode.__init__(self, [self.result])
-      IterElement(frame, seq).connect(self.recv_elem)
+      IterElement(frame, anchor, seq).connect(self.recv_elem)
       return
 
     def recv_elem(self, src):
@@ -546,11 +549,11 @@ class SumFunc(BuiltinFuncNoKwd):
     BuiltinFunc.__init__(self, 'sum', [ANY], [ANY])
     return
 
-  def process_args_nokwd(self, frame, args):
+  def process_args_nokwd(self, frame, anchor, args):
     initial = None
     if 2 <= len(args):
       initial = args[1]
-    return self.SumCaller(frame, args[0], initial)
+    return self.SumCaller(frame, anchor, args[0], initial)
 
 
 ##  UnichrFunc
@@ -571,14 +574,13 @@ class ZipFunc(BuiltinFunc):
     BuiltinFunc.__init__(self, 'zip')
     return
 
-  def call(self, frame, args, kwargs):
+  def call(self, frame, anchor, args, kwargs):
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
       return UndefinedTypeNode()
     elems = [ CompoundTypeNode() for arg1 in args ]
-    # XXX
     zipelem = TupleType.create_tuple(elements=elems)
     seq = ListType.create_list(elemall=zipelem)
     for (i,arg1) in enumerate(args):
-      IterElement(frame, arg1).connect(elems[i].recv)
+      IterElement(frame, anchor, arg1).connect(elems[i].recv)
     return seq

@@ -10,8 +10,9 @@ from config import ErrorConfig
 ##
 class ExpressionNode(CompoundTypeNode):
   
-  def __init__(self, frame):
+  def __init__(self, frame, anchor):
     self.frame = frame
+    self.anchor = anchor
     CompoundTypeNode.__init__(self)
     return
   
@@ -26,8 +27,8 @@ class MustBeDefinedNode(ExpressionNode):
 
   nodes = None
   
-  def __init__(self, frame):
-    ExpressionNode.__init__(self, frame)
+  def __init__(self, frame, anchor):
+    ExpressionNode.__init__(self, frame, anchor)
     MustBeDefinedNode.nodes.append(self)
     return
 
@@ -53,11 +54,11 @@ class MustBeDefinedNode(ExpressionNode):
 ##
 class AttrRef(MustBeDefinedNode):
   
-  def __init__(self, frame, target, attrname):
+  def __init__(self, frame, anchor, target, attrname):
     self.target = target
     self.attrname = attrname
     self.received = set()
-    MustBeDefinedNode.__init__(self, frame)
+    MustBeDefinedNode.__init__(self, frame, anchor)
     self.target.connect(self.recv_target)
     return
 
@@ -69,7 +70,7 @@ class AttrRef(MustBeDefinedNode):
       if obj in self.received: continue
       self.received.add(obj)
       try:
-        obj.get_attr(src, self.attrname).connect(self.recv)
+        obj.get_attr(self.frame, self.anchor, self.attrname).connect(self.recv)
       except NodeAttrError:
         pass
     return
@@ -85,11 +86,11 @@ class AttrRef(MustBeDefinedNode):
 ##
 class OptAttrRef(ExpressionNode):
   
-  def __init__(self, frame, target, attrname):
+  def __init__(self, frame, anchor, target, attrname):
     self.target = target
     self.attrname = attrname
     self.received = set()
-    ExpressionNode.__init__(self, frame)
+    ExpressionNode.__init__(self, frame, anchor)
     self.target.connect(self.recv_target)
     return
 
@@ -101,7 +102,7 @@ class OptAttrRef(ExpressionNode):
       if obj in self.received: continue
       self.received.add(obj)
       try:
-        obj.get_attr(src, self.attrname).connect(self.recv)
+        obj.get_attr(self.frame, self.anchor, self.attrname).connect(self.recv)
       except NodeAttrError:
         self.raise_expt(ErrorConfig.AttributeNotFound(obj, self.attrname))
     return
@@ -111,10 +112,10 @@ class OptAttrRef(ExpressionNode):
 ##
 class IterRef(ExpressionNode):
   
-  def __init__(self, frame, target):
+  def __init__(self, frame, anchor, target):
     self.target = target
     self.received = set()
-    ExpressionNode.__init__(self, frame)
+    ExpressionNode.__init__(self, frame, anchor)
     self.target.connect(self.recv_target)
     return
 
@@ -126,7 +127,7 @@ class IterRef(ExpressionNode):
       if obj in self.received: continue
       self.received.add(obj)
       try:
-        obj.get_iter(self.frame).connect(self.recv)
+        obj.get_iter(self.frame, self.anchor).connect(self.recv)
       except NodeTypeError:
         self.raise_expt(ErrorConfig.NotIterable(obj))
     return
@@ -136,11 +137,11 @@ class IterRef(ExpressionNode):
 ##
 class SubRef(ExpressionNode):
   
-  def __init__(self, frame, target, subs):
+  def __init__(self, frame, anchor, target, subs):
     self.target = target
     self.subs = subs
     self.received = set()
-    ExpressionNode.__init__(self, frame)
+    ExpressionNode.__init__(self, frame, anchor)
     self.target.connect(self.recv_target)
     return
 
@@ -152,7 +153,7 @@ class SubRef(ExpressionNode):
       if obj in self.received: continue
       self.received.add(obj)
       try:
-        obj.get_element(self.frame, self.subs).connect(self.recv)
+        obj.get_element(self.frame, self.anchor, self.subs).connect(self.recv)
       except NodeTypeError:
         self.raise_expt(ErrorConfig.NotSubscriptable(obj))
     return
@@ -162,11 +163,11 @@ class SubRef(ExpressionNode):
 ##
 class SliceRef(ExpressionNode):
   
-  def __init__(self, frame, target, subs):
+  def __init__(self, frame, anchor, target, subs):
     self.target = target
     self.subs = subs
     self.received = set()
-    ExpressionNode.__init__(self, frame)
+    ExpressionNode.__init__(self, frame, anchor)
     self.target.connect(self.recv_target)
     return
 
@@ -178,7 +179,7 @@ class SliceRef(ExpressionNode):
       if obj in self.received: continue
       self.received.add(obj)
       try:
-        obj.get_slice(self.frame, self.subs).connect(self.recv)
+        obj.get_slice(self.frame, self.anchor, self.subs).connect(self.recv)
       except NodeTypeError:
         self.raise_expt(ErrorConfig.NotSubscriptable(obj))
     return
@@ -191,12 +192,12 @@ class SliceRef(ExpressionNode):
 ##
 class AttrAssign(ExpressionNode):
   
-  def __init__(self, frame, target, attrname, value):
+  def __init__(self, frame, anchor, target, attrname, value):
     self.target = target
     self.attrname = attrname
     self.value = value
     self.received = set()
-    ExpressionNode.__init__(self, frame)
+    ExpressionNode.__init__(self, frame, anchor)
     self.target.connect(self.recv_target)
     return
 
@@ -208,7 +209,7 @@ class AttrAssign(ExpressionNode):
       if obj in self.received: continue
       self.received.add(obj)
       try:
-        self.value.connect(obj.get_attr(src, self.attrname, write=True).recv)
+        self.value.connect(obj.get_attr(self.frame, self.anchor, self.attrname, write=True).recv)
       except (NodeAttrError, NodeTypeError, NodeAssignError):
         self.raise_expt(ErrorConfig.AttributeNotAssignable(obj, self.attrname))
     return
@@ -218,12 +219,12 @@ class AttrAssign(ExpressionNode):
 ##
 class SubAssign(ExpressionNode):
   
-  def __init__(self, frame, target, sub, value):
+  def __init__(self, frame, anchor, target, sub, value):
     self.target = target
     self.sub = sub
     self.value = value
     self.received = set()
-    ExpressionNode.__init__(self, frame)
+    ExpressionNode.__init__(self, frame, anchor)
     self.target.connect(self.recv_target)
     return
 
@@ -235,7 +236,7 @@ class SubAssign(ExpressionNode):
       if obj in self.received: continue
       self.received.add(obj)
       try:
-        self.value.connect(obj.get_element(self.frame, self.sub, write=True).recv)
+        self.value.connect(obj.get_element(self.frame, self.anchor, self.sub, write=True).recv)
       except NodeTypeError:
         self.raise_expt(ErrorConfig.NotSubscriptable(obj))
       except NodeAssignError:
@@ -247,12 +248,12 @@ class SubAssign(ExpressionNode):
 ##
 class SliceAssign(ExpressionNode):
   
-  def __init__(self, frame, target, subs, value):
+  def __init__(self, frame, anchor, target, subs, value):
     self.target = target
     self.subs = subs
     self.received = set()
-    ExpressionNode.__init__(self, frame)
-    self.elemall = IterElement(frame, value)
+    ExpressionNode.__init__(self, frame, anchor)
+    self.elemall = IterElement(frame, anchor, value)
     self.target.connect(self.recv_target)
     return
 
@@ -264,7 +265,7 @@ class SliceAssign(ExpressionNode):
       if obj in self.received: continue
       self.received.add(obj)
       try:
-        seq = obj.get_slice(self.frame, self.subs, write=True)
+        seq = obj.get_slice(self.frame, self.anchor, self.subs, write=True)
         self.elemall.connect(seq.elemall.recv)
       except (NodeTypeError, NodeAttrError):
         self.raise_expt(ErrorConfig.NotSubscriptable(obj))
@@ -280,7 +281,7 @@ class SliceAssign(ExpressionNode):
 ##
 class FunCall(ExpressionNode):
   
-  def __init__(self, frame, func, args=None, kwargs=None, star=None, dstar=None):
+  def __init__(self, frame, anchor, func, args=None, kwargs=None, star=None, dstar=None):
     self.func = func
     self.args = tuple(args or ())
     self.kwargs = kwargs or {}
@@ -288,12 +289,12 @@ class FunCall(ExpressionNode):
     self.received = set()
     self.received_tuple = set()
     assert isinstance(frame, ExecutionFrame)
-    ExpressionNode.__init__(self, frame)
+    ExpressionNode.__init__(self, frame, anchor)
     func.connect(self.recv_func)
     if star:
       star.connect(self.recv_tuple)
     if dstar:
-      SequenceTypeChecker(self, dstar, 'keywords must be strings')
+      SequenceTypeChecker(self.frame, anchor, dstar, 'keywords must be strings')
       IterDictValue(self.frame, dstar).connect(self.recv_vararg)
     return
 
@@ -309,7 +310,7 @@ class FunCall(ExpressionNode):
         if k in self.received: continue
         self.received.add(k)
         try:
-          obj.call(self.frame, self.args+varargs, self.kwargs).connect(self.recv)
+          obj.call(self.frame, self.anchor, self.args+varargs, self.kwargs).connect(self.recv)
         except NodeTypeError:
           self.raise_expt(ErrorConfig.NotCallable(obj))
     return
@@ -325,7 +326,7 @@ class FunCall(ExpressionNode):
         else:
           self.varargs.add((obj.elemall,))
       else:
-        self.varargs.add((IterElement(self.frame, obj),))
+        self.varargs.add((IterElement(self.frame, self.anchor, obj),))
     self.recv_func(None)
     return
 
@@ -376,7 +377,7 @@ class BinaryOp(MustBeDefinedNode):
     ('int', 'Mul', 'unicode'): 'unicode',
     }
 
-  def __init__(self, frame, op, left, right):
+  def __init__(self, frame, anchor, op, left, right):
     assert op in ('Add','Sub','Mul','Div','Mod','FloorDiv','Power',
                   'Bitand','Bitor','Bitxor','RightShift','LeftShift')
     self.op = op
@@ -385,7 +386,7 @@ class BinaryOp(MustBeDefinedNode):
     self.received = set()
     self.computed = set()
     self.tupleobj = self.listobj = None
-    MustBeDefinedNode.__init__(self, frame)
+    MustBeDefinedNode.__init__(self, frame, anchor)
     self.left.connect(self.recv_left)
     self.right.connect(self.recv_right)
     return
@@ -487,10 +488,10 @@ class BinaryOp(MustBeDefinedNode):
       return
     # Handle optional methods.
     if isinstance(lobj, InstanceObject):
-      result = OptMethodCall(self.frame, lobj, self.LMETHOD[self.op], [robj])
+      result = OptMethodCall(self.frame, self.anchor, lobj, self.LMETHOD[self.op], [robj])
       result.connect(lambda src: self.recv_result(src, (lobj, robj)))
     if isinstance(robj, InstanceObject):
-      result = OptMethodCall(self.frame, robj, self.RMETHOD[self.op], [lobj])
+      result = OptMethodCall(self.frame, self.anchor, robj, self.RMETHOD[self.op], [lobj])
       result.connect(lambda src: self.recv_result(src, (lobj, robj)))
     return
 
@@ -525,8 +526,8 @@ class AssignOp(BinaryOp):
     '<<=': 'LeftShift',
     }
   
-  def __init__(self, frame, op, left, right):
-    BinaryOp.__init__(self, frame, self.OPS[op], left, right)
+  def __init__(self, frame, anchor, op, left, right):
+    BinaryOp.__init__(self, frame, anchor, self.OPS[op], left, right)
     self.connect(left.recv)
     return
 
@@ -541,11 +542,11 @@ class UnaryOp(MustBeDefinedNode):
     'Invert': '__invert__',
     }
   
-  def __init__(self, frame, op, value):
+  def __init__(self, frame, anchor, op, value):
     self.value = value
     self.op = op
     self.received = set()
-    MustBeDefinedNode.__init__(self, frame)
+    MustBeDefinedNode.__init__(self, frame, anchor)
     self.value.connect(self.recv_value)
     return
   
@@ -561,7 +562,7 @@ class UnaryOp(MustBeDefinedNode):
       if obj.is_type(NumberType.get_typeobj()):
         obj.connect(self.recv)
       elif isinstance(obj, InstanceObject):
-        OptMethodCall(self.frame, obj, self.METHOD[self.op]).connect(self.recv)
+        OptMethodCall(self.frame, self.anchor, obj, self.METHOD[self.op]).connect(self.recv)
     return
 
 
@@ -580,13 +581,13 @@ class CompareOp(ExpressionNode):
     'not in': '__contains__',
     }
   
-  def __init__(self, frame, op, left, right):
+  def __init__(self, frame, anchor, op, left, right):
     from basic_types import BoolType
     self.op = op
     self.left = left
     self.right = right
     self.received = set()
-    ExpressionNode.__init__(self, frame)
+    ExpressionNode.__init__(self, frame, anchor)
     BoolType.get_object().connect(self.recv)
     if op not in ('is', 'is not'):
       self.left.connect(self.recv_left)
@@ -601,7 +602,7 @@ class CompareOp(ExpressionNode):
       if lobj in self.received: continue
       self.received.add(lobj)
       if isinstance(lobj, InstanceObject):
-        OptMethodCall(self.frame, lobj, self.LMETHOD[self.op], [self.right])
+        OptMethodCall(self.frame, self.anchor, lobj, self.LMETHOD[self.op], [self.right])
     return
 
 
@@ -609,11 +610,11 @@ class CompareOp(ExpressionNode):
 ##
 class BooleanOp(ExpressionNode):
   
-  def __init__(self, frame, op, nodes):
+  def __init__(self, frame, anchor, op, nodes):
     from basic_types import BoolType
     self.op = op
     self.nodes = nodes
-    ExpressionNode.__init__(self, frame)
+    ExpressionNode.__init__(self, frame, anchor)
     if op == 'Or' and not [ 1 for node in nodes if isinstance(node, SimpleTypeNode) ]:
       BoolType.get_object().connect(self.recv)
     for node in self.nodes:
@@ -628,10 +629,10 @@ class BooleanOp(ExpressionNode):
 ##
 class NotOp(ExpressionNode):
   
-  def __init__(self, frame, value):
+  def __init__(self, frame, anchor, value):
     from basic_types import BoolType
     self.value = value
-    ExpressionNode.__init__(self, frame)
+    ExpressionNode.__init__(self, frame, anchor)
     BoolType.get_object().connect(self.recv)
     self.value.connect(self.recv)
     return
@@ -648,11 +649,11 @@ class NotOp(ExpressionNode):
 ##
 class IfExpOp(ExpressionNode):
   
-  def __init__(self, frame, test, then, else_):
+  def __init__(self, frame, anchor, test, then, else_):
     self.test = test
     self.then = then
     self.else_ = else_
-    ExpressionNode.__init__(self, frame)
+    ExpressionNode.__init__(self, frame, anchor)
     self.then.connect(self.recv)
     self.else_.connect(self.recv)
     return
@@ -666,31 +667,31 @@ class IfExpOp(ExpressionNode):
 
 ##  MethodCall
 ##
-def MethodCall(frame, target, name, args=None, kwargs=None):
+def MethodCall(frame, anchor, target, name, args=None, kwargs=None):
   assert isinstance(frame, ExecutionFrame)
-  return FunCall(frame, AttrRef(frame, target, name), args=args, kwargs=kwargs)
+  return FunCall(frame, anchor, AttrRef(frame, anchor, target, name), args=args, kwargs=kwargs)
 
-def OptMethodCall(frame, target, name, args=None, kwargs=None):
+def OptMethodCall(frame, anchor, target, name, args=None, kwargs=None):
   assert isinstance(frame, ExecutionFrame)
-  return FunCall(frame, OptAttrRef(frame, target, name), args=args, kwargs=kwargs)
+  return FunCall(frame, anchor, OptAttrRef(frame, anchor, target, name), args=args, kwargs=kwargs)
 
 
 ##  IterElement
 ##
-def IterElement(frame0, target):
+def IterElement(frame0, anchor, target):
   frame1 = ExceptionCatcher(frame0)
   frame1.add_handler(StopIterationType.get_typeobj())
-  return MethodCall(frame1, IterRef(frame0, target), 'next')
+  return MethodCall(frame1, anchor, IterRef(frame0, anchor, target), 'next')
 
 
 ##  IterDictValue
 ##
 class IterDictValue(ExpressionNode):
 
-  def __init__(self, frame, target):
+  def __init__(self, frame, anchor, target):
     self.target = target
     self.received = set()
-    ExpressionNode.__init__(self, frame)
+    ExpressionNode.__init__(self, frame, anchor)
     self.target.connect(self.recv_target)
     return
 
@@ -700,7 +701,7 @@ class IterDictValue(ExpressionNode):
       if obj in self.received: continue
       self.received.add(obj)
       if obj.is_type(DictType.get_typeobj()):
-        MethodCall(self.frame, obj, 'iteritems').connect(self.recv)
+        MethodCall(self.frame, self.anchor, obj, 'iteritems').connect(self.recv)
       else:
         self.raise_expt(ErrorConfig.TypeCheckerError(src, obj, 'dict'))
     return
@@ -710,12 +711,12 @@ class IterDictValue(ExpressionNode):
 ##
 class TupleUnpack(ExpressionNode):
 
-  def __init__(self, frame, tupobj, nelements, strict=True):
+  def __init__(self, frame, anchor, tupobj, nelements, strict=True):
     self.tupobj = tupobj
     self.elements = [ CompoundTypeNode() for _ in xrange(nelements) ]
     self.strict = strict
     self.received = set()
-    ExpressionNode.__init__(self, frame)
+    ExpressionNode.__init__(self, frame, anchor)
     self.tupobj.connect(self.recv_tupobj)
     return
 
@@ -739,7 +740,7 @@ class TupleUnpack(ExpressionNode):
             src.connect(dest.recv)
       else:
         # Unpack a variable-length tuple or other iterable.
-        elemall = IterElement(self.frame, obj)
+        elemall = IterElement(self.frame, self.anchor, obj)
         for dest in self.elements:
           elemall.connect(dest.recv)
     return
@@ -749,7 +750,7 @@ class TupleUnpack(ExpressionNode):
 ##
 class TupleSlice(ExpressionNode):
 
-  def __init__(self, frame, tupobj, start, end=None):
+  def __init__(self, frame, anchor, tupobj, start, end=None):
     self.tupobj = tupobj
     self.start = start
     if end == None:
@@ -757,7 +758,7 @@ class TupleSlice(ExpressionNode):
     else:
       self.length = end-start+1
     self.received = set()
-    ExpressionNode.__init__(self, frame)
+    ExpressionNode.__init__(self, frame, anchor)
     self.tupobj.connect(self.recv_tupobj)
     return
 
@@ -785,5 +786,5 @@ class TupleSlice(ExpressionNode):
             obj.elements[i].connect(self.recv)
       else:
         # Unpack a variable-length tuple or other iterable.
-        IterElement(self.frame, obj).connect(self.recv)
+        IterElement(self.frame, self.anchor, obj).connect(self.recv)
     return

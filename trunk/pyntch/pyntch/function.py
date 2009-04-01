@@ -9,14 +9,14 @@ from frame import ExecutionFrame
 
 
 # assign_arg(var1,arg1): Assign an argument to a local variable var1.
-def assign_arg(frame, var1, arg1):
+def assign_arg(frame, anchor, var1, arg1):
   from expression import TupleUnpack
   assert not isinstance(var1, list), var1
   assert not isinstance(arg1, list), arg1
   if isinstance(var1, tuple):
-    tup = TupleUnpack(frame, arg1, len(var1))
+    tup = TupleUnpack(frame, anchor, arg1, len(var1))
     for (i,v) in enumerate(var1):
-      assign_arg(frame, v, tup.get_nth(i))
+      assign_arg(frame, anchor, v, tup.get_nth(i))
   else:
     var1.bind(arg1)
   return
@@ -44,7 +44,6 @@ class FuncType(BuiltinType, TreeReporter):
       from aggregate_types import GeneratorType
       returns = [ obj for (t,obj) in evals if t == 'r' ]
       yields = [ obj for (t,obj) in evals if t == 'y' ]
-      assert returns
       if yields:
         retvals = [ GeneratorType.create_generator(CompoundTypeNode(yields)) ]
       else:
@@ -53,7 +52,7 @@ class FuncType(BuiltinType, TreeReporter):
         obj.connect(self.recv)
       return
 
-  def __init__(self, parent_reporter, parent_frame, parent_space,
+  def __init__(self, parent_reporter, parent_frame, parent_space, anchor,
                name, argnames, defaults, variargs, kwargs, code, tree):
     TreeReporter.__init__(self, parent_reporter, name)
     def maprec(func, x):
@@ -84,7 +83,7 @@ class FuncType(BuiltinType, TreeReporter):
     # assign the default values.
     self.defaults = tuple(defaults)
     for (var1,arg1) in zip(self.argvars[-len(defaults):], self.defaults):
-      assign_arg(parent_frame, var1, arg1)
+      assign_arg(parent_frame, anchor, var1, arg1)
     # build the function body.
     self.body = self.build_body(name, code)
     self.frames = set()
@@ -109,7 +108,7 @@ class FuncType(BuiltinType, TreeReporter):
   def get_type(self):
     return self
 
-  def call(self, frame, args, kwargs):
+  def call(self, frame, anchor, args, kwargs):
     from basic_types import StrType
     from aggregate_types import DictType, TupleType
     from expression import TupleUnpack, TupleSlice
@@ -133,7 +132,7 @@ class FuncType(BuiltinType, TreeReporter):
     for arg1 in args:
       if varsleft:
         var1 = varsleft.pop(0)
-        assign_arg(frame, var1, arg1)
+        assign_arg(frame, anchor, var1, arg1)
       elif self.variarg:
         variargs.append(arg1)
       else:
@@ -144,14 +143,11 @@ class FuncType(BuiltinType, TreeReporter):
       frame.raise_expt(ErrorConfig.InvalidNumOfArgs(len(self.argvars), len(args)))
     # Handle remaining arguments: kwargs and variargs.
     if self.variarg and variargs:
-      #XXX
-      self.space[self.variarg].bind(TupleType.create_tuple(CompoundTypeNode(variargs)))
+      self.space[self.variarg].bind(TupleType.create_tuple(variargs))
     if self.kwarg:
       if varikwargs:
-        #XXX
-        self.space[self.kwarg].bind(DictType.create_dict(key=StrType.get_object(), value=CompoundTypeNode(varikwargs)))
+        self.space[self.kwarg].bind(DictType.create_dict(key=StrType.get_object(), value=varikwargs))
       else:
-        #XXX
         self.space[self.kwarg].bind(DictType.create_null())
     # Remember where this is called from.
     self.frames.add(frame)
@@ -197,10 +193,10 @@ class ClassMethodType(FuncType): pass
 ##
 class LambdaFuncType(FuncType):
   
-  def __init__(self, parent_reporter, parent_frame, parent_space,
+  def __init__(self, parent_reporter, parent_frame, parent_space, anchor,
                argnames, defaults, variargs, kwargs, code, tree):
     name = '__lambda_%x' % id(code)
-    FuncType.__init__(self, parent_reporter, parent_frame, parent_space,
+    FuncType.__init__(self, parent_reporter, parent_frame, parent_space, anchor,
                       name, argnames, defaults, variargs, kwargs, code, tree)
     return
 
