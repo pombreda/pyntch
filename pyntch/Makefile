@@ -11,5 +11,5 @@ clean:
 	cd stub && $(MAKE) clean
 	cd test && $(MAKE) clean
 
-testall: test/*.py
+testall:
 	$(CHECK) test/*.py
