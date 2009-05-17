@@ -527,6 +527,7 @@ class SumFunc(BuiltinFuncNoKwd):
     
     def __init__(self, frame, anchor, seq, initial):
       self.frame = frame
+      self.anchor = anchor
       self.received = set()
       self.elem = IterElement(frame, anchor, seq)
       self.result = CompoundTypeNode()
@@ -542,7 +543,7 @@ class SumFunc(BuiltinFuncNoKwd):
       for obj in src:
         if obj in self.received: continue
         self.received.add(obj)
-        BinaryOp(self.frame, 'Add', obj, self.result).connect(self.result.recv)
+        BinaryOp(self.frame, self.anchor, 'Add', obj, self.result).connect(self.result.recv)
       return
   
   def __init__(self):

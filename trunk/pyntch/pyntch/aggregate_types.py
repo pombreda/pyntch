@@ -15,16 +15,13 @@ class BuiltinAggregateObject(BuiltinObject):
     self.attrs = {}
     BuiltinObject.__init__(self, typeobj)
     return
-  
-  def copy(self, anchor):
-    return self.get_type().create_copy(anchor, self)
 
   def get_attr(self, frame, anchor, name, write=False):
     if write: raise NodeAssignError(name)
     if name in self.attrs:
       attr = self.attrs[name]
     else:
-      attr = self.create_attr(anchor, name)
+      attr = self.create_attr(frame, anchor, name)
       self.attrs[name] = attr
     return attr
 
@@ -43,9 +40,13 @@ class BuiltinAggregateType(BuiltinCallable, BuiltinType):
     BuiltinType.__init__(self)
     BuiltinCallable.__init__(self, self.TYPE_NAME, [], [ANY])
     return
+  
+  @classmethod
+  def create_null(klass, frame, anchor):
+    raise NotImplementedError
 
   @classmethod
-  def create_copy(klass, anchor, src):
+  def create_copy(klass, frame, anchor, src):
     raise NotImplementedError
   
   @classmethod
@@ -128,7 +129,7 @@ class BuiltinSequenceType(BuiltinAggregateType):
       return UndefinedTypeNode()
     if args:
       return self.create_sequence(frame, anchor, args[0])
-    return self.create_null()
+    return self.create_null(frame, anchor)
 
 
 ##  List
@@ -225,7 +226,7 @@ class ListObject(BuiltinSequenceObject):
     frame.raise_expt(ErrorConfig.MaybeOutOfRange())
     return self
   
-  def create_attr(self, anchor, name):
+  def create_attr(self, frame, anchor, name):
     if name == 'append':
       return self.SequenceAppender('list.append', self, args=[ANY])
     elif name == 'count':
@@ -255,24 +256,39 @@ class ListObject(BuiltinSequenceObject):
 class ListType(BuiltinSequenceType):
   
   TYPE_NAME = 'list'
+  CACHE = {}
   
   @classmethod
   def create_list(klass, elemall=None):
     return ListObject(klass.get_typeobj(), elemall=elemall)
 
   @classmethod
-  def create_copy(klass, anchor, src):
-    return klass.create_list(src.elemall)
-    
-  @classmethod
-  def create_sequence(klass, frame, anchor, src):
+  def create_null(klass, frame, anchor):
+    k = ('null',anchor)
+    if k in klass.CACHE:
+      return klass.CACHE[k]
     listobj = klass.create_list()
-    IterElement(frame, anchor, src).connect(listobj.elemall.recv)
+    klass.CACHE[k] = listobj
     return listobj
 
   @classmethod
-  def create_null(klass):
-    return klass.create_list()
+  def create_copy(klass, frame, anchor, src):
+    k = ('copy',anchor)
+    if k in klass.CACHE:
+      return klass.CACHE[k]
+    listobj = klass.create_list(src.elemall)
+    klass.CACHE[k] = listobj
+    return listobj
+    
+  @classmethod
+  def create_sequence(klass, frame, anchor, src):
+    k = ('sequence',anchor)
+    if k in klass.CACHE:
+      return klass.CACHE[k]
+    listobj = klass.create_list()
+    IterElement(frame, anchor, src).connect(listobj.elemall.recv)
+    klass.CACHE[k] = listobj
+    return listobj
 
   
 ##  TupleObject
@@ -308,7 +324,7 @@ class TupleObject(BuiltinSequenceObject):
     frame.raise_expt(ErrorConfig.MaybeOutOfRange())
     return self
   
-  def create_attr(self, anchor, name):
+  def create_attr(self, frame, anchor, name):
     raise NodeAttrError(name)
 
 
@@ -317,24 +333,39 @@ class TupleObject(BuiltinSequenceObject):
 class TupleType(BuiltinSequenceType):
   
   TYPE_NAME = 'tuple'
+  CACHE = {}
     
   @classmethod
   def create_tuple(klass, elements=None, elemall=None):
     return TupleObject(klass.get_typeobj(), elements=elements, elemall=elemall)
+  
+  @classmethod
+  def create_null(klass, frame, anchor):
+    k = ('null',anchor)
+    if k in klass.CACHE:
+      return klass.CACHE[k]
+    tupleobj = klass.create_tuple()
+    klass.CACHE[k] = tupleobj
+    return tupleobj
 
   @classmethod
-  def create_copy(klass, anchor, src):
-    return klass.create_tuple(elements=src.elements, elemall=src.elemall)
+  def create_copy(klass, frame, anchor, src):
+    k = ('copy',anchor)
+    if k in klass.CACHE:
+      return klass.CACHE[k]
+    tupleobj = klass.create_tuple(elements=src.elements, elemall=src.elemall)
+    klass.CACHE[k] = tupleobj
+    return tupleobj
     
   @classmethod
   def create_sequence(klass, frame, anchor, src):
+    k = ('sequence',anchor)
+    if k in klass.CACHE:
+      return klass.CACHE[k]
     tupleobj = klass.create_tuple()
     IterElement(frame, anchor, src).connect(tupleobj.elemall.recv)
+    klass.CACHE[k] = tupleobj
     return tupleobj
-  
-  @classmethod
-  def create_null(klass):
-    return klass.create_tuple()
 
 
 ##  FrozenSetObject
@@ -395,11 +426,13 @@ class FrozenSetObject(BuiltinSequenceObject):
   def desc1(self, done):
     return '([%s])' % self.elemall.desc1(done)
 
-  def create_attr(self, anchor, name):
+  def create_attr(self, frame, anchor, name):
     if name == 'copy':
-      return BuiltinConstMethod('set.copy', self.copy(anchor))
+      setobj = self.get_type().create_copy(frame, anchor, self)
+      return BuiltinConstMethod('set.copy', setobj)
     elif name == 'difference':
-      return BuiltinConstMethod('set.difference', self.copy(anchor), [[ANY]])
+      setobj = self.get_type().create_copy(frame, anchor, self)
+      return BuiltinConstMethod('set.difference', setobj, [[ANY]])
     elif name == 'intersection':
       return SetObject.Intersection('set.intersection', self)
     elif name == 'issubset':
@@ -407,10 +440,10 @@ class FrozenSetObject(BuiltinSequenceObject):
     elif name == 'issuperset':
       return BuiltinConstMethod('set.issuperset', BoolType.get_object(), [[ANY]])
     elif name == 'symmetric_difference':
-      setobj = self.copy(anchor)
+      setobj = self.get_type().create_copy(frame, anchor, self)
       return self.SequenceExtender('set.symmetric_difference', setobj, setobj, [ANY])
     elif name == 'union':
-      setobj = self.copy(anchor)
+      setobj = self.get_type().create_copy(frame, anchor, self)
       return self.SequenceExtender('set.union', setobj, setobj, [ANY])
     raise NodeAttrError(name)
   
@@ -420,31 +453,46 @@ class FrozenSetObject(BuiltinSequenceObject):
 class FrozenSetType(BuiltinSequenceType):
 
   TYPE_NAME = 'frozenset'
+  CACHE = {}
 
   @classmethod
   def create_set(klass, elemall=None):
     return FrozenSetObject(klass.get_typeobj(), elemall=elemall)
 
   @classmethod
-  def create_copy(klass, anchor, src):
-    return klass.create_set(src.elemall)
-    
-  @classmethod
-  def create_sequence(klass, frame, anchor, src):
+  def create_null(klass, frame, anchor):
+    k = ('null',anchor)
+    if k in klass.CACHE:
+      return klass.CACHE[k]
     setobj = klass.create_set()
-    IterElement(frame, anchor, src).connect(setobj.elemall.recv)
+    klass.CACHE[k] = setobj
     return setobj
 
   @classmethod
-  def create_null(klass):
-    return klass.create_set()
+  def create_copy(klass, frame, anchor, src):
+    k = ('copy',anchor)
+    if k in klass.CACHE:
+      return klass.CACHE[k]
+    setobj = klass.create_set(src.elemall)
+    klass.CACHE[k] = setobj
+    return setobj
+    
+  @classmethod
+  def create_sequence(klass, frame, anchor, src):
+    k = ('sequence',anchor)
+    if k in klass.CACHE:
+      return klass.CACHE[k]
+    setobj = klass.create_set()
+    IterElement(frame, anchor, src).connect(setobj.elemall.recv)
+    klass.CACHE[k] = setobj
+    return setobj
 
 
 ##  SetObject
 ##
 class SetObject(FrozenSetObject):
 
-  def create_attr(self, anchor, name):
+  def create_attr(self, frame, anchor, name):
     if name == 'add':
       return self.SequenceAppender('set.add', self, args=[ANY])
     elif name == 'clear':
@@ -465,7 +513,7 @@ class SetObject(FrozenSetObject):
       return self.SequenceExtender('set.symmetric_difference_update', self, args=[ANY])
     elif name == 'update':
       return self.SequenceExtender('set.update', self, self, [ANY])
-    return FrozenSetObject.create_attr(self, anchor, name)
+    return FrozenSetObject.create_attr(self, frame, anchor, name)
   
 
 ##  SetType
@@ -499,10 +547,10 @@ class IterObject(BuiltinAggregateObject):
   def get_iter(self, frame, anchor):
     return self
 
-  def create_attr(self, anchor, name):
+  def create_attr(self, frame, anchor, name):
     if name == 'next':
       return BuiltinConstMethod('iter.next', self.elemall,
-                                  expts=[StopIterationType.maybe('might raise StopIteration')])
+                                expts=[StopIterationType.maybe('might raise StopIteration')])
     raise NodeAttrError(name)
   
 
@@ -595,7 +643,7 @@ class GeneratorObject(IterObject):
     IterObject.__init__(self, typeobj, elemall=elemall)
     return
 
-  def create_attr(self, anchor, name):
+  def create_attr(self, frame, anchor, name):
     if name == 'send':
       return self.Send('generator.send', self, self.elemall, [ANY],
                        expts=[StopIterationType.maybe('might raise StopIteration')])
@@ -608,7 +656,7 @@ class GeneratorObject(IterObject):
       return BuiltinConstMethod('generator.throw', NoneType.get_object(), [ANY], [ANY, ANY])
     if name == 'close':
       return self.Send('generator.close', self, NoneType.get_object(), [ANY])
-    return IterObject.create_attr(self, anchor, name)
+    return IterObject.create_attr(self, frame, anchor, name)
 
 
 ##  GeneratorType
@@ -800,11 +848,12 @@ class DictObject(BuiltinAggregateObject):
   def desc1(self, done):
     return '{%s: %s}' % (self.key.desc1(done), self.value.desc1(done))
 
-  def create_attr(self, anchor, name):
+  def create_attr(self, frame, anchor, name):
     if name == 'clear':
       return BuiltinConstMethod('dict.clear', NoneType.get_object())
     elif name == 'copy':
-      return BuiltinConstMethod('dict.copy', self.copy(anchor))
+      dictobj = self.get_type().create_copy(frame, anchor, self)
+      return BuiltinConstMethod('dict.copy', dictobj)
     elif name == 'fromkeys':
       return DictObject.FromKeys(self, 'dict.fromkeys')
     elif name == 'get':
@@ -861,25 +910,40 @@ class DictObject(BuiltinAggregateObject):
 class DictType(BuiltinAggregateType):
   
   TYPE_NAME = 'dict'
+  CACHE = {}
 
   @classmethod
   def create_dict(klass, items=None, key=None, value=None):
     return DictObject(klass.get_typeobj(), items=items, key=key, value=value)
 
   @classmethod
-  def create_copy(klass, anchor, src):
-    return klass.create_dict(key=[src.key], value=[src.value])
-    
-  @classmethod
-  def create_sequence(klass, frame, anchor, src):
+  def create_null(klass, frame, anchor):
+    k = ('null',anchor)
+    if k in klass.CACHE:
+      return klass.CACHE[k]
     dictobj = klass.create_dict()
-    converter = DictObject.DictConverter(frame, anchor, dictobj)
-    src.connect(converter.recv)
+    klass.CACHE[k] = dictobj
     return dictobj
 
   @classmethod
-  def create_null(klass):
-    return klass.create_dict()
+  def create_copy(klass, frame, anchor, src):
+    k = ('copy',anchor)
+    if k in klass.CACHE:
+      return klass.CACHE[k]
+    dictobj = klass.create_dict(key=[src.key], value=[src.value])
+    klass.CACHE[k] = dictobj
+    return dictobj
+
+  @classmethod
+  def create_sequence(klass, frame, anchor, src):
+    k = ('sequence',anchor)
+    if k in klass.CACHE:
+      return klass.CACHE[k]
+    dictobj = klass.create_dict()
+    converter = DictObject.DictConverter(frame, anchor, dictobj)
+    src.connect(converter.recv)
+    klass.CACHE[k] = dictobj
+    return dictobj
 
   def process_args(self, frame, anchor, args, kwargs):
     if kwargs:
@@ -892,7 +956,7 @@ class DictType(BuiltinAggregateType):
       return obj
     if args:
       return self.create_sequence(frame, anchor, args[0])
-    return self.create_null()
+    return self.create_null(frame, anchor)
 
 
 ##  EnumerateType
