@@ -172,7 +172,7 @@ class ListObject(BuiltinSequenceObject):
           if obj in self.received_fkey: continue
           self.received_fkey.add(obj)
           try:
-            obj.call(self.frame, self.anchor, [self.target.elemall], {}).connect(self.key.recv)
+            obj.call(self.frame, self.anchor, (self.target.elemall,), {}).connect(self.key.recv)
           except NodeTypeError:
             self.frame.raise_expt(ErrorConfig.NotCallable(obj))
         return
@@ -184,7 +184,7 @@ class ListObject(BuiltinSequenceObject):
           try:
             checker = TypeChecker(self.frame, IntType.get_typeobj(),
                                   'the return value of comparison function')
-            obj.call(self.frame, self.anchor, [self.key, self.key], {}).connect(checker.recv)
+            obj.call(self.frame, self.anchor, (self.key, self.key), {}).connect(checker.recv)
           except NodeTypeError:
             self.frame.raise_expt(ErrorConfig.NotCallable(obj))
         return

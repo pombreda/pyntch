@@ -120,7 +120,7 @@ class ClassType(BuiltinType, TreeReporter):
     from expression import OptMethodCall
     assert isinstance(frame, ExecutionFrame)
     self.frames.add(frame)
-    OptMethodCall(frame, anchor, self, '__init__', (self.instance,)+args, kwargs)
+    OptMethodCall(frame, anchor, self, '__init__', (self.instance,)+tuple(args), kwargs)
     return self.instance
   
 class PythonClassType(ClassType, TreeReporter):
