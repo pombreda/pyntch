@@ -295,7 +295,7 @@ class FunCall(ExpressionNode):
       star.connect(self.recv_tuple)
     if dstar:
       SequenceTypeChecker(self.frame, anchor, dstar, 'keywords must be strings')
-      IterDictValue(self.frame, dstar).connect(self.recv_vararg)
+      IterDictValue(self.frame, anchor, dstar).connect(self.recv_vararg)
     return
 
   def __repr__(self):

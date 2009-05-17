@@ -148,7 +148,7 @@ class FuncType(BuiltinType, TreeReporter):
       if varikwargs:
         self.space[self.kwarg].bind(DictType.create_dict(key=StrType.get_object(), value=varikwargs))
       else:
-        self.space[self.kwarg].bind(DictType.create_null())
+        self.space[self.kwarg].bind(DictType.create_null(frame, anchor))
     # Remember where this is called from.
     self.frames.add(frame)
     # Propagate the exceptions upward.
