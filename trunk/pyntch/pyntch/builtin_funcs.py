@@ -68,7 +68,7 @@ class IterFuncChecker(CompoundTypeNode):
   def recv_func(self, src):
     for obj in src:
       try:
-        obj.call(self.frame, self.anchor, [self.target.elemall])
+        obj.call(self.frame, self.anchor, (self.target.elemall,))
       except NodeTypeError:
         self.frame.raise_expt(ErrorConfig.NotCallable(obj))
     return
@@ -199,7 +199,7 @@ class FilterFunc(BuiltinFuncNoKwd):
         self.received.add(obj)
         if not isinstance(obj, NoneType):
           try:
-            obj.call(self.frame, self.anchor, [self.elem], {})
+            obj.call(self.frame, self.anchor, (self.elem,), {})
           except NodeTypeError:
             self.frame.raise_expt(ErrorConfig.NotCallable(obj))
       return
@@ -324,7 +324,7 @@ class MapFunc(BuiltinFunc):
       self.frame = frame
       self.anchor = anchor
       self.received = set()
-      self.args = [ IterElement(frame, anchor, obj) for obj in objs ]
+      self.args = tuple( IterElement(frame, anchor, obj) for obj in objs )
       self.listobj = ListType.create_list()
       CompoundTypeNode.__init__(self, [self.listobj])
       func.connect(self.recv_func)

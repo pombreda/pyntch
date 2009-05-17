@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, os
+import sys, os, os.path
 from pyntch.typenode import TypeNode, CompoundTypeNode
 from pyntch.frame import ExecutionFrame
 from pyntch.expression import MustBeDefinedNode
