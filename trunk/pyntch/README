@@ -2,6 +2,8 @@ Pyntch
 README
 
 # TODO:
+#  ignore certain modules not found.
+#  ignore exceptions raised in certain class/functions.
 #  add more test cases/stubs.
 
 
@@ -15,11 +17,11 @@ the functions or methods. Then it detects possible errors caused
 by type mismatch and exceptions raised from functions. Unlike
 other Python code checker (such as Pychecker or Pyflakes), Pyntch
 does not check the style issues. NOTICE: Pyntch is still at the
-proof-of-ideas stage and not proven to be effective.
+proof-of-ideas stage and not proven to be efficient or even usable.
 
 Pyntch can detect the following types of errors:
 
- * type mismatch (e.g. try adding an integer and a string).
+ * type mismatch (e.g. adding an integer and a string).
  * access to undefined attributes (e.g. "obj.attr" where "obj" does not have "attr").
  * subscript access to unsubscriptable objects (e.g. a[1] where a is not a sequence).
  * call of something uncallable (e.g. func(1) where func is neither a function nor a class).
