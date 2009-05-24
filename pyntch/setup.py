@@ -8,5 +8,6 @@ setup(name='pyntch',
       author='Yusuke Shinyama',
       url='http://www.unixuser.org/~euske/python/pyntch/index.html',
       packages=['pyntch'],
+      package_data={ 'pyntch': ['stub/*.pyi'] },
       scripts=['tools/tchecker.py', 'tools/makestub.py'],
       )
