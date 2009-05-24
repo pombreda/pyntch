@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-from typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, NodeAssignError
-from exception import SequenceTypeChecker, StopIterationType
-from frame import ExecutionFrame, ExceptionCatcher
-from config import ErrorConfig
+from pyntch.typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, NodeAssignError
+from pyntch.exception import SequenceTypeChecker, StopIterationType
+from pyntch.frame import ExecutionFrame, ExceptionCatcher
+from pyntch.config import ErrorConfig
 
 
 ##  ExpressionNode
@@ -316,7 +316,7 @@ class FunCall(ExpressionNode):
     return
 
   def recv_tuple(self, src):
-    from aggregate_types import TupleType
+    from pyntch.aggregate_types import TupleType
     for obj in src:
       if obj in self.received_tuple: continue
       self.received_tuple.add(obj)
@@ -407,9 +407,9 @@ class BinaryOp(MustBeDefinedNode):
     return
 
   def update_op(self, lobj, robj):
-    from basic_types import NumberType, IntType, BaseStringType, BUILTIN_OBJECT
-    from aggregate_types import ListType, ListObject, TupleType
-    from klass import InstanceObject
+    from pyntch.basic_types import NumberType, IntType, BaseStringType, BUILTIN_OBJECT
+    from pyntch.aggregate_types import ListType, ListObject, TupleType
+    from pyntch.klass import InstanceObject
     if (lobj,robj) in self.received: return
     self.received.add((lobj,robj))
     # special handling for a formatting (%) operator
@@ -554,8 +554,8 @@ class UnaryOp(MustBeDefinedNode):
     return '%s(%r)' % (self.op, self.value)
   
   def recv_value(self, src):
-    from basic_types import NumberType
-    from klass import InstanceObject
+    from pyntch.basic_types import NumberType
+    from pyntch.klass import InstanceObject
     for obj in src:
       if obj in self.received: continue
       self.received.add(obj)
@@ -582,7 +582,7 @@ class CompareOp(ExpressionNode):
     }
   
   def __init__(self, frame, anchor, op, left, right):
-    from basic_types import BoolType
+    from pyntch.basic_types import BoolType
     self.op = op
     self.left = left
     self.right = right
@@ -597,7 +597,7 @@ class CompareOp(ExpressionNode):
     return '%s(%r,%r)' % (self.op, self.left, self.right)
 
   def recv_left(self, left):
-    from klass import InstanceObject
+    from pyntch.klass import InstanceObject
     for lobj in left:
       if lobj in self.received: continue
       self.received.add(lobj)
@@ -611,7 +611,7 @@ class CompareOp(ExpressionNode):
 class BooleanOp(ExpressionNode):
   
   def __init__(self, frame, anchor, op, nodes):
-    from basic_types import BoolType
+    from pyntch.basic_types import BoolType
     self.op = op
     self.nodes = nodes
     ExpressionNode.__init__(self, frame, anchor)
@@ -630,7 +630,7 @@ class BooleanOp(ExpressionNode):
 class NotOp(ExpressionNode):
   
   def __init__(self, frame, anchor, value):
-    from basic_types import BoolType
+    from pyntch.basic_types import BoolType
     self.value = value
     ExpressionNode.__init__(self, frame, anchor)
     BoolType.get_object().connect(self.recv)
@@ -696,7 +696,7 @@ class IterDictValue(ExpressionNode):
     return
 
   def recv_target(self, src):
-    from aggregate_types import DictType
+    from pyntch.aggregate_types import DictType
     for obj in src:
       if obj in self.received: continue
       self.received.add(obj)
@@ -727,7 +727,7 @@ class TupleUnpack(ExpressionNode):
     return self.elements[i]
 
   def recv_tupobj(self, src):
-    from aggregate_types import TupleType
+    from pyntch.aggregate_types import TupleType
     for obj in src:
       if obj in self.received: continue
       self.received.add(obj)
@@ -769,7 +769,7 @@ class TupleSlice(ExpressionNode):
       return '<TupleSlice: %r[%r:]>' % (self.tupobj, self.start)
 
   def recv_tupobj(self, src):
-    from aggregate_types import TupleType
+    from pyntch.aggregate_types import TupleType
     for obj in src:
       if obj in self.received: continue
       self.received.add(obj)

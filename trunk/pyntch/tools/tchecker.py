@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import sys, os, os.path
+import pyntch
 from pyntch.typenode import TypeNode, CompoundTypeNode
 from pyntch.frame import ExecutionFrame
 from pyntch.expression import MustBeDefinedNode
@@ -18,9 +19,10 @@ def main(argv):
     (opts, args) = getopt.getopt(argv[1:], 'dc:p:')
   except getopt.GetoptError:
     return usage()
+  stubdir = os.path.join(os.path.dirname(pyntch.__file__), 'stub')
   debug = 0
   verbose = 1
-  modpath = ['stub']+sys.path[:]
+  modpath = [stubdir]+sys.path[:]
   for (k, v) in opts:
     if k == '-d': debug += 1
     elif k == '-p': modpath.extend(v.split(':'))

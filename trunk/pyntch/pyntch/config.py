@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from exception import SyntaxErrorType, TypeErrorType, ValueErrorType, \
+from pyntch.exception import SyntaxErrorType, TypeErrorType, ValueErrorType, \
      AttributeErrorType, IndexErrorType, IOErrorType, EOFErrorType, \
      KeyErrorType, NameErrorType, RuntimeErrorType, OSErrorType, \
      UnicodeDecodeErrorType, UnicodeEncodeErrorType

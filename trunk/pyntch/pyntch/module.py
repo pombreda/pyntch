@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-import sys, os.path
-stderr = sys.stderr
-from typenode import BuiltinType, BuiltinObject
-from frame import ExecutionFrame
-from namespace import Namespace
+import sys, os.path, compiler
+from pyntch.typenode import BuiltinType, BuiltinObject
+from pyntch.frame import ExecutionFrame
+from pyntch.namespace import Namespace
 
 
 ##  IndentedStream
@@ -92,7 +91,7 @@ class PythonModuleObject(ModuleObject, TreeReporter):
     return '<Module %s (%s)>' % (self.name, self.path)
 
   def load(self, tree):
-    from syntax import build_stmt
+    from pyntch.syntax import build_stmt
     evals = []
     self.space.register_names(tree)
     build_stmt(self, self.frame, self.space, tree, evals, isfuncdef=True)
@@ -127,7 +126,7 @@ class Interpreter(object):
   @classmethod
   def initialize(klass, module_path):
     # global parameters.
-    from namespace import BuiltinTypesNamespace, BuiltinExceptionsNamespace, BuiltinNamespace, DefaultNamespace
+    from pyntch.namespace import BuiltinTypesNamespace, BuiltinExceptionsNamespace, BuiltinNamespace, DefaultNamespace
     klass.module_path = module_path
     default = DefaultNamespace()
     builtin = BuiltinNamespace(default)
@@ -150,7 +149,7 @@ class Interpreter(object):
   @classmethod
   def find_module(klass, name, modpath):
     if klass.debug:
-      print >>stderr, 'find_module: name=%r' % name, modpath
+      print >>sys.stderr, 'find_module: name=%r' % name, modpath
     for dirname in modpath:
       for fname in (name+'.py', name+'.pyi'):
         path = os.path.join(dirname, fname)
@@ -166,12 +165,11 @@ class Interpreter(object):
   # load_file
   @classmethod
   def load_file(klass, path, modname):
-    from compiler import parseFile
     path = os.path.normpath(path)
     if path in klass.PATH2MODULE:
       module = klass.PATH2MODULE[path]
     else:
-      print >>stderr, 'loading: %r' % path
+      print >>sys.stderr, 'loading: %r' % path
       dirname = os.path.dirname(path)
       if dirname not in klass.module_path:
         klass.module_path.insert(0, dirname)
@@ -179,7 +177,7 @@ class Interpreter(object):
       klass.PATH2MODULE[path] = module
       klass.NAME2MODULE[modname] = module
       try:
-        tree = parseFile(path)
+        tree = compiler.parseFile(path)
       except IOError:
         raise klass.ModuleNotFound(modname, path)
       def rec(n):
@@ -195,7 +193,7 @@ class Interpreter(object):
   @classmethod
   def load_module(klass, fullname):
     if klass.debug:
-      print >>stderr, 'load_module: %r...' % fullname
+      print >>sys.stderr, 'load_module: %r...' % fullname
     if fullname in klass.NAME2MODULE:
       module = klass.NAME2MODULE[fullname]
     else:

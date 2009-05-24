@@ -1,16 +1,16 @@
 #!/usr/bin/env python
 
-from typenode import CompoundTypeNode, \
+from pyntch.typenode import CompoundTypeNode, \
      NodeTypeError, NodeAttrError, BuiltinType, BuiltinObject
-from namespace import Namespace, Variable
-from config import ErrorConfig
-from module import TreeReporter
-from frame import ExecutionFrame
+from pyntch.namespace import Namespace, Variable
+from pyntch.config import ErrorConfig
+from pyntch.module import TreeReporter
+from pyntch.frame import ExecutionFrame
 
 
 # assign_arg(var1,arg1): Assign an argument to a local variable var1.
 def assign_arg(frame, anchor, var1, arg1):
-  from expression import TupleUnpack
+  from pyntch.expression import TupleUnpack
   assert not isinstance(var1, list), var1
   assert not isinstance(arg1, list), arg1
   if isinstance(var1, tuple):
@@ -41,7 +41,7 @@ class FuncType(BuiltinType, TreeReporter):
       return '<funcbody %s>' % self.name
 
     def set_retval(self, evals):
-      from aggregate_types import GeneratorType
+      from pyntch.aggregate_types import GeneratorType
       returns = [ obj for (t,obj) in evals if t == 'r' ]
       yields = [ obj for (t,obj) in evals if t == 'y' ]
       if yields:
@@ -91,7 +91,7 @@ class FuncType(BuiltinType, TreeReporter):
     return
 
   def build_body(self, name, tree):
-    from syntax import build_stmt
+    from pyntch.syntax import build_stmt
     body = self.FuncBody(name)
     evals = []
     self.space.register_names(tree)
@@ -109,9 +109,9 @@ class FuncType(BuiltinType, TreeReporter):
     return self
 
   def call(self, frame, anchor, args, kwargs):
-    from basic_types import StrType
-    from aggregate_types import DictType, TupleType
-    from expression import TupleUnpack, TupleSlice
+    from pyntch.basic_types import StrType
+    from pyntch.aggregate_types import DictType, TupleType
+    from pyntch.expression import TupleUnpack, TupleSlice
     # Process keyword arguments first.
     varsleft = list(self.argvars)
     varikwargs = []
@@ -201,7 +201,7 @@ class LambdaFuncType(FuncType):
     return
 
   def build_body(self, name, tree):
-    from syntax import build_expr
+    from pyntch.syntax import build_expr
     body = self.FuncBody(name)
     evals = []
     evals.append(('r', build_expr(self, self.frame, self.space, tree, evals)))

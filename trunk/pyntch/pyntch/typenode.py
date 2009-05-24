@@ -5,7 +5,6 @@
 
 import sys
 
-
 class NodeError(Exception): pass
 class NodeTypeError(NodeError): pass
 class NodeAttrError(NodeError): pass

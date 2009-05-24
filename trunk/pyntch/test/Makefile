@@ -1,7 +1,7 @@
 # Makefile
 
 PYTHON=python
-CHECK=PYTHONPATH=.. $(PYTHON) ../check.py
+CHECK=PYTHONPATH=.. $(PYTHON) ../tools/tchecker.py
 
 all:
 

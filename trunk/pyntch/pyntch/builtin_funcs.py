@@ -3,14 +3,14 @@
 ##  This module should not be imported as toplevel,
 ##  as it causes circular imports!
 
-from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, UndefinedTypeNode
-from typenode import BuiltinType, BuiltinCallable, BuiltinConstCallable
-from exception import TypeChecker
-from basic_types import TypeType, NoneType, NumberType, BoolType, IntType, LongType, \
+from pyntch.typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, UndefinedTypeNode
+from pyntch.typenode import BuiltinType, BuiltinCallable, BuiltinConstCallable
+from pyntch.exception import TypeChecker
+from pyntch.basic_types import TypeType, NoneType, NumberType, BoolType, IntType, LongType, \
      FloatType, BaseStringType, StrType, UnicodeType, ANY
-from aggregate_types import ListType, TupleType, DictType, IterType, ListObject
-from expression import IterElement, IterRef, BinaryOp, MustBeDefinedNode, FunCall
-from config import ErrorConfig
+from pyntch.aggregate_types import ListType, TupleType, DictType, IterType, ListObject
+from pyntch.expression import IterElement, IterRef, BinaryOp, MustBeDefinedNode, FunCall
+from pyntch.config import ErrorConfig
 
 
 ##  BuiltinFunc

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import sys
-from typenode import TypeNode, CompoundTypeNode, NodeTypeError
-stderr = sys.stderr
+from pyntch.typenode import TypeNode, CompoundTypeNode, NodeTypeError
 
 
 ##  TracebackObject
@@ -50,7 +49,7 @@ class ExecutionFrame(CompoundTypeNode):
     if parent:
       assert isinstance(parent, ExecutionFrame), parent
       if self.expt_debug:
-        print >>stderr, 'connect_expt: %r <- %r' % (parent, self)
+        print >>sys.stderr, 'connect_expt: %r <- %r' % (parent, self)
       self.connect(parent.recv)
     return
 
@@ -63,7 +62,7 @@ class ExecutionFrame(CompoundTypeNode):
       return '<Frame at ???>'
 
   def set_reraise(self):
-    from config import ErrorConfig
+    from pyntch.config import ErrorConfig
     self.raise_expt(ErrorConfig.RaiseOutsideTry())
     return
 
@@ -81,7 +80,7 @@ class ExecutionFrame(CompoundTypeNode):
     if expt in self.raised: return
     self.raised.add(expt)
     if self.expt_debug:
-      print >>stderr, 'raise_expt: %r <- %r' % (self, expt)
+      print >>sys.stderr, 'raise_expt: %r <- %r' % (self, expt)
     TracebackObject(expt, self).connect(self.recv)
     return
 
@@ -123,7 +122,7 @@ class ExceptionHandler(ExecutionFrame):
     return '<Handler for %r>' % ','.join(map(repr, self.catchtypes))
 
   def recv_expt(self, src):
-    from aggregate_types import TupleType
+    from pyntch.aggregate_types import TupleType
     for obj in src:
       if obj in self.received: continue
       self.received.add(obj)
@@ -200,8 +199,8 @@ class ExceptionMaker(CompoundTypeNode):
     return '<exception %s>' % (self.describe())
 
   def recv_type(self, src):
-    from klass import ClassType
-    from config import ErrorConfig
+    from pyntch.klass import ClassType
+    from pyntch.config import ErrorConfig
     for obj in src:
       if obj in self.processed: continue
       self.processed.add(obj)
