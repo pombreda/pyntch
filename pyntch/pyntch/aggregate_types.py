@@ -1,10 +1,11 @@
 #!/usr/bin/env python
-from typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, NodeAssignError, UndefinedTypeNode
-from typenode import BuiltinObject, BuiltinType, BuiltinCallable, BuiltinMethod, BuiltinConstMethod
-from exception import TypeChecker, StopIterationType
-from basic_types import BoolType, IntType, StrType, NoneType, ANY
-from expression import IterElement, MethodCall
-from config import ErrorConfig
+
+from pyntch.typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, NodeAssignError, UndefinedTypeNode
+from pyntch.typenode import BuiltinObject, BuiltinType, BuiltinCallable, BuiltinMethod, BuiltinConstMethod
+from pyntch.exception import TypeChecker, StopIterationType
+from pyntch.basic_types import BoolType, IntType, StrType, NoneType, ANY
+from pyntch.expression import IterElement, MethodCall
+from pyntch.config import ErrorConfig
 
 
 ##  BuiltinAggregateObject

@@ -1,10 +1,8 @@
 #!/usr/bin/env python
-import sys
-stderr = sys.stderr
 
-from typenode import TypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, \
+from pyntch.typenode import TypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, \
      BuiltinType, BuiltinObject
-from klass import ClassType, InstanceObject
+from pyntch.klass import ClassType, InstanceObject
 
 
 ##  ExceptionType
@@ -144,8 +142,8 @@ class TypeChecker(CompoundTypeNode):
             (','.join(map(repr, self.types)), self.validtypes))
 
   def recv(self, src):
-    from config import ErrorConfig
-    from basic_types import TypeType
+    from pyntch.config import ErrorConfig
+    from pyntch.basic_types import TypeType
     if self.validtypes == self.ANY: return
     for obj in src:
       if obj in self.received: continue
@@ -171,7 +169,7 @@ class SequenceTypeChecker(TypeChecker):
     return
   
   def recv(self, src):
-    from expression import IterElement
+    from pyntch.expression import IterElement
     for obj in src:
       if obj in self.received: continue
       self.received.add(obj)
@@ -179,7 +177,7 @@ class SequenceTypeChecker(TypeChecker):
     return
   
   def recv_elemobj(self, src):
-    from config import ErrorConfig
+    from pyntch.config import ErrorConfig
     if self.validtypes == self.ANY: return
     for obj in src:
       if obj in self.received_elem: continue
@@ -204,8 +202,8 @@ class KeyValueTypeChecker(TypeChecker):
     return
     
   def recv(self, src):
-    from config import ErrorConfig
-    from aggregate_types import DictObject
+    from pyntch.config import ErrorConfig
+    from pyntch.aggregate_types import DictObject
     for obj in src:
       if obj in self.received: continue
       self.received.add(obj)
@@ -217,7 +215,7 @@ class KeyValueTypeChecker(TypeChecker):
     return
   
   def recv_key(self, src):
-    from config import ErrorConfig
+    from pyntch.config import ErrorConfig
     for obj in src:
       if obj in self.received_key: continue
       self.received_key.add(obj)
@@ -231,7 +229,7 @@ class KeyValueTypeChecker(TypeChecker):
     return
 
   def recv_value(self, src):
-    from config import ErrorConfig
+    from pyntch.config import ErrorConfig
     for obj in src:
       if obj in self.received_value: continue
       self.received_value.add(obj)

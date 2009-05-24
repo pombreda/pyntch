@@ -3,11 +3,11 @@
 ##  This module should not be imported as toplevel,
 ##  as it causes circular imports!
 
-from typenode import TypeNode, CompoundTypeNode, NodeAttrError, NodeAssignError, UndefinedTypeNode
-from typenode import BuiltinObject, BuiltinType, BuiltinCallable, BuiltinConstCallable, BuiltinConstMethod
-from exception import TypeChecker, KeyValueTypeChecker
-from config import ErrorConfig
-from klass import InstanceObject
+from pyntch.typenode import TypeNode, CompoundTypeNode, NodeAttrError, NodeAssignError, UndefinedTypeNode
+from pyntch.typenode import BuiltinObject, BuiltinType, BuiltinCallable, BuiltinConstCallable, BuiltinConstMethod
+from pyntch.exception import TypeChecker, KeyValueTypeChecker
+from pyntch.config import ErrorConfig
+from pyntch.klass import InstanceObject
 
 ANY = TypeChecker.ANY
 
@@ -135,7 +135,7 @@ class ComplexType(BuiltinConstCallable, NumberType):
 class BaseStringObject(BuiltinObject):
 
   def __init__(self, typeobj):
-    from aggregate_types import IterType
+    from pyntch.aggregate_types import IterType
     BuiltinObject.__init__(self, typeobj)
     self.iter = IterType.create_iter(self)
     return
@@ -160,7 +160,7 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
   TYPE_NAME = 'basestring'
 
   def get_attr(self, frame, anchor, name, write=False):
-    from aggregate_types import TupleType, ListType
+    from pyntch.aggregate_types import TupleType, ListType
     if name == 'capitalize':
       return BuiltinConstMethod('str.capitalize', self.get_object())
     elif name == 'center':
@@ -275,7 +275,7 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
       return
     
     def recv(self, src):
-      from expression import OptMethodCall
+      from pyntch.expression import OptMethodCall
       for obj in src:
         if obj in self.received: continue
         self.received.add(obj)
@@ -301,7 +301,7 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
     return BuiltinConstCallable.call(self, frame, anchor, args, kwargs)
 
   def __init__(self):
-    from aggregate_types import ListType
+    from pyntch.aggregate_types import ListType
     BuiltinBasicType.__init__(self)
     BuiltinConstCallable.__init__(self, 'basestring', None)
     return
@@ -357,7 +357,7 @@ class UnicodeType(BaseStringType):
 class FileObject(BuiltinObject):
 
   def __init__(self, typeobj):
-    from aggregate_types import IterType
+    from pyntch.aggregate_types import IterType
     BuiltinObject.__init__(self, typeobj)
     self.iter = IterType.create_iter(StrType.get_object())
     return
@@ -377,7 +377,7 @@ class FileType(BuiltinConstCallable, BuiltinBasicType):
     return
 
   def get_attr(self, frame, anchor, name, write=False):
-    from aggregate_types import ListType
+    from pyntch.aggregate_types import ListType
     if name == 'close':
       return BuiltinConstMethod('file.close', NoneType.get_object())
     elif name == 'closed':
@@ -455,7 +455,7 @@ BUILTIN_OBJECT = dict(
 class XRangeObject(BuiltinObject):
   
   def __init__(self, typeobj):
-    from aggregate_types import IterType
+    from pyntch.aggregate_types import IterType
     BuiltinObject.__init__(self, typeobj)
     self.iter = IterType.create_iter(IntType.get_object())
     return

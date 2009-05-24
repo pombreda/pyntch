@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-from typenode import CompoundTypeNode, \
+from pyntch.typenode import CompoundTypeNode, \
      NodeTypeError, NodeAttrError, BuiltinType, BuiltinObject, UndefinedTypeNode
-from namespace import Namespace
-from module import TreeReporter
-from frame import ExecutionFrame
+from pyntch.namespace import Namespace
+from pyntch.module import TreeReporter
+from pyntch.frame import ExecutionFrame
 
 
 ##  BoundMethodType
@@ -65,7 +65,7 @@ class ClassType(BuiltinType, TreeReporter):
       return
 
     def recv(self, src):
-      from basic_types import StaticMethodObject, ClassMethodObject
+      from pyntch.basic_types import StaticMethodObject, ClassMethodObject
       for obj in src:
         if obj in self.processed: continue
         self.processed.add(obj)
@@ -117,7 +117,7 @@ class ClassType(BuiltinType, TreeReporter):
     return method
 
   def call(self, frame, anchor, args, kwargs):
-    from expression import OptMethodCall
+    from pyntch.expression import OptMethodCall
     assert isinstance(frame, ExecutionFrame)
     self.frames.add(frame)
     OptMethodCall(frame, anchor, self, '__init__', (self.instance,)+tuple(args), kwargs)
@@ -128,7 +128,7 @@ class PythonClassType(ClassType, TreeReporter):
   def __init__(self, parent_reporter, parent_frame, parent_space, anchor, name, bases, code, evals, tree):
     TreeReporter.__init__(self, parent_reporter, name)
     ClassType.__init__(self, name, bases)
-    from syntax import build_stmt
+    from pyntch.syntax import build_stmt
     self.anchor = anchor
     self.loc = (tree._module, tree.lineno)
     self.space = Namespace(parent_space, name)
@@ -187,8 +187,8 @@ class InstanceObject(BuiltinObject):
       return '%r.%s' % (self.instance, self.name)
 
     def recv(self, src):
-      from function import FuncType
-      from basic_types import StaticMethodObject, ClassMethodObject
+      from pyntch.function import FuncType
+      from pyntch.basic_types import StaticMethodObject, ClassMethodObject
       for obj in src:
         if obj in self.processed: continue
         self.processed.add(obj)
@@ -231,36 +231,36 @@ class InstanceObject(BuiltinObject):
     return attr
 
   def get_iter(self, frame, anchor):
-    from expression import OptMethodCall
+    from pyntch.expression import OptMethodCall
     assert isinstance(frame, ExecutionFrame)
     return OptMethodCall(frame, anchor, self, '__iter__')
 
   def get_reversed(self, frame, anchor):
-    from expression import OptMethodCall
+    from pyntch.expression import OptMethodCall
     assert isinstance(frame, ExecutionFrame)
     return OptMethodCall(frame, anchor, self, '__reversed__')
 
   def get_length(self, frame, anchor):
-    from expression import OptMethodCall
+    from pyntch.expression import OptMethodCall
     assert isinstance(frame, ExecutionFrame)
     return OptMethodCall(frame, anchor, self, '__len__')
 
   def get_element(self, frame, anchor, sub, write=False):
-    from expression import OptMethodCall
+    from pyntch.expression import OptMethodCall
     if write:
       return OptMethodCall(frame, anchor, self, '__setelem__', sub)
     else:
       return OptMethodCall(frame, anchor, self, '__getelem__', sub)
     
   def get_slice(self, frame, anchor, subs, write=False):
-    from expression import OptMethodCall
+    from pyntch.expression import OptMethodCall
     if write:
       return OptMethodCall(frame, anchor, self, '__setslice__', subs)
     else:
       return OptMethodCall(frame, anchor, self, '__getslice__', subs)
 
   def call(self, frame, anchor, args, kwargs):
-    from expression import OptMethodCall
+    from pyntch.expression import OptMethodCall
     return OptMethodCall(frame, anchor, self, '__call__', args, kwargs)
   
   def bind_func(self, func):

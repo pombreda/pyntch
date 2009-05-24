@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
 from compiler import ast
-from typenode import TypeNode, UndefinedTypeNode, CompoundTypeNode
-from frame import ExecutionFrame, ExceptionCatcher, ExceptionMaker
-from exception import TypeChecker
-from config import ErrorConfig
-from klass import PythonClassType
-from function import FuncType, LambdaFuncType
-from expression import ExpressionNode, AttrRef, SubRef, SliceRef, \
+from pyntch.typenode import TypeNode, UndefinedTypeNode, CompoundTypeNode
+from pyntch.frame import ExecutionFrame, ExceptionCatcher, ExceptionMaker
+from pyntch.exception import TypeChecker
+from pyntch.config import ErrorConfig
+from pyntch.klass import PythonClassType
+from pyntch.function import FuncType, LambdaFuncType
+from pyntch.expression import ExpressionNode, AttrRef, SubRef, SliceRef, \
      AttrAssign, SubAssign, SliceAssign, \
      FunCall, BinaryOp, UnaryOp, AssignOp, CompareOp, BooleanOp, NotOp, IfExpOp, \
      IterElement, TupleUnpack
@@ -91,8 +91,8 @@ def build_assign(reporter, frame, space, n, v, evals):
 ##  Constructs a TypeNode from a given syntax tree.
 ##
 def build_expr(reporter, frame, space, tree, evals):
-  from basic_types import BUILTIN_OBJECT
-  from aggregate_types import IterType, GeneratorType, ListType, DictType, TupleType
+  from pyntch.basic_types import BUILTIN_OBJECT
+  from pyntch.aggregate_types import IterType, GeneratorType, ListType, DictType, TupleType
 
   if isinstance(tree, ast.Const):
     typename = type(tree.value).__name__
@@ -258,7 +258,7 @@ def build_expr(reporter, frame, space, tree, evals):
 ##  build_stmt
 ##
 def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
-  from basic_types import NoneType, StrType
+  from pyntch.basic_types import NoneType, StrType
   assert isinstance(frame, ExecutionFrame)
 
   if isinstance(tree, ast.Module):

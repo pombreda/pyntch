@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from compiler import ast
-from typenode import CompoundTypeNode
+from pyntch.typenode import CompoundTypeNode
 
 
 ##  Variable
@@ -90,7 +90,7 @@ class Namespace(object):
   
   # register_names
   def register_names(self, tree):
-    from module import Interpreter
+    from pyntch.module import Interpreter
     
     if isinstance(tree, ast.Module):
       self.register_names(tree.node)
@@ -331,7 +331,7 @@ class Namespace(object):
 class BuiltinTypesNamespace(Namespace):
   
   def __init__(self, parent):
-    import klass, function, basic_types, aggregate_types, builtin_funcs, module
+    from pyntch import klass, function, basic_types, aggregate_types, builtin_funcs, module
     Namespace.__init__(self, parent, 'types')
     # types
     self.register_var('type').bind(basic_types.TypeType.get_typeobj())
@@ -376,7 +376,7 @@ class BuiltinTypesNamespace(Namespace):
 class BuiltinExceptionsNamespace(Namespace):
   
   def __init__(self, parent):
-    import exception
+    from pyntch import exception
     Namespace.__init__(self, parent, 'exceptions')
     # exceptions
     self.register_var('Exception').bind(exception.ExceptionType.get_typeobj())
@@ -419,8 +419,8 @@ class BuiltinExceptionsNamespace(Namespace):
 class BuiltinNamespace(Namespace):
 
   def __init__(self, parent):
-    import basic_types
-    import builtin_funcs
+    from pyntch import basic_types
+    from pyntch import builtin_funcs
     Namespace.__init__(self, parent, '__builtin__')
     self.register_var('abs').bind(builtin_funcs.AbsFunc())
     self.register_var('apply').bind(builtin_funcs.ApplyFunc())
@@ -467,7 +467,7 @@ class BuiltinNamespace(Namespace):
 class DefaultNamespace(Namespace):
   
   def __init__(self):
-    import basic_types
+    from pyntch import basic_types
     Namespace.__init__(self, None, '(default)')
     self.register_var('__file__').bind(basic_types.StrType.get_object())
     self.register_var('__name__').bind(basic_types.StrType.get_object())
