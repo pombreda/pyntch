@@ -1,4 +1,4 @@
-# Makefile
+# Makefile for pyntch
 
 PACKAGE=pyntch
 
@@ -10,7 +10,7 @@ VERSION=`$(PYTHON) $(PACKAGE)/__init__.py`
 DISTNAME=$(PACKAGE)-dist-$(VERSION)
 DISTFILE=$(DISTNAME).tar.gz
 
-CHECK=$(PYTHON) check.py
+TCHECKER=$(PYTHON) tools/tchecker.py
 
 all:
 
@@ -18,10 +18,10 @@ install:
 	$(PYTHON) setup.py install
 
 clean:
-	-rm *.pyc *.pyo
-	cd pyntch && $(MAKE) clean
-	cd stub && $(MAKE) clean
-	cd test && $(MAKE) clean
+	-rm -rf build
+	-cd $(PACKAGE) && $(MAKE) clean
+	-cd tools && $(MAKE) clean
+	-cd samples && $(MAKE) clean
 
 testall:
 	cd test && $(MAKE) test
