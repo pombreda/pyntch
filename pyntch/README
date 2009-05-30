@@ -1,4 +1,4 @@
-Pyntch
+Pyntch - Python code analyzer
 README
 
 # TODO:
@@ -9,15 +9,16 @@ README
 
 What's It?
 
-Pyntch is a PYthoN Type CHecker. It aims to catch possible runtime
-errors before actually running a code. Pyntch examines a Python
+Pyntch is a Python code analyzer. It can identify possible types of
+each variable in a Python program and detect possible runtime
+errors before actually running the program. Pyntch examines a Python
 source code statically and infers all possible types of variables,
-class attributes, function signatures, and the return values of
-the functions or methods. Then it detects possible errors caused
+class attributes, function signatures, and return values of
+each function or method. Then it detects possible errors caused
 by type mismatch and exceptions raised from functions. Unlike
 other Python code checker (such as Pychecker or Pyflakes), Pyntch
-does not check the style issues. NOTICE: Pyntch is still at the
-proof-of-ideas stage and not proven to be efficient or even usable.
+does not check the style issues. Disclaimer: Pyntch is still at the
+proof-of-ideas stage and not proven to be efficient or even useful.
 
 Pyntch can detect the following types of errors:
 
@@ -30,10 +31,10 @@ Pyntch can detect the following types of errors:
 
 Background
 
-One of the greatest strength on scripting languages is its
-dynamicity. You can define any functions, variables and data
-structures whenever you want without elaborating the detailed
-specifications. However, this feature leads to some drawback:
+One of the greatest strength on scripting languages such as Python
+is its dynamicity. You can define any functions, variables and
+data structures whenever you want without elaborating the detailed
+specifications. However, this feature comes with some cost:
 sometimes it is difficult to find potential errors that are caused
 by type mismatch before actually running the program.
 
@@ -55,7 +56,7 @@ and what kind of types can be returned from a function at any time
 of execution, and what kind of exceptions might be raised. This is
 done by examining the code without executing it. The goal of
 Pyntch is to try to analyze every possible execution path and
-every possible combination of data.
+all possible combinations of data.
 
 Because the purpose of Pyntch is to catch as many obscure errors
 as possible before the code is acutally used in a production, it
@@ -101,9 +102,14 @@ The output shows several things:
  * Line 9 says that this function returns an integer.
  * Line 10 says that this function might raise a TypeError exception caused at line 2.
 
+
 Adding a module path
 
+
 Creating a stub module
+
+
+
 
 
 How It Works
@@ -171,7 +177,7 @@ to the lack of awareness of execution order, Pyntch reports this
 variable might have two possible types: an integer and string.
 Although we expect this kind of errors does not affect much to the
 overall usefulness of the report, we provide a way to supress this
-type of output.
+type of output. Also, Pyntch cannot detect UnboundLocalError.
 
 Due to the nature of source level analysis, Pyntch cannot analyze
 a program that uses extension modules, in which the code behavior
@@ -190,4 +196,4 @@ Pyntch can analyze correctly has to meet the following conditions:
  * not using eval, compile or exec
  * no metaclass programming
 
-cannot catch UnboundLocalError
+cannot catch

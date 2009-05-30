@@ -68,6 +68,9 @@ class ModuleObject(BuiltinObject):
     return self.name
 
   def get_attr(self, frame, anchor, name, write=False):
+    from basic_types import StrType
+    if name == '__file__':
+      return StrType.get_object()
     return self.space.register_var(name)
   
   
