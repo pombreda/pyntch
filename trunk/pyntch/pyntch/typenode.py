@@ -194,6 +194,8 @@ class BuiltinObject(SimpleTypeNode):
     return self.typeobj
   
   def get_attr(self, frame, anchor, name, write=False):
+    if name == '__class__':
+      return self.get_type()
     return self.get_type().get_attr(frame, anchor, name, write=write)
   
   def is_type(self, *typeobjs):

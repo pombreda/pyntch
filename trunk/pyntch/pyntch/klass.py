@@ -101,7 +101,9 @@ class ClassType(BuiltinType, TreeReporter):
     return False
 
   def get_attr(self, frame, anchor, name, write=False):
-    if name not in self.attrs:
+    if name == '__class__':
+      return self.get_type()
+    elif name not in self.attrs:
       attr = self.ClassAttr(frame, anchor, name, self, self.baseklass)
       self.attrs[name] = attr
     else:
@@ -223,7 +225,9 @@ class InstanceObject(BuiltinObject):
     return False
 
   def get_attr(self, frame, anchor, name, write=False):
-    if name not in self.attrs:
+    if name == '__class__':
+      return self.get_type()
+    elif name not in self.attrs:
       attr = self.InstanceAttr(frame, anchor, name, self)
       self.attrs[name] = attr
     else:
