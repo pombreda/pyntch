@@ -1,0 +1,312 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Pyntch - Python code analyzer</title>
+<style type="text/css"><!--
+blockquote { background: #eeeeee; }
+--></style>
+</head><body>
+
+<h1>Pyntch</h1>
+<p>
+Python code analyzer
+
+<p>
+<a href="http://www.unixuser.org/~euske/python/pyntch/index.html">Homepage</a>
+<a href="#changes">Recent Changes</a>
+
+<div align=right class=lastmod>
+<!-- hhmts start -->
+Last Modified: Sat May 30 20:06:20 JST 2009
+<!-- hhmts end -->
+</div>
+
+<a name="intro"></a>
+<hr noshade>
+<h2>What's It?</h2>
+<p>
+Pyntch is a Python code analyzer. It can detect possible runtime
+errors before actually running the code. Pyntch examines a Python
+source code statically and infers all possible types of variables,
+class attributes, function signatures, and return values of
+each function or method. Then it detects possible errors caused
+by type mismatch or other exceptions raised from each function. Unlike
+other Python code checker (such as Pychecker or Pyflakes), Pyntch
+does not check the style issues. 
+<strong>Disclaimer:</strong> Pyntch is still at the
+proof-of-ideas stage and not proven to be efficient or even useful.
+<p>
+Pyntch can detect the following types of errors:
+<ul>
+<li> Type mismatch (e.g. adding an integer and a string).
+<li> Access to undefined attributes (e.g. "<code>obj.attr</code>" where "<code>obj</code>" does not have attribute "<code>attr</code>").
+<li> Subscript access to unsubscriptable objects (e.g. <code>a[1]</code> where a is not a sequence).
+<li> Calling something uncallable (e.g. <code>func(1)</code> where func is not either function, method, or class).
+<li> Iteration over non-iterable objects (e.g. <code>sorted(x)</code> where x is not an iterable object).
+</ul>
+
+<a name="source"></a>
+<p>
+<strong>Download:</strong><br>
+<a href="http://www.unixuser.org/~euske/python/pyntch/pyntch-dist-20090517.tar.gz">
+http://www.unixuser.org/~euske/python/pyntch/pyntch-dist-20090517.tar.gz
+</a>
+
+<p>
+<strong>Discussion:</strong> (for questions and comments, post here)<br>
+<a href="http://groups.google.com/group/pyntch-users/">
+http://groups.google.com/group/pyntch-users/
+</a>
+
+<P>
+<strong>View the source:</strong><br>
+<a href="http://code.google.com/p/pyntch/source/browse/trunk/pyntch">
+http://code.google.com/p/pyntch/source/browse/trunk/pyntch
+</a>
+
+<a name="background"></a>
+<hr noshade>
+<h2>Background</h2>
+<p>
+One of the greatest strength on scripting languages such as Python
+is its dynamicity. You can define any functions, variables and
+data structures whenever you want without elaborating the detailed
+specifications. However, this feature comes with some cost:
+sometimes it is difficult to find potential errors that are caused
+by type mismatch before actually running the program.
+<p>
+Have you experienced a TypeError caused by giving a wrong type of
+arguments, say, a string object to numeric functions?  Or trying
+to access a nonexistent method of a wrongly passed class that
+would otherwise have such a method? There is always a risk of such
+unexpected exceptions that cause sudden death of a Python program.
+This kind of behavior is particulary unfavorable for mission
+critical applications, so we want to catch these errors in
+advance. Unfortunately, as the program gets larger, it's getting
+hard to track these kinds of errors, and it's even harder to
+prevent them by infering which types/values can be passed or
+returned by each function.
+<p>
+Pyntch aims to help reducing these burdens by infering what kind
+of types can be assigned to variables/members/function arguments
+and what kind of types can be returned from a function at any time
+of execution, and what kind of exceptions might be raised. This is
+done by examining the code without executing it. The goal of
+Pyntch is to try to analyze every possible execution path and
+all possible combinations of data.
+<p>
+Because the purpose of Pyntch is to catch as many obscure errors
+as possible before the code is acutally used in a production, it
+focuses on the coverage of the analysis at the expense of its accuracy.
+Sometimes Pyntch brings a lot of false positives in its result,
+which need to be further examined by human programmers.
+
+<a name="install"></a>
+<hr noshade>
+<h2>How to Install</h2>
+
+<ol>
+<li> Install <a href="http://www.python.org/download/">Python</a> 2.4 or newer.
+<li> Download the <a href="#source">Pyntch source</a>.
+<li> Extract it.
+<li> Run <code>setup.py</code> to install:<br>
+<blockquote><pre>
+# <strong>python setup.py install</strong>
+</pre></blockquote>
+<li> Done!
+</ol>
+
+<a name="usage"></a>
+<hr noshade>
+<h2>How to Use</h2>
+<p>
+The basic use of Pyntch is pretty simple and straightforward.
+Take this sample code:
+<blockquote><pre>
+  $ cat mycode.py
+0 def f(x,y):
+1   return x+y
+2 print f(3, 4)
+3 print f(3, 'a')
+</pre></blockquote>
+<p>
+To check this code, simply run the check.py against the source file:
+<blockquote><pre>
+   $ tchecker.py mycode.py
+ 0 === basic.py ===
+ 1 loading: 'basic.py'
+ 2 [basic]
+ 3   (raises &lt;TypeError: unsupported operand Add for &lt;int&gt; and &lt;int&gt;&gt; at basic.py(2))
+ 4
+ 5   ### basic.py(1)
+ 6   # called at basic.py(4)
+ 7   # called at basic.py(3)
+ 8   def f(x=&lt;int&gt;, y=&lt;int&gt;|&lt;str&gt;):
+ 9     return &lt;int&gt;
+10     raises &lt;TypeError: unsupported operand Add for &lt;int&gt; and &lt;int&gt;&gt; at basic.py(2)
+</pre></blockquote>
+<p>
+The output shows several things:
+<ul>
+<li> Line 3 shows that running this entire code might raise a TypeError exception
+   that is caused at line 2 of basic.py.
+<li> Line 5-10 tells about the function defined at line 1.
+<li> Line 6,7 says that this function is called from line 3 and 4.
+<li> Line 8 shows the possible types of parameters to this function:
+   x is an integer, and y is either an integer or string.
+<li> Line 9 says that this function returns an integer.
+<li> Line 10 says that this function might raise a TypeError exception caused at line 2.
+</ul>
+
+<h3>Adding a module path</h3>
+
+
+<h3>Creating a stub module</h3>
+<p>
+Due to the nature of source level analysis, Pyntch cannot analyze
+a program that uses extension modules, in which the code behavior
+are embedded in opaque binaries.  In that case, a user can
+instruct Pyntch to use an alternative "stub" module which is
+written in Python and defines only the return type of each
+function, just like C headers.
+
+<h3>Limitations</h3>
+<p>
+One of the major drawbacks of typeflow analysis is its inability
+to take account of execution order (which is also true for
+dataflow analysis). The sequence of statements is simply ignored
+and all the possible order is considered. This is like considering
+every permutation of statements in a program and combining them
+into one. This sometimes brings inaccuracy to its result in
+exchange for a comprehensiveness of the checking. For example,
+consider the following two consecutive statements:
+<blockquote><pre>
+  x = 1
+  x = 'a'
+</pre></blockquote>
+<p>
+After executing these two statements, it is obvious that variable
+x has always a string object, not an integer object. However, due
+to the lack of awareness of execution order, Pyntch reports this
+variable might have two possible types: an integer and string.
+Although we expect this kind of errors does not affect much to the
+overall usefulness of the report, we provide a way to supress this
+type of output. Also, Pyntch cannot detect UnboundLocalError.
+<p>
+Pyntch assumes the scope of each namespace is statically defined,
+i.e. all the names (variables, functions, classes and attributes)
+are written down in the source code. Therefore a program that
+Pyntch can analyze correctly has to meet the following conditions:
+<ul>
+<li> not altering __dict__, globals(), locals()
+<li> not using getattr, setattr
+<li> not using eval, compile or exec
+<li> no metaclass programming
+</ul>
+
+<a name="usage"></a>
+<hr noshade>
+<h2>How It Works</h2>
+<p>
+(This section is still way under construction.)
+<p>
+The basic mechanism of Pyntch is based on the idea of "typeflow
+analysis."  This is similar to dataflow analysis, which gives the
+maximal set of possible data that are stored at each location
+(either variable or continuation) in a program. First, it constructs
+a big connected graph that represents the entire Python program.
+Every expression or statement is converted to a "node", which is
+an abstraact place where certain type(s) of data is stored or
+passed. Then it tries to figure out what type of data goes from
+one node to another.
+<p>
+Let us consider a trivial example:
+<blockquote><pre>
+  a = 'xyz'
+  b = 2
+  c = a*b
+</pre></blockquote>
+<p>
+Given the above statements, Pyntch constructs a graph shown in
+Fig. 1. A square shaped node is a "leaf" node, which represents a
+single type of Python object. A round shaped node is a "compound"
+node, which is a place that one or more types of objects can be
+potentially stored. Now, the data stored at the top two leaf
+nodes, which are a string and an integer object respectively, flow
+down to the lower nodes and each node passes the data according to
+the arrow. Both objects are "mixed" at the plus sign node, which
+produces a string object (because in Python multiplying a string
+and an integer gives a repreated string).  Eventually, the object
+goes into variable c, which is the node at the bottom.
+This way, you can infer the possible type of each variable.
+
+<h3>Handling Dynamicity</h3>
+<p>
+Now take an example that involves a function:
+<blockquote><pre>
+  def foo(x):
+    return x+1
+  def bar(y):
+    return y-1
+  f = foo
+  z = f(1)
+  f = bar
+  z = f(2)
+</pre></blockquote>
+
+<h3>Preventing Explosion</h3>
+
+<p>
+(todo)
+
+
+<a name="changes"></a>
+<hr noshade>
+<h2>Changes</h2>
+<ul>
+<li> 2009/05/17: Initial release.
+<li> 2008/03/01: Start the project.
+</ul>
+
+<a name="related"></a>
+<hr noshade>
+<h2>Related Projects</h2>
+<ul>
+<li> <a href="http://pychecker.sourceforge.net/">PyChecker: a python source code checking tool</a>
+<li> <a href="http://divmod.org/trac/wiki/DivmodPyflakes">Pyflakes</a>
+<li> <a href="http://www.logilab.org/project/pylint">pylint</a>
+</ul>
+
+<a name="license"></a>
+<hr noshade>
+<h2>Terms and Conditions</h2>
+<p>
+<small>
+Copyright (c) 2008-2009 Yusuke Shinyama &lt;yusuke at cs dot nyu dot edu&gt;
+<p>
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or
+sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+<p>
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+<p>
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+</small>
+
+<hr noshade>
+<address>Yusuke Shinyama</address>
+</body>
