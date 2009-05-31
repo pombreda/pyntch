@@ -83,6 +83,8 @@ class TypeNode(object):
     return self.desc1(set())
   def signature(self):
     return None
+  def is_type(self, *_):
+    return False
 
 
 ##  SimpleTypeNode

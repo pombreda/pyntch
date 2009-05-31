@@ -19,7 +19,7 @@ Python code analyzer
 
 <div align=right class=lastmod>
 <!-- hhmts start -->
-Last Modified: Sun May 31 11:30:25 JST 2009
+Last Modified: Sun May 31 17:43:50 JST 2009
 <!-- hhmts end -->
 </div>
 
@@ -28,7 +28,7 @@ Last Modified: Sun May 31 11:30:25 JST 2009
 <h2>What's It?</h2>
 <p>
 Pyntch is a Python code analyzer. It can detect possible runtime
-errors before actually running the code. Pyntch examines a Python
+errors before actually running a Python code. Pyntch examines a
 source code statically and infers all possible types of variables,
 class attributes, function signatures, and return values of
 each function or method. Then it detects possible errors caused
@@ -36,16 +36,21 @@ by type mismatch or other exceptions raised from each function. Unlike
 other Python code checker (such as Pychecker or Pyflakes), Pyntch
 does not check the style issues. 
 <p>
-<strong>Disclaimer:</strong> Pyntch is still at the
-proof-of-ideas stage and not proven to be efficient or even useful.
+<strong>Disclaimer:</strong> 
+Pyntch is still at the proof-of-ideas stage and 
+not proven to be efficient or even useful.
 <p>
 Pyntch can detect the following types of errors:
 <ul>
 <li> Type mismatch (e.g. adding an integer and a string).
-<li> Access to undefined attributes (e.g. "<code>obj.attr</code>" where "<code>obj</code>" does not have attribute "<code>attr</code>").
-<li> Subscript access to unsubscriptable objects (e.g. <code>a[1]</code> where a is not a sequence).
-<li> Calling something uncallable (e.g. <code>func(1)</code> where func is not either function, method, or class).
-<li> Iteration over non-iterable objects (e.g. <code>sorted(x)</code> where x is not an iterable object).
+<li> Access to undefined attributes
+ (e.g. <code>obj.attr</code> where <code>obj</code> does not have attribute <code>attr</code>).
+<li> Subscript access to unsubscriptable objects
+ (e.g. <code>a[1]</code> where a is not a sequence).
+<li> Calling something uncallable
+ (e.g. <code>func(1)</code> where func is not either function, method, or class).
+<li> Iteration over non-iterable objects
+ (e.g. <code>sorted(x)</code> where x is not an iterable object).
 </ul>
 
 <a name="source"></a>
@@ -218,11 +223,11 @@ into one. This sometimes brings inaccuracy to its result in
 exchange for a comprehensiveness of the checking. For example,
 consider the following two consecutive statements:
 <blockquote><pre>
-  x = 1
-  x = 'a'
+x = 1
+x = 'a'
 </pre></blockquote>
 <p>
-After executing these two statements, it is obvious that variable
+After executing these two statements, it is clear that variable
 x has always a string object, not an integer object. However, due
 to the lack of awareness of execution order, Pyntch reports this
 variable might have two possible types: an integer and string.
@@ -230,15 +235,19 @@ Although we expect this kind of errors does not affect much to the
 overall usefulness of the report, we provide a way to supress this
 type of output. Also, Pyntch cannot detect UnboundLocalError.
 <p>
+Another limitation is that
 Pyntch assumes the scope of each namespace is statically defined,
 i.e. all the names (variables, functions, classes and attributes)
 are written down in the source code. Therefore a program that
-Pyntch can analyze correctly has to meet the following conditions:
+define or alter the namespace dynamically during execution cannot be
+correctly analyzed. Basically, a code has to meet
+the following conditions:
 <ul>
-<li> not altering __dict__, globals(), locals()
-<li> not using getattr, setattr
-<li> not using eval, compile or exec
-<li> no metaclass programming
+<li> not using <code>globals()</code> or <code>locals()</code> function,
+ nor refering to or altering <code>__dict__</code> member.
+<li> not using <code>getattr</code> or <code>setattr</code>.
+<li> not using <code>eval</code>, <code>compile</code> or <code>exec</code> functions.
+<li> no metaclass programming.
 </ul>
 
 

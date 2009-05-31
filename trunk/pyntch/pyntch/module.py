@@ -51,6 +51,13 @@ class TreeReporter(object):
     return
   
   
+class ModuleNotFound(Exception):
+  def __init__(self, name, path):
+    self.name = name
+    self.path = path
+    return
+  
+
 ##  Module
 ##
 class ModuleObject(BuiltinObject):
@@ -95,9 +102,18 @@ class PythonModuleObject(ModuleObject, TreeReporter):
 
   def load(self, tree):
     from pyntch.syntax import build_stmt
+    from pyntch.config import ErrorConfig
+    from pyntch.exception import ImportErrorType
     evals = []
-    self.space.register_names(tree)
-    build_stmt(self, self.frame, self.space, tree, evals, isfuncdef=True)
+    try:
+      self.space.register_names(tree)
+      build_stmt(self, self.frame, self.space, tree, evals, isfuncdef=True)
+    except ModuleNotFound, e:
+      if ErrorConfig.ignore_module_notfound:
+        pass
+      else:
+        self.frame.raise_expt(ImportErrorType.occur(e.name))
+        print >>sys.stderr, 'module not found: %r' % e.name
     return
 
   def get_path(self):
@@ -117,8 +133,6 @@ class PythonModuleObject(ModuleObject, TreeReporter):
 ##
 class Interpreter(object):
 
-  class ModuleNotFound(Exception): pass
-  
   debug = 0
   
   module_path = None
@@ -163,7 +177,7 @@ class Interpreter(object):
         path = os.path.join(path, '__init__.py')
         if os.path.isfile(path):
           return path
-    raise klass.ModuleNotFound(name, modpath)
+    raise ModuleNotFound(name, modpath)
 
   # load_file
   @classmethod
@@ -182,7 +196,7 @@ class Interpreter(object):
       try:
         tree = compiler.parseFile(path)
       except IOError:
-        raise klass.ModuleNotFound(modname, path)
+        raise ModuleNotFound(modname, path)
       def rec(n):
         n._module = module
         for c in n.getChildNodes():
@@ -204,7 +218,7 @@ class Interpreter(object):
       modname = fullname
       try:
         path = klass.find_module(modname, modpath)
-      except klass.ModuleNotFound, e:
+      except ModuleNotFound, e:
         try:
           i = fullname.rindex('.')
           parent = klass.load_module(fullname[:i])
