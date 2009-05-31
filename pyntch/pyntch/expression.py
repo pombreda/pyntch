@@ -66,13 +66,14 @@ class AttrRef(MustBeDefinedNode):
     return '%r.%s' % (self.target, self.attrname)
 
   def recv_target(self, src):
+    from pyntch.basic_types import NoneType
     for obj in src:
       if obj in self.received: continue
       self.received.add(obj)
       try:
         obj.get_attr(self.frame, self.anchor, self.attrname).connect(self.recv)
       except NodeAttrError:
-        pass
+        self.raise_expt(ErrorConfig.AttributeNotFound(obj, self.attrname))
     return
 
   def check_undefined(self):

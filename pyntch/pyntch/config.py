@@ -8,6 +8,15 @@ from pyntch.exception import SyntaxErrorType, TypeErrorType, ValueErrorType, \
 class ErrorConfig(object):
 
   raise_uncertain = False
+  
+  ignore_module_notfound = False
+
+  ignore_none = True
+  
+  @classmethod
+  def is_ignored(klass, obj):
+    from pyntch.basic_types import NoneType
+    return klass.ignore_none and obj.is_type(NoneType.get_typeobj())
 
   # occur
   @classmethod
@@ -20,11 +29,7 @@ class ErrorConfig(object):
 
   @classmethod
   def NotSupported(klass, name):
-    return RuntimeErrorType.occur('unsupported feature: %s' % name)
-  
-  @classmethod
-  def NotCallable(klass, obj):
-    return TypeErrorType.occur('not callable: %r' % obj)
+    return RuntimeErrorType.occur('not supported feature: %s' % name)
   
   @classmethod
   def NotInstantiatable(klass, typename):
@@ -54,39 +59,53 @@ class ErrorConfig(object):
     return ValueErrorType.occur('not convertable to %s' % typename)
 
   @classmethod
+  def NotCallable(klass, obj):
+    if klass.is_ignored(obj): return None
+    return TypeErrorType.occur('not callable: %r' % obj)
+  
+  @classmethod
   def NotIterable(klass, obj):
+    if klass.is_ignored(obj): return None
     return TypeErrorType.occur('not iterable: %r' % obj)
   
   @classmethod
   def NotSubscriptable(klass, obj):
+    if klass.is_ignored(obj): return None
     return TypeErrorType.occur('not subscriptable: %r' % obj)
   
   @classmethod
   def NotAssignable(klass, obj):
+    if klass.is_ignored(obj): return None
     return TypeErrorType.occur('cannot assign item: %r' % obj)
   
   @classmethod
   def NoLength(klass, obj):
+    if klass.is_ignored(obj): return None
     return TypeErrorType.occur('length not defined' % obj)
   
   @classmethod
   def AttributeNotFound(klass, obj, attrname):
+    if klass.is_ignored(obj): return None
     return AttributeErrorType.occur('attribute not found: %r.%s' % (obj, attrname))
   
   @classmethod
   def AttributeNotAssignable(klass, obj, attrname):
+    if klass.is_ignored(obj): return None
     return AttributeErrorType.occur('attribute cannot be assigned: %r.%s' % (obj, attrname))
   
   @classmethod
   def NotUnpackable(klass, obj):
+    if klass.is_ignored(obj): return None
     return ValueErrorType.occur('tuple cannot be unpacked: %r' % obj)
   
   @classmethod
   def NotSupportedOperand(klass, op, left, right=None):
     if right:
-      return TypeErrorType.occur('unsupported operand %s(%s, %s)' % (op, left.describe(), right.describe()))
+      if klass.is_ignored(left) or klass.is_ignored(right): return None
+      return TypeErrorType.occur('not supported operand %s(%s, %s)' % (op, left.describe(), right.describe()))
     else:
-      return TypeErrorType.occur('unsupported operand %s(%s)' % (op, left.describe()))
+      if klass.is_ignored(left): return None
+      return TypeErrorType.occur('not supported operand %s(%s)' % (op, left.describe()))
 
   @classmethod
   def TypeCheckerError(klass, src, obj, validtype):
@@ -158,8 +177,6 @@ class ErrorConfig(object):
     if not klass.raise_uncertain: return None
     return EOFErrorType.maybe('end of file')
   
-  def __init__(self):
-    return
-
-  def load(self, fname):
-    return
+  @classmethod
+  def load(klass, fname):
+    raise NotImplementedError

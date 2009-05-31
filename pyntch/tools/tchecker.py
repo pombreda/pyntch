@@ -25,6 +25,7 @@ def main(argv):
   modpath = [stubdir]+sys.path[:]
   for (k, v) in opts:
     if k == '-d': debug += 1
+    elif k == '-c': ErrorConfig.load(v)
     elif k == '-p': modpath.extend(v.split(':'))
   TypeNode.debug = debug
   TypeNode.verbose = verbose

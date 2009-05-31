@@ -20,7 +20,7 @@ class TracebackObject(TypeNode):
     try:
       (module,lineno) = self.frame.getloc()
       return '%s at %s(%s)' % (self.expt, module.get_path(), lineno)
-    except ValueError:
+    except TypeError:
       return '%s at ???' % self.expt
 
   def desc1(self, _):
