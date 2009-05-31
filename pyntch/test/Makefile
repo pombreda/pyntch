@@ -1,7 +1,7 @@
 # Makefile
 
 PYTHON=python
-CHECK=PYTHONPATH=.. $(PYTHON) ../tools/tchecker.py
+TCHECKER=../tools/tchecker.py
 
 all:
 
@@ -9,4 +9,4 @@ clean:
 	-rm *.pyc *.pyo
 
 test:
-	$(CHECK) *.py
+	PYTHONPATH=.. $(PYTHON) $(TCHECKER) *.py

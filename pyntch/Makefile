@@ -10,15 +10,18 @@ VERSION=`$(PYTHON) $(PACKAGE)/__init__.py`
 DISTNAME=$(PACKAGE)-dist-$(VERSION)
 DISTFILE=$(DISTNAME).tar.gz
 
-TCHECKER=$(PYTHON) tools/tchecker.py
+TCHECKER=tools/tchecker.py
 
 all:
 
 install:
 	$(PYTHON) setup.py install
 
+selfcheck:
+	PYTHONPATH=. $(PYTHON) $(TCHECKER) $(TCHECKER) > selfcheck.txt
+
 clean:
-	-rm -rf build
+	-rm -rf build selfcheck.txt
 	-cd $(PACKAGE) && $(MAKE) clean
 	-cd tools && $(MAKE) clean
 
