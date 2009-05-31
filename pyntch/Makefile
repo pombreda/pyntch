@@ -21,7 +21,6 @@ clean:
 	-rm -rf build
 	-cd $(PACKAGE) && $(MAKE) clean
 	-cd tools && $(MAKE) clean
-	-cd samples && $(MAKE) clean
 
 testall:
 	cd test && $(MAKE) test
