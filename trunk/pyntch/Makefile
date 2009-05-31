@@ -41,5 +41,5 @@ dist: clean
 
 WEBDIR=$$HOME/Site/unixuser.org/python/pyntch
 publish: dist
-	cp $(TMPDIR)/$(DISTFILE) $(WEBDIR)
-	cp README.html $(WEBDIR)/index.html
+	cp $(TMPDIR)/$(DISTFILE) $(WEBDIR)/
+	cp docs/index.html docs/*.png $(WEBDIR)/
