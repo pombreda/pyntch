@@ -14,11 +14,12 @@ Python code analyzer
 
 <p>
 <a href="http://www.unixuser.org/~euske/python/pyntch/index.html">Homepage</a>
+&nbsp;
 <a href="#changes">Recent Changes</a>
 
 <div align=right class=lastmod>
 <!-- hhmts start -->
-Last Modified: Sun May 31 11:24:59 JST 2009
+Last Modified: Sun May 31 11:30:25 JST 2009
 <!-- hhmts end -->
 </div>
 
@@ -34,6 +35,7 @@ each function or method. Then it detects possible errors caused
 by type mismatch or other exceptions raised from each function. Unlike
 other Python code checker (such as Pychecker or Pyflakes), Pyntch
 does not check the style issues. 
+<p>
 <strong>Disclaimer:</strong> Pyntch is still at the
 proof-of-ideas stage and not proven to be efficient or even useful.
 <p>
@@ -258,9 +260,9 @@ one node to another.
 <p>
 Let us consider a trivial example:
 <blockquote><pre>
-  a = 'xyz'
-  b = 2
-  c = a*b
+A = 'xyz'
+B = 2
+C = a*b
 </pre></blockquote>
 <p>
 Given the above statements, Pyntch constructs a graph shown in
@@ -276,6 +278,11 @@ and an integer gives a repreated string).  Eventually, the object
 goes into variable c, which is the node at the bottom.
 This way, you can infer the possible type of each variable.
 
+<center>
+<img src="simple1.png"><br>
+Fig 1. Simple expression
+</center>
+
 <h3>Handling Dynamicity</h3>
 <p>
 Now take an example that involves a function:
@@ -289,6 +296,11 @@ Now take an example that involves a function:
   f = bar
   z = f(2)
 </pre></blockquote>
+
+<center>
+<img src="simple2.png"><br>
+Fig 2. Handling function call
+</center>
 
 <h3>Preventing Explosion</h3>
 
