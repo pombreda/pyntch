@@ -154,7 +154,7 @@ class Interpreter(object):
     if klass.debug:
       print >>sys.stderr, 'find_module: name=%r' % name, modpath
     for dirname in modpath:
-      for fname in (name+'.py', name+'.pyi'):
+      for fname in (name+'.pyi', name+'.py'):
         path = os.path.join(dirname, fname)
         if os.path.isfile(path):
           return path
