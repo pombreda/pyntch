@@ -2,8 +2,8 @@
 from distutils.core import setup
 
 setup(name='pyntch',
-      version='2009xxxx',
-      description='Python type checker',
+      version='20090531',
+      description='Python code analyzer',
       license='MIT/X',
       author='Yusuke Shinyama',
       url='http://www.unixuser.org/~euske/python/pyntch/index.html',
