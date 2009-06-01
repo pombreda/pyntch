@@ -207,7 +207,6 @@ def build_expr(reporter, frame, space, tree, evals):
 
   # list comprehension
   elif isinstance(tree, ast.ListComp):
-    print (tree, tree._module, tree.lineno)
     elements = [ build_expr(reporter, frame, space, tree.expr, evals) ]
     expr = ListType.create_list(CompoundTypeNode(elements))
     for qual in tree.quals:
