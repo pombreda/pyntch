@@ -59,7 +59,7 @@ def build_assert(reporter, frame, space, tree, arg, evals):
 def build_assign(reporter, frame, space, n, v, evals):
   if isinstance(n, ast.AssName) or isinstance(n, ast.Name):
     space[n.name].bind(v)
-  elif isinstance(n, ast.AssTuple):
+  elif isinstance(n, ast.AssTuple) or isinstance(n, ast.AssList):
     tup = TupleUnpack(ExecutionFrame(frame, n), n, v, len(n.nodes))
     for (i,c) in enumerate(n.nodes):
       build_assign(reporter, frame, space, c, tup.get_nth(i), evals)
@@ -207,6 +207,7 @@ def build_expr(reporter, frame, space, tree, evals):
 
   # list comprehension
   elif isinstance(tree, ast.ListComp):
+    print (tree, tree._module, tree.lineno)
     elements = [ build_expr(reporter, frame, space, tree.expr, evals) ]
     expr = ListType.create_list(CompoundTypeNode(elements))
     for qual in tree.quals:
@@ -407,6 +408,8 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, ast.AssName):
     pass
   elif isinstance(tree, ast.AssTuple):
+    pass
+  elif isinstance(tree, ast.AssList):
     pass
   elif isinstance(tree, ast.AssAttr):
     build_expr(reporter, frame, space, tree.expr, evals)

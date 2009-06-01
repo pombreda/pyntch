@@ -289,6 +289,7 @@ class Namespace(object):
     elif isinstance(tree, ast.Lambda):
       for value in tree.defaults:
         self.register_names(value)
+      self.register_names(tree.code)
     elif isinstance(tree, ast.IfExp):
       self.register_names(tree.test)
       self.register_names(tree.then)

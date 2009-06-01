@@ -214,7 +214,7 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
       return BuiltinConstMethod('str.lower', self.get_object())
     elif name == 'lstrip':
       return BuiltinConstMethod('str.lstrip', self.get_object(),
-                                [BaseStringType])
+                                [], [BaseStringType])
     elif name == 'partition':
       return BuiltinConstMethod('str.partiion',
                                 TupleType.create_tuple([self.get_object(), self.get_object(), self.get_object()]),
@@ -241,7 +241,7 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
                                 [], [BaseStringType, IntType])
     elif name == 'rstrip':
       return BuiltinConstMethod('str.rstrip', self.get_object(),
-                                [BaseStringType])
+                                [], [BaseStringType])
     elif name == 'split':
       return BuiltinConstMethod('str.split', ListType.create_list(self.get_object()),
                                 [], [BaseStringType, IntType])
@@ -253,7 +253,7 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
                                 [BaseStringType], [IntType, IntType])
     elif name == 'strip':
       return BuiltinConstMethod('str.strip', self.get_object(),
-                                [BaseStringType])
+                                [], [BaseStringType])
     elif name == 'swapcase':
       return BuiltinConstMethod('str.swapcase', self.get_object())
     elif name == 'title':
