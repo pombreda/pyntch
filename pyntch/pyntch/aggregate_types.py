@@ -3,6 +3,7 @@
 from pyntch.typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, NodeAssignError, UndefinedTypeNode
 from pyntch.typenode import BuiltinObject, BuiltinType, BuiltinCallable, BuiltinMethod, BuiltinConstMethod
 from pyntch.exception import TypeChecker, StopIterationType
+from pyntch.frame import ExceptionCatcher
 from pyntch.basic_types import BoolType, IntType, StrType, NoneType, ANY
 from pyntch.expression import IterElement, MethodCall
 from pyntch.config import ErrorConfig
@@ -575,8 +576,9 @@ class ReversedType(BuiltinCallable, IterType):
   # convert
   class ReversedIterConverter(CompoundTypeNode):
     
-    def __init__(self, frame, target):
+    def __init__(self, frame, anchor, target):
       self.frame = frame
+      self.anchor = anchor
       self.target = target
       self.received = set()
       CompoundTypeNode.__init__(self)
@@ -591,10 +593,10 @@ class ReversedType(BuiltinCallable, IterType):
         if obj in self.received: continue
         self.received.add(obj)
         try:
-          iterobj = obj.get_reversed(self.frame)
+          iterobj = obj.get_reversed(self.frame, self.anchor)
           frame1 = ExceptionCatcher(self.frame)
           frame1.add_handler(StopIterationType.get_typeobj())
-          MethodCall(frame1, iterobj, 'next').connect(self.recv)
+          MethodCall(frame1, self.anchor, iterobj, 'next').connect(self.recv)
         except NodeTypeError:
           self.frame.raise_expt(ErrorConfig.NotIterable(obj))
       return
@@ -608,7 +610,7 @@ class ReversedType(BuiltinCallable, IterType):
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
       return UndefinedTypeNode()
-    return self.ReversedIterConverter(frame, args[0])
+    return self.ReversedIterConverter(frame, anchor, args[0])
   
 
 ##  GeneratorObject
