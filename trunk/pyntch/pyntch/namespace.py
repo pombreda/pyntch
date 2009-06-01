@@ -242,6 +242,10 @@ class Namespace(object):
       self.register_names(tree.node)
       for arg1 in tree.args:
         self.register_names(arg1)
+      if tree.star_args:
+        self.register_names(tree.star_args)
+      if tree.dstar_args:
+        self.register_names(tree.dstar_args)
     elif isinstance(tree, ast.Keyword):
       self.register_names(tree.expr)
     elif isinstance(tree, ast.Getattr):
