@@ -179,4 +179,14 @@ class ErrorConfig(object):
   
   @classmethod
   def load(klass, fname):
-    raise NotImplementedError
+    fp = file(fname, 'r')
+    data = fp.read()
+    fp.close()
+    code = compile(data, fname, 'exec')
+    dic = {}
+    eval(code, dic)
+    for (k,v) in dic.iteritems():
+      if k.startswith('_'): continue
+      if hasattr(klass, k):
+        setattr(klass, k, v)
+    return

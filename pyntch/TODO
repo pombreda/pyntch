@@ -1,6 +1,5 @@
 TODO:
 
-- make this somewhat somehow useful!!
-- finer control of error/warnings.
+- finer control of errors/warnings.
 - ignore exceptions raised in certain class/functions.
-- add more test cases/stubs.
+- add more test cases and stub modules.
