@@ -98,9 +98,9 @@ class ApplyFunc(BuiltinFuncNoKwd):
 
   def process_args_nokwd(self, frame, anchor, args):
     star = dstar = None
-    if 1 <= len(args):
-      star = args[1]
     if 2 <= len(args):
+      star = args[1]
+    if 3 <= len(args):
       dstar = args[2]
     return FunCall(frame, anchor, args[0], star=star, dstar=dstar)
 

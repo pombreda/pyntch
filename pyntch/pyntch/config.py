@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import sys
 from pyntch.exception import SyntaxErrorType, TypeErrorType, ValueErrorType, \
      AttributeErrorType, IndexErrorType, IOErrorType, EOFErrorType, \
      KeyErrorType, NameErrorType, RuntimeErrorType, OSErrorType, \
@@ -12,6 +12,8 @@ class ErrorConfig(object):
   ignore_module_notfound = False
 
   ignore_none = True
+
+  show_all = False
   
   @classmethod
   def is_ignored(klass, obj):
@@ -187,6 +189,13 @@ class ErrorConfig(object):
     eval(code, dic)
     for (k,v) in dic.iteritems():
       if k.startswith('_'): continue
-      if hasattr(klass, k):
-        setattr(klass, k, v)
+      klass.set(k, v)
+    return
+
+  @classmethod
+  def set(klass, k, v):
+    if hasattr(klass, k):
+      setattr(klass, k, v)
+    else:
+      print >>sys.stderr, 'invalid option: ErrorConfig.%s' % k
     return

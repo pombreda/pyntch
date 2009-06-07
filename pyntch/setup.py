@@ -3,12 +3,12 @@ from distutils.core import setup
 
 setup(name='pyntch',
       version='20090531',
-      description='Python source code analyzer',
+      description='Examine python code and infer possible type of errors',
       license='MIT/X',
       author='Yusuke Shinyama',
       author_email='yusuke at cs dot nyu dot edu',
       url='http://www.unixuser.org/~euske/python/pyntch/index.html',
-      long_description='''Pyntch is a Python source code analyzer. It can detect possible runtime
+      long_description='''Pyntch is a PYthoN Type CHecker. It detects possible runtime
 errors before actually running a Python code. Pyntch examines a
 source code statically and infers all possible types of variables,
 class attributes, function signatures, and return values of
