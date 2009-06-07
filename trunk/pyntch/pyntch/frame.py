@@ -85,6 +85,7 @@ class ExecutionFrame(CompoundTypeNode):
     return
 
   def show(self, out):
+    from pyntch.config import ErrorConfig
     expts_here = []
     expts_there = []
     for expt in self:
@@ -98,8 +99,9 @@ class ExecutionFrame(CompoundTypeNode):
         expts_there.append(expt)
     for expt in sorted(expts_here, key=lambda expt:expt.frame.getloc()):
       out.write('  raises %r' % expt)
-    for expt in sorted(expts_there, key=lambda expt:expt.frame.getloc()):
-      out.write('  [raises %r]' % expt)
+    if ErrorConfig.show_all:
+      for expt in sorted(expts_there, key=lambda expt:expt.frame.getloc()):
+        out.write('  [raises %r]' % expt)
     return
 
 

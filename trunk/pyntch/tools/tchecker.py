@@ -13,10 +13,10 @@ from pyntch.config import ErrorConfig
 def main(argv):
   import getopt
   def usage():
-    print 'usage: %s [-d] [-c config] [-p pythonpath] [file ...]' % argv[0]
+    print 'usage: %s [-d] [-a] [-c config] [-C key=val] [-p pythonpath] [file ...]' % argv[0]
     return 100
   try:
-    (opts, args) = getopt.getopt(argv[1:], 'dc:p:')
+    (opts, args) = getopt.getopt(argv[1:], 'dac:C:p:')
   except getopt.GetoptError:
     return usage()
   stubdir = os.path.join(os.path.dirname(pyntch.__file__), 'stub')
@@ -25,7 +25,11 @@ def main(argv):
   modpath = [stubdir]+sys.path[:]
   for (k, v) in opts:
     if k == '-d': debug += 1
+    elif k == '-a': ErrorConfig.show_all = True
     elif k == '-c': ErrorConfig.load(v)
+    elif k == '-C':
+      (k,v) = v.split('=')
+      ErrorConfig.set(k, eval(v))
     elif k == '-p': modpath.extend(v.split(':'))
   TypeNode.debug = debug
   TypeNode.verbose = verbose
