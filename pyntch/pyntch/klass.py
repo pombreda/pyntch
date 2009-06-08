@@ -20,7 +20,7 @@ class BoundMethodType(BuiltinType):
     return
 
   def __repr__(self):
-    return '<boundmethod %r(%s=%r)>' % (self.func, self.func.argnames[0], self.arg0)
+    return '<boundmethod %r(arg0=%r)>' % (self.func, self.arg0)
   
   def get_type(self):
     return self
