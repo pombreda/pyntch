@@ -195,8 +195,13 @@ class Namespace(object):
     # import
     elif isinstance(tree, ast.Import):
       for (modname,name) in tree.names:
-        asname = name or modname
         module = Interpreter.load_module(modname)
+        if name:
+          asname = name
+        elif '.' in modname:
+          continue
+        else:
+          asname = modname
         self.register_var(asname)
         self[asname].bind(module)
 
