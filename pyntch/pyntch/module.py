@@ -79,6 +79,10 @@ class ModuleObject(BuiltinObject):
     if name == '__file__':
       return StrType.get_object()
     return self.space.register_var(name)
+
+  def add_child(self, name, module):
+    self.space.register_var(name).bind(module)
+    return
   
   
 class ModuleType(BuiltinType):
@@ -216,8 +220,10 @@ class Interpreter(object):
     else:
       modpath = klass.module_path
       modname = fullname
+      parent = None
       try:
         path = klass.find_module(modname, modpath)
+        module = klass.load_file(path, fullname)
       except ModuleNotFound, e:
         try:
           i = fullname.rindex('.')
@@ -226,6 +232,7 @@ class Interpreter(object):
           modname = fullname[i+1:]
         except ValueError:
           raise e
-      path = klass.find_module(modname, modpath)
-      module = klass.load_file(path, fullname)
+        path = klass.find_module(modname, modpath)
+        module = klass.load_file(path, fullname)
+        parent.add_child(modname, module)
     return module
