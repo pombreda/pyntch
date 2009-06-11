@@ -143,7 +143,7 @@ class CompoundTypeNode(TypeNode):
     if self in done:
       return '...'
     elif self.types:
-      done = done.union([self])
+      done.add(self)
       return '|'.join( sorted(set( obj.desc1(done) for obj in self )) )
     else:
       return '?'
