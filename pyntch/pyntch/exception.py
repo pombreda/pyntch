@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-from pyntch.typenode import TypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, \
+from pyntch.typenode import TypeNode, CompoundTypeNode, \
+     NodeTypeError, NodeAttrError, NodeAssignError, \
      BuiltinType, BuiltinObject
 from pyntch.klass import ClassType, InstanceObject
 
@@ -36,6 +37,7 @@ class ExceptionType(ClassType):
 
   def get_attr(self, frame, anchor, name, write=False):
     if name == '__init__':
+      if write: raise NodeAssignError(name)
       return self.InitMethod(self)
     return ClassType.get_attr(self, frame, anchor, name, write=write)
 

@@ -26,16 +26,16 @@ class TypeNode(object):
 
   @classmethod
   def inc(klass):
-    if not klass.verbose: return
-    klass.N += 1
-    if klass.N % 1000 == 0:
-      sys.stderr.write('.'); sys.stderr.flush()
+    if klass.verbose:
+      klass.N += 1
+      if klass.N % 1000 == 0:
+        sys.stderr.write('.'); sys.stderr.flush()
     return
   
   @classmethod  
   def showstat(klass):
-    if not klass.verbose: return
-    print >>sys.stderr, '%d nodes' % klass.N
+    if klass.verbose:
+      print >>sys.stderr, '%d nodes' % klass.N
     return
 
   def __init__(self, types):
@@ -197,6 +197,7 @@ class BuiltinObject(SimpleTypeNode):
   
   def get_attr(self, frame, anchor, name, write=False):
     if name == '__class__':
+      if write: raise NodeAssignError(name)
       return self.get_type()
     return self.get_type().get_attr(frame, anchor, name, write=write)
   

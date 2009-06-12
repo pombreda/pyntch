@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys, os.path, compiler
-from pyntch.typenode import BuiltinType, BuiltinObject
+from pyntch.typenode import BuiltinType, BuiltinObject, NodeAssignError
 from pyntch.frame import ExecutionFrame
 from pyntch.namespace import Namespace
 
@@ -77,6 +77,7 @@ class ModuleObject(BuiltinObject):
   def get_attr(self, frame, anchor, name, write=False):
     from basic_types import StrType
     if name == '__file__':
+      if write: raise NodeAssignError(name)
       return StrType.get_object()
     return self.space.register_var(name)
 
@@ -109,15 +110,8 @@ class PythonModuleObject(ModuleObject, TreeReporter):
     from pyntch.config import ErrorConfig
     from pyntch.exception import ImportErrorType
     evals = []
-    try:
-      self.space.register_names(tree)
-      build_stmt(self, self.frame, self.space, tree, evals, isfuncdef=True)
-    except ModuleNotFound, e:
-      if ErrorConfig.ignore_module_notfound:
-        pass
-      else:
-        self.frame.raise_expt(ImportErrorType.occur(e.name))
-        print >>sys.stderr, 'module not found: %r' % e.name
+    self.space.register_names(tree)
+    build_stmt(self, self.frame, self.space, tree, evals, isfuncdef=True)
     return
 
   def get_path(self):
@@ -137,6 +131,7 @@ class PythonModuleObject(ModuleObject, TreeReporter):
 ##
 class Interpreter(object):
 
+  verbose = 0
   debug = 0
   
   module_path = None
@@ -190,7 +185,8 @@ class Interpreter(object):
     if path in klass.PATH2MODULE:
       module = klass.PATH2MODULE[path]
     else:
-      print >>sys.stderr, 'loading: %r' % path
+      if klass.verbose:
+        print >>sys.stderr, 'loading: %r' % path
       dirname = os.path.dirname(path)
       if dirname not in klass.module_path:
         klass.module_path.insert(0, dirname)
@@ -230,7 +226,7 @@ class Interpreter(object):
           parent = klass.load_module(fullname[:i])
           modpath = [ os.path.dirname(parent.path) ]
           modname = fullname[i+1:]
-        except ValueError:
+        except (ValueError, ModuleNotFound):
           raise e
         path = klass.find_module(modname, modpath)
         module = klass.load_file(path, fullname)
