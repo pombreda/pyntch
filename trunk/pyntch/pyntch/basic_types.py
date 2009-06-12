@@ -161,6 +161,7 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
 
   def get_attr(self, frame, anchor, name, write=False):
     from pyntch.aggregate_types import TupleType, ListType
+    if write: raise NodeAssignError(name)
     if name == 'capitalize':
       return BuiltinConstMethod('str.capitalize', self.get_object())
     elif name == 'center':
@@ -312,6 +313,7 @@ class StrType(BaseStringType):
   TYPE_INSTANCE = StrObject
   
   def get_attr(self, frame, anchor, name, write=False):
+    if write: raise NodeAssignError(name)
     if name == 'translate':
       return BuiltinConstMethod('str.translate', self.get_object(),
                                 [BaseStringType], [BaseStringType],
@@ -337,6 +339,7 @@ class UnicodeType(BaseStringType):
       return
 
   def get_attr(self, frame, anchor, name, write=False):
+    if write: raise NodeAssignError(name)
     if name == 'isdecimal':
       return BuiltinConstMethod('unicode.isdecimal', BoolType.get_object())
     elif name == 'isnumeric':
@@ -378,6 +381,7 @@ class FileType(BuiltinConstCallable, BuiltinBasicType):
 
   def get_attr(self, frame, anchor, name, write=False):
     from pyntch.aggregate_types import ListType
+    if write: raise NodeAssignError(name)
     if name == 'close':
       return BuiltinConstMethod('file.close', NoneType.get_object())
     elif name == 'closed':

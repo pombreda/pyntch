@@ -9,11 +9,16 @@ class ErrorConfig(object):
 
   raise_uncertain = False
   
-  ignore_module_notfound = False
-
   ignore_none = True
 
   show_all = False
+
+  unfound_modules = set()
+  
+  @classmethod
+  def module_not_found(klass, modname):
+    klass.unfound_modules.add(modname)
+    return
   
   @classmethod
   def is_ignored(klass, obj):

@@ -39,8 +39,6 @@ class FixedVariable(Variable):
 ##
 class Namespace(object):
 
-  debug = 0
-
   def __init__(self, parent_space, name):
     self.parent_space = parent_space
     self.name = name
@@ -90,7 +88,8 @@ class Namespace(object):
   
   # register_names
   def register_names(self, tree):
-    from pyntch.module import Interpreter
+    from pyntch.module import Interpreter, ModuleNotFound
+    from pyntch.config import ErrorConfig
     
     if isinstance(tree, ast.Module):
       self.register_names(tree.node)
@@ -195,7 +194,6 @@ class Namespace(object):
     # import
     elif isinstance(tree, ast.Import):
       for (modname,name) in tree.names:
-        module = Interpreter.load_module(modname)
         if name:
           asname = name
         elif '.' in modname:
@@ -203,17 +201,25 @@ class Namespace(object):
         else:
           asname = modname
         self.register_var(asname)
-        self[asname].bind(module)
+        try:
+          module = Interpreter.load_module(modname)
+          self[asname].bind(module)
+        except ModuleNotFound, e:
+          ErrorConfig.module_not_found(modname)
 
     # from
     elif isinstance(tree, ast.From):
-      module = Interpreter.load_module(tree.modname)
-      for (name0,name1) in tree.names:
-        if name0 == '*':
-          self.import_all(module.space)
-        else:
-          asname = name1 or name0
-          self.register_var(asname).bind(module.space.register_var(name0))
+      modname = tree.modname
+      try:
+        module = Interpreter.load_module(modname)
+        for (name0,name1) in tree.names:
+          if name0 == '*':
+            self.import_all(module.space)
+          else:
+            asname = name1 or name0
+            self.register_var(asname).bind(module.space.register_var(name0))
+      except ModuleNotFound, e:
+        ErrorConfig.module_not_found(modname)
 
     # print, printnl
     elif isinstance(tree, (ast.Print, ast.Printnl)):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from pyntch.typenode import CompoundTypeNode, \
-     NodeTypeError, NodeAttrError, BuiltinType, BuiltinObject, UndefinedTypeNode
+     NodeTypeError, NodeAttrError, NodeAssignError, BuiltinType, BuiltinObject, UndefinedTypeNode
 from pyntch.namespace import Namespace
 from pyntch.module import TreeReporter
 from pyntch.frame import ExecutionFrame
@@ -102,6 +102,7 @@ class ClassType(BuiltinType, TreeReporter):
 
   def get_attr(self, frame, anchor, name, write=False):
     if name == '__class__':
+      if write: raise NodeAssignError(name)
       return self.get_type()
     elif name not in self.attrs:
       attr = self.ClassAttr(frame, anchor, name, self, self.baseklass)
@@ -210,7 +211,7 @@ class InstanceObject(BuiltinObject):
     self.boundmethods = {}
     BuiltinObject.__init__(self, klass)
     for (name, value) in klass.attrs.iteritems():
-      value.connect(self.get_attr(None, None, name).recv)
+      value.connect(self.get_attr(None, None, name, True).recv)
     return
   
   def __repr__(self):
@@ -226,6 +227,7 @@ class InstanceObject(BuiltinObject):
 
   def get_attr(self, frame, anchor, name, write=False):
     if name == '__class__':
+      if write: raise NodeAssignError(name)
       return self.get_type()
     elif name not in self.attrs:
       attr = self.InstanceAttr(frame, anchor, name, self)
