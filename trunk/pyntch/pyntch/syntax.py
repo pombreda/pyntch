@@ -403,6 +403,13 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, ast.Global):
     pass
 
+  # with (for __future__ python 2.5 or 2.6)
+  elif isinstance(tree, ast.With):
+    # XXX need to call __enter__ and __exit__
+    value = build_expr(reporter, frame, space, tree.expr, evals)
+    build_assign(reporter, frame, space, tree.vars, value, evals)
+    build_stmt(reporter, frame, space, tree.body, evals)
+
   # del
   elif isinstance(tree, ast.AssName):
     pass

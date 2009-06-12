@@ -139,6 +139,12 @@ class Namespace(object):
     elif isinstance(tree, ast.Yield):
       self.register_names(tree.value)
 
+    # with (for __future__ python 2.5 or 2.6)
+    elif isinstance(tree, ast.With):
+      self.register_names(tree.expr)
+      self.register_names(tree.vars)
+      self.register_names(tree.body)
+
     # (mutliple statements)
     elif isinstance(tree, ast.Stmt):
       for stmt in tree.nodes:
