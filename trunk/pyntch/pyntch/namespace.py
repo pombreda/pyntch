@@ -199,17 +199,16 @@ class Namespace(object):
         
     # import
     elif isinstance(tree, ast.Import):
-      for (modname,name) in tree.names:
-        if name:
-          asname = name
-        elif '.' in modname:
-          continue
-        else:
-          asname = modname
-        self.register_var(asname)
+      for (modname,asname) in tree.names:
+        if '.' in modname:
+          try:
+            Interpreter.load_module(modname)
+          except ModuleNotFound, e:
+            ErrorConfig.module_not_found(modname)
+          modname = modname[:modname.index('.')]
         try:
           module = Interpreter.load_module(modname)
-          self[asname].bind(module)
+          self.register_var(asname or modname).bind(module)
         except ModuleNotFound, e:
           ErrorConfig.module_not_found(modname)
 

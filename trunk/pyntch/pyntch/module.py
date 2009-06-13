@@ -74,7 +74,7 @@ class ModuleObject(BuiltinObject):
   def get_path(self):
     return '?'
 
-  def get_loadpath(self):
+  def get_childpath(self):
     return []
 
   def get_name(self):
@@ -123,7 +123,7 @@ class PythonModuleObject(ModuleObject, TreeReporter):
   def get_path(self):
     return self.path
 
-  def get_loadpath(self):
+  def get_childpath(self):
     return [ os.path.dirname(self.path) ]
 
   def show(self, out):
@@ -222,17 +222,21 @@ class Interpreter(object):
       print >>sys.stderr, 'load_module: %r...' % modname
     if parent:
       fullname = parent.name+'.'+modname
-      modpath = parent.get_loadpath()
+      modpath = parent.get_childpath()
     else:
       fullname = modname
       modpath = klass.module_path
     if fullname in klass.NAME2MODULE:
       return klass.NAME2MODULE[fullname]
-    elif '.' in modname:
-      i = modname.index('.')
-      path = klass.find_module(modname[:i], modpath)
-      module = klass.load_file(path, fullname)
-      return klass.load_module(modname[i+1:], module)
-    else:
+    if '.' not in modname:
       path = klass.find_module(modname, modpath)
       return klass.load_file(path, fullname)
+    i = modname.index('.')
+    (modname, childname) = (modname[:i], modname[i+1:])
+    path = klass.find_module(modname, modpath)
+    if parent:
+      fullname = parent.name+'.'+modname
+    else:
+      fullname = modname
+    module = klass.load_file(path, fullname)
+    return klass.load_module(childname, module)
