@@ -218,12 +218,19 @@ class Namespace(object):
       modname = tree.modname
       try:
         module = Interpreter.load_module(modname)
-        for (name0,name1) in tree.names:
-          if name0 == '*':
+        for (name,asname) in tree.names:
+          if name == '*':
             self.import_all(module.space)
           else:
-            asname = name1 or name0
-            self.register_var(asname).bind(module.space.register_var(name0))
+            try:
+              obj = Interpreter.load_module(name, module)
+            except ModuleNotFound:
+              try:
+                obj = module.space[name]
+              except KeyError:
+                ErrorConfig.module_not_found(name)
+                continue
+            self.register_var(asname or name).bind(obj)
       except ModuleNotFound, e:
         ErrorConfig.module_not_found(modname)
 
