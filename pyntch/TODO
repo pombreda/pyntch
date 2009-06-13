@@ -1,6 +1,7 @@
 TODO:
 
-- support special function checking (e.g. pack, unpack).
-- finer (scoped) control of errors/warnings.
-- ignore exceptions raised in certain class/functions.
 - add more test cases and stub modules.
+- support __all__
+- support special function checking (e.g. pack, unpack).
+- finer control of errors/warnings: ignore exceptions raised in certain class/functions.
+

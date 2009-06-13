@@ -71,6 +71,12 @@ class ModuleObject(BuiltinObject):
   def __repr__(self):
     return '<Module %s>' % (self.name,)
 
+  def get_path(self):
+    return '?'
+
+  def get_loadpath(self):
+    return []
+
   def get_name(self):
     return self.name
 
@@ -116,6 +122,9 @@ class PythonModuleObject(ModuleObject, TreeReporter):
 
   def get_path(self):
     return self.path
+
+  def get_loadpath(self):
+    return [ os.path.dirname(self.path) ]
 
   def show(self, out):
     out.write('[%s]' % self.name)
@@ -186,7 +195,7 @@ class Interpreter(object):
       module = klass.PATH2MODULE[path]
     else:
       if klass.verbose:
-        print >>sys.stderr, 'loading: %r' % path
+        print >>sys.stderr, 'loading: %r as %r' % (path, modname)
       dirname = os.path.dirname(path)
       if dirname not in klass.module_path:
         klass.module_path.insert(0, dirname)
@@ -208,27 +217,22 @@ class Interpreter(object):
 
   # load_module
   @classmethod
-  def load_module(klass, fullname):
+  def load_module(klass, modname, parent=None):
     if klass.debug:
-      print >>sys.stderr, 'load_module: %r...' % fullname
-    if fullname in klass.NAME2MODULE:
-      module = klass.NAME2MODULE[fullname]
+      print >>sys.stderr, 'load_module: %r...' % modname
+    if parent:
+      fullname = parent.name+'.'+modname
+      modpath = parent.get_loadpath()
     else:
+      fullname = modname
       modpath = klass.module_path
-      modname = fullname
-      parent = None
-      try:
-        path = klass.find_module(modname, modpath)
-        module = klass.load_file(path, fullname)
-      except ModuleNotFound, e:
-        try:
-          i = fullname.rindex('.')
-          parent = klass.load_module(fullname[:i])
-          modpath = [ os.path.dirname(parent.path) ]
-          modname = fullname[i+1:]
-        except (ValueError, ModuleNotFound):
-          raise e
-        path = klass.find_module(modname, modpath)
-        module = klass.load_file(path, fullname)
-        parent.add_child(modname, module)
-    return module
+    if fullname in klass.NAME2MODULE:
+      return klass.NAME2MODULE[fullname]
+    elif '.' in modname:
+      i = modname.index('.')
+      path = klass.find_module(modname[:i], modpath)
+      module = klass.load_file(path, fullname)
+      return klass.load_module(modname[i+1:], module)
+    else:
+      path = klass.find_module(modname, modpath)
+      return klass.load_file(path, fullname)
