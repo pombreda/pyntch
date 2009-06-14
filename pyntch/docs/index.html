@@ -19,7 +19,7 @@ Python type checker / source code analyzer
 
 <div align=right class=lastmod>
 <!-- hhmts start -->
-Last Modified: Sat Jun  6 17:14:27 JST 2009
+Last Modified: Mon Jun 15 00:39:12 JST 2009
 <!-- hhmts end -->
 </div>
 
@@ -28,19 +28,22 @@ Last Modified: Sat Jun  6 17:14:27 JST 2009
 <h2>What's It?</h2>
 <p>
 Pyntch is a PYthoN Type CHecker. It detects possible runtime
-errors before actually running a Python code. Pyntch examines a
-source code statically and infers all possible types of variables,
-class attributes, function signatures, and return values of
-each function or method. Then it detects possible errors caused
-by type mismatch or other exceptions raised from each function. Unlike
-other Python code checker (such as Pychecker or Pyflakes), Pyntch
-does not check the style issues. 
+errors before actually running a code. Pyntch examines a source
+code statically and infers all possible types of variables,
+attributes, function arguments, and return values of each function
+or method. Then it detects possible exceptions caused by type
+mismatch, attribute not found, or other types of exceptions raised
+from each function. Unlike other Python code checkers (such as
+Pychecker or Pyflakes), Pyntch does not check the style issues.
 <p>
-<strong>Disclaimer:</strong> 
-Pyntch is still at the proof-of-ideas stage and 
-not proven to be efficient or even useful.
-<p>
-Pyntch can detect the following types of errors:
+Pyntch can infer the following information from a source code:
+<ul>
+<li> All possible types of objects that variables, 
+function arguments or class attribtes might have.
+<li> Functions or instance methods that can be actually called at each
+function call, considering polymorphism.
+<li> A list of calling locations for each function or method.
+<li> The following types of uncaught exceptions that might occur in a certain function:
 <ul>
 <li> Type mismatch (e.g. adding an integer and a string).
 <li> Access to undefined attributes
@@ -52,12 +55,13 @@ Pyntch can detect the following types of errors:
 <li> Iteration over non-iterable objects
  (e.g. <code>sorted(x)</code> where x is not an iterable object).
 </ul>
+</ul>
 
 <a name="source"></a>
 <p>
 <strong>Download:</strong><br>
-<a href="http://www.unixuser.org/~euske/python/pyntch/pyntch-dist-20090531.tar.gz">
-http://www.unixuser.org/~euske/python/pyntch/pyntch-dist-20090531.tar.gz
+<a href="http://www.unixuser.org/~euske/python/pyntch/pyntch-dist-20090615.tar.gz">
+http://www.unixuser.org/~euske/python/pyntch/pyntch-dist-20090615.tar.gz
 </a>
 (54KBytes)
 
@@ -78,18 +82,20 @@ http://code.google.com/p/pyntch/source/browse/trunk/pyntch
 <hr noshade>
 <h2>Background</h2>
 <p>
-One of the greatest strength on scripting languages such as Python
-is its dynamicity. You can define any functions, variables and
-data structures whenever you want without elaborating the detailed
-specifications. However, this feature comes with some cost:
-sometimes it is difficult to find potential errors that are caused
-by type mismatch before actually running the program.
-<p>
 Have you experienced a TypeError caused by giving a wrong type of
 arguments, say, a string object to numeric functions?  Or trying
 to access a nonexistent method of a wrongly passed class that
-would otherwise have such a method? There is always a risk of such
-unexpected exceptions that cause sudden death of a Python program.
+would otherwise have such a method? 
+One of the great advantages of scripting languages such as Python
+is its dynamicity. You can define any functions, variables and
+data structures whenever you want without elaborating the detailed
+type definitions. However, this feature comes with some cost:
+sometimes it is difficult to find potential errors that are caused
+by type mismatch before actually running the program.
+<p>
+In a language like Python, there is always a risk of uncaught runtime exceptions 
+that a programmer could not foresee when s/he was writing the code,
+which causes sudden death of the program.
 This kind of behavior is particulary unfavorable for mission
 critical applications, so we want to catch these errors in
 advance. Unfortunately, as the program gets larger, it's getting
@@ -173,9 +179,10 @@ The output shows several things:
 <h3>Adding a module path</h3>
 <p>
 Pyntch can take module names instead of actual file names as input.
-Pyntch searches the default Python path that is normally specified by <code>PYTHONPATH</code>
-environment variable as well as stub path (explained below). If you want to instruct
-Pyntch to look at different places, use <code>-p</code> option:
+Pyntch searches the Python search path that is specified by <code>PYTHONPATH</code>
+environment variable, as well as stub path (explained below). If you want to instruct
+Pyntch to look at different locations, use <code>-p</code> option to alter
+the module search path:
 <blockquote><pre>
 $ <strong>tchecker.py -p /path/to/your/modules mypackage.mymodule</strong>
 </pre></blockquote>
@@ -183,7 +190,7 @@ $ <strong>tchecker.py -p /path/to/your/modules mypackage.mymodule</strong>
 <h3>Creating a stub module</h3>
 <p>
 Due to the nature of source level analysis, Pyntch cannot analyze
-a program that uses extension modules, in which the behavior of
+a program that uses external modules, in which the behavior of
 the code is specified only in opaque binaries.  In that case, a
 user can instruct Pyntch to use an alternative "stub" module which
 is written in Python and defines only the return type of each
@@ -209,6 +216,51 @@ Stub modules for several built-in modules such as <code>sys</code> or
 They are normally placed in the Pyntch package directory 
 (e.g. <code>/usr/local/lib/python2.5/site-packages</code>) and
 used by default instead of built-in Python modules.
+
+<p>
+Pyntch cannot correctly analyze a built-in function that returns
+different types of values depending on its parameters
+(notably <code>struct.unpack</code>).
+
+<h3>Controlling warnings</h3>
+<p>
+Since Pyntch can produce a lot of information about a code, a user
+might be overwhelmed by the amount or complexity of its
+result. Pyntch offers a couple of ways for controlling the
+outputs in order to provide the desired information.
+
+<h4>Command line options:</h4>
+<dl>
+<dt> <code>-C <u>key</u>=<u>value</u></code>
+<dd> Specify a configuration parameter (described below).
+
+<dt> <code>-c <u>config_file</u></code>
+<dd> Specify a configuration file. A configuration file is a Python 
+script that defines parameters for <code>ErrorConfig</code> settings.
+
+<dt> <code>-p <u>python_path</u></code>
+<dd> Add a search path for Python modules. Multiple <code>-p</code> options are allowed.
+
+<dt> <code>-a</code>
+<dd> Same as <code>show_all=True</code>.
+
+</dl>
+
+<h4>Configuration parameters:</h4>
+<p>
+These are defined in <code>ErrorConfig</code> class (config.py).
+<dl>
+<dt> <code>raise_uncertain</code> <em>(boolean)</em>
+<dd> Include uncertain runtime exceptions (such as file error).
+
+<dt> <code>ignore_none</code> <em>(boolean)</em>
+<dd> Supress warnings for operations against a None object.
+
+<dt> <code>show_all</code> <em>(boolean)</em>
+<dd> Displays all the possible uncatched exceptions for each function,
+including exceptions that occur indirectly inside the internal function calls.
+
+</dl>
 
 
 <a name="limitations"></a>
@@ -250,7 +302,6 @@ the following conditions:
 <li> not using <code>eval</code>, <code>compile</code> or <code>exec</code> functions.
 <li> no metaclass programming.
 </ul>
-
 
 <a name="howitworks"></a>
 <hr noshade>
@@ -322,6 +373,7 @@ Fig 2. Handling function call
 <hr noshade>
 <h2>Changes</h2>
 <ul>
+<li> 2009/06/15: Several bugfixes.
 <li> 2009/05/31: Initial release.
 <li> 2008/03/01: Start the project.
 </ul>

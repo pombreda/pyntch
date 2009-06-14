@@ -19,6 +19,8 @@ def main(argv):
     (opts, args) = getopt.getopt(argv[1:], 'dqac:C:p:')
   except getopt.GetoptError:
     return usage()
+  if not args:
+    return usage()
   stubdir = os.path.join(os.path.dirname(pyntch.__file__), 'stub')
   debug = 0
   verbose = 1
