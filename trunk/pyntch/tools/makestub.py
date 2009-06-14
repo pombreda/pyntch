@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 import sys
-import fileinput
-stdout = sys.stdout
-stderr = sys.stderr
 
 BUILTIN_TYPES = ('bool', 'int', 'long', 'float', 'complex',
                  'str', 'unicode', 'list', 'tuple', 'dict')
