@@ -242,10 +242,16 @@ def build_expr(reporter, frame, space, tree, evals):
     else_ = build_expr(reporter, frame, space, tree.else_, evals)
     expr = IfExpOp(ExecutionFrame(frame, tree), tree, test, then, else_)
 
+  # Backquote (unsupported)
   elif isinstance(tree, ast.Backquote):
     ExecutionFrame(frame, tree).raise_expt(ErrorConfig.NotSupported('backquote notation'))
     expr = UndefinedTypeNode('backquote')
 
+  # Ellipsis
+  elif isinstance(tree, ast.Ellipsis):
+    ExecutionFrame(frame, tree).raise_expt(ErrorConfig.NotSupported('ellipsis'))
+    expr = UndefinedTypeNode('ellipsis')
+  
   else:
     # unsupported AST.
     raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._module.get_path(), tree.lineno))
