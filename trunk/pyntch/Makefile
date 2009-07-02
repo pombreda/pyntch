@@ -9,13 +9,14 @@ TMPDIR=/tmp
 VERSION=`$(PYTHON) $(PACKAGE)/__init__.py`
 DISTNAME=$(PACKAGE)-dist-$(VERSION)
 DISTFILE=$(DISTNAME).tar.gz
+PREFIX=/usr/local
 
 TCHECKER=tools/tchecker.py
 
 all:
 
 install:
-	$(PYTHON) setup.py install
+	$(PYTHON) setup.py install --prefix=$(PREFIX)
 
 selfcheck:
 	PYTHONPATH=. $(PYTHON) $(TCHECKER) $(TCHECKER) > selfcheck.txt
