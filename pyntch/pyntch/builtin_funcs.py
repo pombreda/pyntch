@@ -475,7 +475,7 @@ class ReduceFunc(BuiltinFuncNoKwd):
       return
       
   def __init__(self):
-    BuiltinFunc.__init__(self, 'reduce', [ANY, ANY])
+    BuiltinFunc.__init__(self, 'reduce', [ANY, ANY], [ANY])
     return
 
   def process_args_nokwd(self, frame, anchor, args):

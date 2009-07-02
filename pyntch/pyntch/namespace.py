@@ -180,7 +180,7 @@ class Namespace(object):
         if expr:
           self.register_names(expr)
         if e:
-          self.register_var(e.name)
+          self.register_names(e)
         self.register_names(stmt)
       if tree.else_:
         self.register_names(tree.else_)
