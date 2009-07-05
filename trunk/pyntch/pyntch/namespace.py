@@ -343,6 +343,9 @@ class Namespace(object):
     elif isinstance(tree, ast.Assert):
       if isinstance(tree.test, ast.Const) and isinstance(tree.test.value, str) and tree.test.value:
         self.register_fixed(tree.test.value)
+      self.register_names(tree.test)
+      if tree.fail:
+        self.register_names(tree.fail)
     
     # Ellipsis
     elif isinstance(tree, ast.Ellipsis):

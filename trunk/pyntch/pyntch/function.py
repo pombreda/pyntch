@@ -130,6 +130,7 @@ class FuncType(BuiltinType, TreeReporter):
     # Process standard arguments.
     variargs = []
     for arg1 in args:
+      assert arg1 != None, args
       if varsleft:
         var1 = varsleft.pop(0)
         assign_arg(frame, anchor, var1, arg1)
