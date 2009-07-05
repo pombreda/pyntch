@@ -91,7 +91,7 @@ def build_assign(reporter, frame, space, n, v, evals):
 ##  Constructs a TypeNode from a given syntax tree.
 ##
 def build_expr(reporter, frame, space, tree, evals):
-  from pyntch.basic_types import BUILTIN_OBJECT
+  from pyntch.basic_types import BUILTIN_OBJECT, IntType
   from pyntch.aggregate_types import IterType, GeneratorType, ListType, DictType, TupleType
 
   if isinstance(tree, ast.Const):
@@ -132,11 +132,12 @@ def build_expr(reporter, frame, space, tree, evals):
       
   elif isinstance(tree, ast.Slice):
     obj = build_expr(reporter, frame, space, tree.expr, evals)
-    lower = upper = None
+    lower = upper = IntType.get_object() # maxint is given when omitted.
     if tree.lower:
       lower = build_expr(reporter, frame, space, tree.lower, evals)
     if tree.upper:
       upper = build_expr(reporter, frame, space, tree.upper, evals)
+    assert lower != None and upper != None
     expr = SliceRef(ExecutionFrame(frame, tree), tree, obj, [lower, upper])
 
   elif isinstance(tree, ast.Sliceobj):

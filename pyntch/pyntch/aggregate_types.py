@@ -218,7 +218,11 @@ class ListObject(BuiltinSequenceObject):
 
   # ListObject
   def desc1(self, done):
-    return '[%s]' % self.elemall.desc1(done)
+    if self in done:
+      return '...'
+    else:
+      done.add(self)
+      return '[%s]' % self.elemall.desc1(done)
 
   def get_element(self, frame, anchor, sub, write=False):
     frame.raise_expt(ErrorConfig.MaybeOutOfRange())
@@ -311,10 +315,14 @@ class TupleObject(BuiltinSequenceObject):
       return '(%s)' % ','.join( obj.describe() for obj in self.elements )
 
   def desc1(self, done):
-    if self.elements == None:
-      return '(*%s)' % self.elemall.desc1(done)
+    if self in done:
+      return '...'
     else:
-      return '(%s)' % ','.join( obj.desc1(done) for obj in self.elements )
+      done.add(self)
+      if self.elements == None:
+        return '(*%s)' % self.elemall.desc1(done)
+      else:
+        return '(%s)' % ','.join( obj.desc1(done) for obj in self.elements )
 
   def get_element(self, frame, anchor, sub, write=False):
     if write: raise NodeAssignError
@@ -426,7 +434,11 @@ class FrozenSetObject(BuiltinSequenceObject):
 
   #
   def desc1(self, done):
-    return '([%s])' % self.elemall.desc1(done)
+    if self in done:
+      return '...'
+    else:
+      done.add(self)
+      return '([%s])' % self.elemall.desc1(done)
 
   def create_attr(self, frame, anchor, name):
     if name == 'copy':
@@ -544,7 +556,11 @@ class IterObject(BuiltinAggregateObject):
     return '(%s, ...)' % self.elemall
 
   def desc1(self, done):
-    return '(%s, ...)' % self.elemall.desc1(done)
+    if self in done:
+      return '...'
+    else:
+      done.add(self)
+      return '(%s, ...)' % self.elemall.desc1(done)
 
   def get_iter(self, frame, anchor):
     return self
@@ -849,7 +865,11 @@ class DictObject(BuiltinAggregateObject):
     return '{%s: %s}' % (self.key, self.value)
 
   def desc1(self, done):
-    return '{%s: %s}' % (self.key.desc1(done), self.value.desc1(done))
+    if self in done:
+      return '...'
+    else:
+      done.add(self)
+      return '{%s: %s}' % (self.key.desc1(done), self.value.desc1(done))
 
   def create_attr(self, frame, anchor, name):
     if name == 'clear':

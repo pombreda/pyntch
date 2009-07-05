@@ -1,3 +1,6 @@
+BUGS:
+os.path
+
 TODO:
 
 - add more test cases and stub modules.

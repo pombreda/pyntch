@@ -160,10 +160,10 @@ class PythonClassType(ClassType, TreeReporter):
     else:
       out.write('class %s:' % self.name)
     blocks = set( name for (name,_) in self.children )
-    for (name, attr) in sorted(self.attrs.iteritems()):
+    for (name, attr) in self.attrs.iteritems():
       if name in blocks or not attr.types: continue
       out.write('  class.%s = %s' % (name, attr.describe()))
-    for (name, attr) in sorted(self.instance.attrs.iteritems()):
+    for (name, attr) in self.instance.attrs.iteritems():
       if name in blocks or not attr.types: continue
       out.write('  instance.%s = %s' % (name, attr.describe()))
     return
