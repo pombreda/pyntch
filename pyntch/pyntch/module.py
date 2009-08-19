@@ -51,15 +51,15 @@ class TreeReporter(object):
     return
   
   
+##  Module
+##
 class ModuleNotFound(Exception):
+  
   def __init__(self, name, path=None):
     self.name = name
     self.path = path
     return
   
-
-##  Module
-##
 class ModuleObject(BuiltinObject):
   
   def __init__(self, name, space, level=0):
@@ -88,6 +88,9 @@ class ModuleObject(BuiltinObject):
   def add_child(self, name, module):
     self.space.register_var(name).bind(module)
     return
+
+  def load_module(self, name, stdpath=True):
+    raise ModuleNotFound(name)
   
   def import_object(self, name):
     if name in self.space:
@@ -134,7 +137,11 @@ class PythonModuleObject(ModuleObject, TreeReporter):
     return
 
   def load_module(self, name, stdpath=True):
-    return Interpreter.load_module(name, [os.path.dirname(self.path)], level=self.level+1, stdpath=stdpath)
+    if self.name == 'os' and name == 'path':
+      # os.path hack
+      return Interpreter.load_module('posixpath', [], level=self.level+1, stdpath=True)
+    else:
+      return Interpreter.load_module(name, [os.path.dirname(self.path)], level=self.level+1, stdpath=stdpath)
 
   def import_object(self, name):
     if name in self.space:
@@ -148,6 +155,7 @@ class Interpreter(object):
 
   verbose = 0
   debug = 0
+  lines = 0
   
   module_path = None
   stub_path = None
@@ -210,6 +218,10 @@ class Interpreter(object):
       module = PythonModuleObject(modname, klass.DEFAULT_NAMESPACE, path, level=level)
       klass.PATH2MODULE[path] = module
       try:
+        fp = file(path)
+        for _ in fp:
+          klass.lines += 1
+        fp.close()
         tree = compiler.parseFile(path)
       except IOError:
         raise ModuleNotFound(modname, path)
