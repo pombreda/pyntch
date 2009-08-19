@@ -128,7 +128,7 @@ class BuiltinSequenceType(BuiltinAggregateType):
   def process_args(self, frame, anchor, args, kwargs):
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
-      return UndefinedTypeNode()
+      return UndefinedTypeNode.get_object()
     if args:
       return self.create_sequence(frame, anchor, args[0])
     return self.create_null(frame, anchor)
@@ -625,7 +625,7 @@ class ReversedType(BuiltinCallable, IterType):
   def process_args(self, frame, anchor, args, kwargs):
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
-      return UndefinedTypeNode()
+      return UndefinedTypeNode.get_object()
     return self.ReversedIterConverter(frame, anchor, args[0])
   
 
@@ -994,6 +994,6 @@ class EnumerateType(BuiltinCallable, BuiltinType):
   def process_args(self, frame, anchor, args, kwargs):
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
-      return UndefinedTypeNode()
+      return UndefinedTypeNode.get_object()
     elemall = TupleType.create_tuple([IntType.get_object(), IterElement(frame, anchor, args[0])])
     return IterObject(self.get_typeobj(), elemall=elemall)

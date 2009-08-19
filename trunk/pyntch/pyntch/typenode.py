@@ -22,22 +22,30 @@ class TypeNode(object):
 
   verbose = 0
   debug = 0
-  N = 0
+  nodes = 0
+
+  procs = set()
 
   @classmethod
   def inc(klass):
-    if klass.verbose:
-      klass.N += 1
-      if klass.N % 1000 == 0:
-        sys.stderr.write('.'); sys.stderr.flush()
-    return
-  
-  @classmethod  
-  def showstat(klass):
-    if klass.verbose:
-      print >>sys.stderr, '%d nodes' % klass.N
+    klass.nodes += 1
     return
 
+  @classmethod
+  def schedule(klass, proc, obj):
+    klass.procs.add((proc, obj))
+    return
+  
+  @classmethod
+  def run(klass):
+    while klass.procs:
+      if klass.verbose:
+        print >>sys.stderr, 'processing:', klass.nodes, len(klass.procs)
+      (procs, klass.procs) = (klass.procs, set())
+      for (proc,obj) in procs:
+        proc(obj)
+    return
+  
   def __init__(self, types):
     self.types = set(types)
     self.sendto = []
@@ -58,7 +66,8 @@ class TypeNode(object):
       print >>sys.stderr, 'connect: %r -> %r' % (self, receiver)
     if receiver in self.sendto: return False
     self.sendto.append(receiver)
-    return receiver(self)
+    self.schedule(receiver, self)
+    return
 
   def get_attr(self, frame, anchor, name, write=False):
     raise NodeAttrError(name)
@@ -134,9 +143,10 @@ class CompoundTypeNode(TypeNode):
   
   def update_type(self, obj):
     if obj in self.types: return
+    #print 'add', id(self), id(obj), obj
     self.types.add(obj)
     for receiver in self.sendto:
-      receiver(self)
+      self.schedule(receiver, self)
     return True
 
   def desc1(self, done):
@@ -160,6 +170,13 @@ class CompoundTypeNode(TypeNode):
 ##
 class UndefinedTypeNode(TypeNode):
   
+  OBJECT = None
+  @classmethod
+  def get_object(klass):
+    if not klass.OBJECT:
+      klass.OBJECT = klass()
+    return klass.OBJECT
+
   def __init__(self, name=None):
     TypeNode.__init__(self, [])
     return
@@ -281,10 +298,10 @@ class BuiltinCallable(object):
     from config import ErrorConfig
     if len(args) < self.minargs:
       frame.raise_expt(ErrorConfig.InvalidNumOfArgs(self.minargs, len(args)))
-      return UndefinedTypeNode()
+      return UndefinedTypeNode.get_object()
     if len(self.args) < len(args):
       frame.raise_expt(ErrorConfig.InvalidNumOfArgs(len(self.args), len(args)))
-      return UndefinedTypeNode()
+      return UndefinedTypeNode.get_object()
     return self.process_args(frame, anchor, args, kwargs)
 
   def process_args(self, frame, anchor, args, kwargs):

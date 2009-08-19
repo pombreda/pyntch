@@ -9,14 +9,17 @@ from pyntch.namespace import Namespace
 from pyntch.module import Interpreter, IndentedStream, ModuleNotFound
 from pyntch.config import ErrorConfig
 
+#sys.setrecursionlimit(3000)
+#sys.stderr = sys.stdout
+
 # main
 def main(argv):
   import getopt
   def usage():
-    print 'usage: %s [-d] [-q] [-a] [-c config] [-C key=val] [-p pythonpath] [file ...]' % argv[0]
+    print 'usage: %s [-d] [-q] [-a] [-c config] [-C key=val] [-p pythonpath] [-P stubpath] [file ...]' % argv[0]
     return 100
   try:
-    (opts, args) = getopt.getopt(argv[1:], 'dqac:C:p:')
+    (opts, args) = getopt.getopt(argv[1:], 'dqac:C:p:P:')
   except getopt.GetoptError:
     return usage()
   if not args:
@@ -24,7 +27,8 @@ def main(argv):
   stubdir = os.path.join(os.path.dirname(pyntch.__file__), 'stub')
   debug = 0
   verbose = 1
-  modpath = [stubdir]+sys.path[:]
+  modpath = sys.path[:]
+  stubpath = [stubdir]
   for (k, v) in opts:
     if k == '-d': debug += 1
     elif k == '-q': verbose -= 1
@@ -34,11 +38,12 @@ def main(argv):
       (k,v) = v.split('=')
       ErrorConfig.set(k, eval(v))
     elif k == '-p': modpath.extend(v.split(':'))
+    elif k == '-P': stubpath.extend(v.split(':'))
   TypeNode.debug = debug
-  TypeNode.verbose = verbose
   Interpreter.debug = debug
+  TypeNode.verbose = verbose
   Interpreter.verbose = verbose
-  Interpreter.initialize(modpath)
+  Interpreter.initialize(modpath, stubpath)
   MustBeDefinedNode.reset()
   modules = []
   for name in args:
@@ -48,14 +53,14 @@ def main(argv):
         (name,_) = os.path.splitext(os.path.basename(name))
         module = Interpreter.load_file(path, name)
       else:
-        module = Interpreter.load_module(name)
+        module = Interpreter.load_module(name, [])[-1]
       modules.append(module)
     except ModuleNotFound, e:
       print >>sys.stderr, 'module not found:', name
-  MustBeDefinedNode.check()
   if ErrorConfig.unfound_modules:
     print >>sys.stderr, 'modules not found:', ', '.join(sorted(ErrorConfig.unfound_modules))
-  TypeNode.showstat()
+  TypeNode.run()
+  MustBeDefinedNode.check()
   for module in modules:
     print '===', module.get_name(), '==='
     module.showrec(IndentedStream(sys.stdout))

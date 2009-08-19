@@ -266,6 +266,8 @@ def build_expr(reporter, frame, space, tree, evals):
 ##
 def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   from pyntch.basic_types import NoneType, StrType
+  from pyntch.module import ModuleNotFound
+  from pyntch.config import ErrorConfig
   assert isinstance(frame, ExecutionFrame)
 
   if isinstance(tree, ast.Module):
@@ -403,9 +405,31 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
 
   # import
   elif isinstance(tree, ast.Import):
-    pass
+    for (name,asname) in tree.names:
+      try:
+        modules = tree._module.load_module(name)
+        if asname:
+          space[asname].bind(modules[-1])
+        else:
+          asname = name.split('.')[0]
+          space[asname].bind(modules[0])
+      except ModuleNotFound, e:
+        ErrorConfig.module_not_found(e.name)
+        
   elif isinstance(tree, ast.From):
-    pass
+    try:
+      modname = tree.modname
+      modules = tree._module.load_module(modname)
+      for (name,asname) in tree.names:
+        if name != '*':
+          try:
+            obj = modules[-1].import_object(name)
+            space[asname or name].bind(obj)
+          except ModuleNotFound, e:
+            ErrorConfig.module_not_found(modname+'.'+e.name)
+    except ModuleNotFound, e:
+      ErrorConfig.module_not_found(e.name)
+  
   # global
   elif isinstance(tree, ast.Global):
     pass

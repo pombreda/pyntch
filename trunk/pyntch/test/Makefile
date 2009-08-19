@@ -8,5 +8,5 @@ all:
 clean:
 	-rm *.pyc *.pyo
 
-test:
+check:
 	PYTHONPATH=.. $(PYTHON) $(TCHECKER) *.py

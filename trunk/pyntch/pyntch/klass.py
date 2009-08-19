@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from pyntch.typenode import CompoundTypeNode, \
-     NodeTypeError, NodeAttrError, NodeAssignError, BuiltinType, BuiltinObject, UndefinedTypeNode
+     NodeTypeError, NodeAttrError, NodeAssignError, BuiltinType, BuiltinObject
 from pyntch.namespace import Namespace
 from pyntch.module import TreeReporter
 from pyntch.frame import ExecutionFrame
