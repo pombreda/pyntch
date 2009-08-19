@@ -88,7 +88,7 @@ class Namespace(object):
   
   # register_names
   def register_names(self, tree):
-    from pyntch.module import Interpreter, ModuleNotFound
+    from pyntch.module import ModuleNotFound
     from pyntch.config import ErrorConfig
     
     if isinstance(tree, ast.Module):
@@ -199,39 +199,26 @@ class Namespace(object):
         
     # import
     elif isinstance(tree, ast.Import):
-      for (modname,asname) in tree.names:
-        if '.' in modname:
-          try:
-            Interpreter.load_module(modname)
-          except ModuleNotFound, e:
-            ErrorConfig.module_not_found(modname)
-          modname = modname[:modname.index('.')]
-        try:
-          module = Interpreter.load_module(modname)
-          self.register_var(asname or modname).bind(module)
-        except ModuleNotFound, e:
-          ErrorConfig.module_not_found(modname)
+      for (name,asname) in tree.names:
+        if asname:
+          self.register_var(asname)
+        else:
+          name = name.split('.')[0]
+          self.register_var(name)
 
     # from
     elif isinstance(tree, ast.From):
-      modname = tree.modname
-      try:
-        module = Interpreter.load_module(modname)
-        for (name,asname) in tree.names:
-          if name == '*':
+      for (name,asname) in tree.names:
+        if name == '*':
+          modname = tree.modname
+          try:
+            module = tree._module.load_module(modname)[-1]
             self.import_all(module.space)
-          else:
-            try:
-              obj = Interpreter.load_module(name, module)
-            except ModuleNotFound:
-              try:
-                obj = module.space[name]
-              except KeyError:
-                ErrorConfig.module_not_found(name)
-                continue
-            self.register_var(asname or name).bind(obj)
-      except ModuleNotFound, e:
-        ErrorConfig.module_not_found(modname)
+          except ModuleNotFound, e:
+            print 'module_not_found: from:', e.name
+            ErrorConfig.module_not_found(e.name)
+        else:
+          self.register_var(asname or name)
 
     # print, printnl
     elif isinstance(tree, (ast.Print, ast.Printnl)):

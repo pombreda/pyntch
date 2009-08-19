@@ -298,7 +298,7 @@ class BaseStringType(BuiltinConstCallable, BuiltinBasicType):
   def call(self, frame, anchor, args, kwargs):
     if self.TYPE_NAME == 'basestring':
       frame.raise_expt(ErrorConfig.NotInstantiatable('basestring'))
-      return UndefinedTypeNode()
+      return UndefinedTypeNode.get_object()
     return BuiltinConstCallable.call(self, frame, anchor, args, kwargs)
 
   def __init__(self):
@@ -519,7 +519,7 @@ class StaticMethodType(BuiltinCallable, BuiltinType):
   def process_args(self, frame, anchor, args, kwargs):
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
-      return UndefinedTypeNode()
+      return UndefinedTypeNode.get_object()
     return self.MethodConverter(self.get_typeobj(), self.wrapper, args[0])
 
 class ClassMethodObject(BuiltinObject):

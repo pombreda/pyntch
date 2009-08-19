@@ -33,7 +33,7 @@ class BuiltinFuncNoKwd(BuiltinFunc):
   def process_args(self, frame, anchor, args, kwargs):
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
-      return UndefinedTypeNode()
+      return UndefinedTypeNode.get_object()
     return self.process_args_nokwd(frame, anchor, args)
 
   def process_args_nokwd(self, frame, anchor, args):
@@ -347,10 +347,10 @@ class MapFunc(BuiltinFunc):
   def call(self, frame, anchor, args, kwargs):
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
-      return UndefinedTypeNode()
+      return UndefinedTypeNode.get_object()
     if len(args) < self.minargs:
       frame.raise_expt(ErrorConfig.InvalidNumOfArgs(self.minargs, len(args)))
-      return UndefinedTypeNode()
+      return UndefinedTypeNode.get_object()
     return self.MapCaller(frame, anchor, args[0], args[1:])
 
 
@@ -365,7 +365,7 @@ class MinFunc(BuiltinFunc):
   def call(self, frame, anchor, args, kwargs):
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
-      return UndefinedTypeNode()
+      return UndefinedTypeNode.get_object()
     retobj = CompoundTypeNode()
     if len(args) == 1:
       IterElement(frame, anchor, args[0]).connect(retobj.recv)
@@ -578,7 +578,7 @@ class ZipFunc(BuiltinFunc):
   def call(self, frame, anchor, args, kwargs):
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
-      return UndefinedTypeNode()
+      return UndefinedTypeNode.get_object()
     elems = [ CompoundTypeNode() for arg1 in args ]
     zipelem = TupleType.create_tuple(elements=elems)
     seq = ListType.create_list(elemall=zipelem)

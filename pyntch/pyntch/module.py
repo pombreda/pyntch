@@ -52,7 +52,7 @@ class TreeReporter(object):
   
   
 class ModuleNotFound(Exception):
-  def __init__(self, name, path):
+  def __init__(self, name, path=None):
     self.name = name
     self.path = path
     return
@@ -62,9 +62,10 @@ class ModuleNotFound(Exception):
 ##
 class ModuleObject(BuiltinObject):
   
-  def __init__(self, name, space):
+  def __init__(self, name, space, level=0):
     self.name = name
     self.space = space
+    self.level = level
     BuiltinObject.__init__(self, ModuleType.get_typeobj())
     return
   
@@ -73,9 +74,6 @@ class ModuleObject(BuiltinObject):
 
   def get_path(self):
     return '?'
-
-  def get_childpath(self):
-    return []
 
   def get_name(self):
     return self.name
@@ -91,6 +89,10 @@ class ModuleObject(BuiltinObject):
     self.space.register_var(name).bind(module)
     return
   
+  def import_object(self, name):
+    if name in self.space:
+      return self.space[name]
+    raise ModuleNotFound(name)
   
 class ModuleType(BuiltinType):
   
@@ -101,30 +103,26 @@ class ModuleType(BuiltinType):
 ##
 class PythonModuleObject(ModuleObject, TreeReporter):
 
-  def __init__(self, name, parent_space, path=None):
+  def __init__(self, name, parent_space, path=None, level=0):
     self.path = path
     self.frame = ExecutionFrame(None, None)
-    ModuleObject.__init__(self, name, Namespace(parent_space, name))
+    ModuleObject.__init__(self, name, Namespace(parent_space, name), level=level)
     TreeReporter.__init__(self, None, name)
     return
   
   def __repr__(self):
     return '<Module %s (%s)>' % (self.name, self.path)
 
-  def load(self, tree):
+  def set(self, tree):
     from pyntch.syntax import build_stmt
     from pyntch.config import ErrorConfig
     from pyntch.exception import ImportErrorType
-    evals = []
     self.space.register_names(tree)
-    build_stmt(self, self.frame, self.space, tree, evals, isfuncdef=True)
+    build_stmt(self, self.frame, self.space, tree, [], isfuncdef=True)
     return
 
   def get_path(self):
     return self.path
-
-  def get_childpath(self):
-    return [ os.path.dirname(self.path) ]
 
   def show(self, out):
     out.write('[%s]' % self.name)
@@ -134,6 +132,14 @@ class PythonModuleObject(ModuleObject, TreeReporter):
       out.write('  %s = %s' % (name, v.describe()))
     self.frame.show(out)
     return
+
+  def load_module(self, name, stdpath=True):
+    return Interpreter.load_module(name, [os.path.dirname(self.path)], level=self.level+1, stdpath=stdpath)
+
+  def import_object(self, name):
+    if name in self.space:
+      return self.space[name]
+    return self.load_module(name)[-1]
   
 
 ##  Interpreter
@@ -144,15 +150,17 @@ class Interpreter(object):
   debug = 0
   
   module_path = None
+  stub_path = None
   PATH2MODULE = None
-  NAME2MODULE = None
+  BUILTIN_MODULE = None
   DEFAULT_NAMESPACE = None
 
   @classmethod
-  def initialize(klass, module_path):
+  def initialize(klass, module_path, stub_path):
     # global parameters.
     from pyntch.namespace import BuiltinTypesNamespace, BuiltinExceptionsNamespace, BuiltinNamespace, DefaultNamespace
     klass.module_path = module_path
+    klass.stub_path = stub_path
     default = DefaultNamespace()
     builtin = BuiltinNamespace(default)
     types = BuiltinTypesNamespace(builtin)
@@ -161,7 +169,7 @@ class Interpreter(object):
     builtin.import_all(exceptions)
     default.import_all(builtin)
     klass.DEFAULT_NAMESPACE = default
-    klass.NAME2MODULE = {
+    klass.BUILTIN_MODULE = {
       '__builtin__': ModuleObject('__builtin__', builtin),
       'types': ModuleObject('types', types),
       'exceptions': ModuleObject('exceptions', exceptions),
@@ -172,7 +180,10 @@ class Interpreter(object):
   # find_module(name)
   #   return the full path for a given module name.
   @classmethod
-  def find_module(klass, name, modpath):
+  def find_module(klass, name, modpath, stdpath=False):
+    modpath = klass.stub_path + modpath
+    if stdpath:
+      modpath += klass.module_path
     if klass.debug:
       print >>sys.stderr, 'find_module: name=%r' % name, modpath
     for dirname in modpath:
@@ -189,19 +200,15 @@ class Interpreter(object):
 
   # load_file
   @classmethod
-  def load_file(klass, path, modname):
+  def load_file(klass, path, modname, level=0):
     path = os.path.normpath(path)
     if path in klass.PATH2MODULE:
       module = klass.PATH2MODULE[path]
     else:
       if klass.verbose:
-        print >>sys.stderr, 'loading: %r as %r' % (path, modname)
-      dirname = os.path.dirname(path)
-      if dirname not in klass.module_path:
-        klass.module_path.insert(0, dirname)
-      module = PythonModuleObject(modname, klass.DEFAULT_NAMESPACE, path)
+        print >>sys.stderr, ' '*level+'loading: %r as %r' % (path, modname)
+      module = PythonModuleObject(modname, klass.DEFAULT_NAMESPACE, path, level=level)
       klass.PATH2MODULE[path] = module
-      klass.NAME2MODULE[modname] = module
       try:
         tree = compiler.parseFile(path)
       except IOError:
@@ -212,31 +219,28 @@ class Interpreter(object):
           rec(c)
         return
       rec(tree)
-      module.load(tree)
+      module.set(tree)
     return module
 
   # load_module
   @classmethod
-  def load_module(klass, modname, parent=None):
+  def load_module(klass, fullname, modpath, level=0, stdpath=True):
     if klass.debug:
-      print >>sys.stderr, 'load_module: %r...' % modname
-    if parent:
-      fullname = parent.name+'.'+modname
-      modpath = parent.get_childpath()
-    else:
-      fullname = modname
-      modpath = klass.module_path
-    if fullname in klass.NAME2MODULE:
-      return klass.NAME2MODULE[fullname]
-    if '.' not in modname:
-      path = klass.find_module(modname, modpath)
-      return klass.load_file(path, fullname)
-    i = modname.index('.')
-    (modname, childname) = (modname[:i], modname[i+1:])
-    path = klass.find_module(modname, modpath)
-    if parent:
-      fullname = parent.name+'.'+modname
-    else:
-      fullname = modname
-    module = klass.load_file(path, fullname)
-    return klass.load_module(childname, module)
+      print >>sys.stderr, 'load_module: %r...' % fullname
+    if fullname in klass.BUILTIN_MODULE:
+      return [klass.BUILTIN_MODULE[fullname]]
+    modules = []
+    module = None
+    for name in fullname.split('.'):
+      if module:
+        module = module.load_module(name, stdpath=False)[-1]
+      else:
+        try:
+          path = klass.find_module(name, modpath, stdpath=stdpath)
+          module = klass.load_file(path, name, level=level)
+        except ModuleNotFound:
+          if klass.verbose:
+            print >>sys.stderr, ' '*level+'not found: %r' % name
+          raise
+      modules.append(module)
+    return modules

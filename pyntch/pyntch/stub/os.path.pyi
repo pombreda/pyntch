@@ -1,2 +1,0 @@
-#
-from posixpath import *
