@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, os, os.path
+import sys, os, os.path, time
 import pyntch
 from pyntch.typenode import TypeNode, CompoundTypeNode
 from pyntch.frame import ExecutionFrame
@@ -45,6 +45,7 @@ def main(argv):
   Interpreter.verbose = verbose
   Interpreter.initialize(modpath, stubpath)
   MustBeDefinedNode.reset()
+  t = time.time()
   modules = []
   for name in args:
     try:
@@ -61,6 +62,8 @@ def main(argv):
     print >>sys.stderr, 'modules not found:', ', '.join(sorted(ErrorConfig.unfound_modules))
   TypeNode.run()
   MustBeDefinedNode.check()
+  if verbose:
+    print >>sys.stderr, 'total files=%d, lines=%d in %.2fsec' % (Interpreter.files, Interpreter.lines, time.time()-t)
   for module in modules:
     print '===', module.get_name(), '==='
     module.showrec(IndentedStream(sys.stdout))

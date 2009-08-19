@@ -156,6 +156,7 @@ class Interpreter(object):
   verbose = 0
   debug = 0
   lines = 0
+  files = 0
   
   module_path = None
   stub_path = None
@@ -222,6 +223,7 @@ class Interpreter(object):
         for _ in fp:
           klass.lines += 1
         fp.close()
+        klass.files += 1
         tree = compiler.parseFile(path)
       except IOError:
         raise ModuleNotFound(modname, path)
