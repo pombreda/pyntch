@@ -40,10 +40,10 @@ def main(argv):
     elif k == '-p': modpath.extend(v.split(':'))
     elif k == '-P': stubpath.extend(v.split(':'))
   TypeNode.debug = debug
-  Interpreter.debug = debug
   TypeNode.verbose = verbose
+  Interpreter.debug = debug
   Interpreter.verbose = verbose
-  Interpreter.initialize(modpath, stubpath)
+  Interpreter.initialize(stubpath)
   MustBeDefinedNode.reset()
   t = time.time()
   modules = []
@@ -52,9 +52,9 @@ def main(argv):
       if name.endswith('.py'):
         path = name
         (name,_) = os.path.splitext(os.path.basename(name))
-        module = Interpreter.load_file(path, name)
+        module = Interpreter.load_file(name, path, modpath)
       else:
-        module = Interpreter.load_module(name, [])[-1]
+        module = Interpreter.load_module(name, modpath)[-1]
       modules.append(module)
     except ModuleNotFound, e:
       print >>sys.stderr, 'module not found:', name
