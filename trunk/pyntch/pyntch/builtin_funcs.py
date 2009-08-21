@@ -5,7 +5,7 @@
 
 from pyntch.typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, UndefinedTypeNode
 from pyntch.typenode import BuiltinType, BuiltinCallable, BuiltinConstCallable
-from pyntch.exception import TypeChecker
+from pyntch.typenode import TypeChecker
 from pyntch.basic_types import TypeType, NoneType, NumberType, BoolType, IntType, LongType, \
      FloatType, BaseStringType, StrType, UnicodeType, ANY
 from pyntch.aggregate_types import ListType, TupleType, DictType, IterType, ListObject

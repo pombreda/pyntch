@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from compiler import ast
-from pyntch.typenode import CompoundTypeNode
+from pyntch.typenode import CompoundTypeNode, TypeChecker
 
 
 ##  Variable
@@ -25,14 +25,15 @@ class Variable(CompoundTypeNode):
     return
 
 
-class FixedVariable(Variable):
+##  TypedVariable
+##
+class TypedVariable(Variable, TypeChecker):
   
-  def bind(self, _):
+  def __init__(self, space, name, frame, validtypes):
+    Variable.__init__(self, space, name)
+    TypeChecker.__init__(self, frame, validtypes, repr(self))
     return
   
-  def setup(self, obj):
-    obj.connect(self.recv)
-    return
 
 
 ##  Namespace
@@ -82,10 +83,11 @@ class Namespace(object):
       var = self.vars[name]
     return var
   
-  def register_fixed(self, name):
-    self.vars[name] = FixedVariable(self, name)
+  def register_typed_var(self, name, obj):
+    assert name in self.vars
+    self.vars[name] = obj
     return
-  
+
   # register_names
   def register_names(self, tree):
     from pyntch.module import ModuleNotFound
@@ -328,8 +330,6 @@ class Namespace(object):
 
     # Assert
     elif isinstance(tree, ast.Assert):
-      if isinstance(tree.test, ast.Const) and isinstance(tree.test.value, str) and tree.test.value:
-        self.register_fixed(tree.test.value)
       self.register_names(tree.test)
       if tree.fail:
         self.register_names(tree.fail)

@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 from compiler import ast
-from pyntch.typenode import TypeNode, UndefinedTypeNode, CompoundTypeNode
+from pyntch.typenode import TypeNode, UndefinedTypeNode, CompoundTypeNode, TypeChecker
+from pyntch.namespace import TypedVariable
 from pyntch.frame import ExecutionFrame, ExceptionCatcher, ExceptionMaker
-from pyntch.exception import TypeChecker
 from pyntch.config import ErrorConfig
 from pyntch.klass import PythonClassType
 from pyntch.function import FuncType, LambdaFuncType
@@ -27,10 +27,6 @@ class SliceObject(ExpressionNode):
 ##
 def build_assert(reporter, frame, space, tree, arg, evals):
   # "assert isinstance() and isinstance() and ...
-  if isinstance(tree, ast.Const) and isinstance(tree.value, str) and tree.value:
-    obj = build_expr(reporter, frame, space, arg, [])
-    space[tree.value].setup(obj)
-    return
   if isinstance(tree, ast.CallFunc):
     tests = [ tree ]
   elif isinstance(tree, ast.And):
@@ -43,13 +39,14 @@ def build_assert(reporter, frame, space, tree, arg, evals):
         node.node.name == 'isinstance' and
         len(node.args) == 2):
       (a,b) = node.args
+      validtypes = [build_expr(reporter, frame, space, b, evals)]
       if arg and isinstance(arg, ast.Const):
-        blame = arg.value
+        checker = TypeChecker(frame, validtypes, arg.value)
       elif isinstance(a, ast.Name):
-        blame = repr(a.name)
+        checker = TypedVariable(space, a.name, frame, validtypes)
+        #space.register_typed_var(a.name, checker)
       else:
-        blame = repr(a)
-      checker = TypeChecker(frame, [build_expr(reporter, frame, space, b, evals)], blame)
+        checker = TypeChecker(frame, validtypes, repr(a))
       build_expr(reporter, frame, space, a, evals).connect(checker.recv)
   return
 
