@@ -2,7 +2,8 @@
 
 from pyntch.typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, NodeAssignError, UndefinedTypeNode
 from pyntch.typenode import BuiltinObject, BuiltinType, BuiltinCallable, BuiltinMethod, BuiltinConstMethod
-from pyntch.exception import TypeChecker, StopIterationType
+from pyntch.typenode import TypeChecker
+from pyntch.exception import StopIterationType
 from pyntch.frame import ExceptionCatcher
 from pyntch.basic_types import BoolType, IntType, StrType, NoneType, ANY
 from pyntch.expression import IterElement, MethodCall
@@ -997,3 +998,89 @@ class EnumerateType(BuiltinCallable, BuiltinType):
       return UndefinedTypeNode.get_object()
     elemall = TupleType.create_tuple([IntType.get_object(), IterElement(frame, anchor, args[0])])
     return IterObject(self.get_typeobj(), elemall=elemall)
+
+
+##  SequenceTypeChecker
+##
+class SequenceTypeChecker(TypeChecker):
+  
+  def __init__(self, parent_frame, anchor, types, blame):
+    self.anchor = anchor
+    self.received = set()
+    self.received_elem = set()
+    TypeChecker.__init__(self, parent_frame, types, blame=blame)
+    return
+  
+  def recv(self, src):
+    from pyntch.expression import IterElement
+    for obj in src:
+      if obj in self.received: continue
+      self.received.add(obj)
+      IterElement(self.parent_frame, self.anchor, obj).connect(self.recv_elemobj)
+    return
+  
+  def recv_elemobj(self, src):
+    from pyntch.config import ErrorConfig
+    if self.validtypes == self.ANY: return
+    for obj in src:
+      if obj in self.received_elem: continue
+      self.received_elem.add(obj)
+      for typeobj in self.validtypes:
+        if obj.is_type(typeobj): break
+      else:
+        s = '[%s]' % ('|'.join(map(repr, self.validtypes)))
+        self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError(self.blame, obj, s))
+    return
+
+
+##  KeyValueTypeChecker
+##
+class KeyValueTypeChecker(TypeChecker):
+  
+  def __init__(self, parent_frame, keys, values, blame):
+    self.validkeys = CompoundTypeNode(keys)
+    self.received_key = set()
+    self.received_value = set()
+    TypeChecker.__init__(self, parent_frame, values, blame=blame)
+    return
+    
+  def recv(self, src):
+    from pyntch.config import ErrorConfig
+    from pyntch.aggregate_types import DictObject
+    for obj in src:
+      if obj in self.received: continue
+      self.received.add(obj)
+      if isinstance(obj, DictObject):
+        obj.key.connect(self.recv_key)
+        obj.value.connect(self.recv_value)
+      else:
+        self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError(self.blame, obj, 'dict'))
+    return
+  
+  def recv_key(self, src):
+    from pyntch.config import ErrorConfig
+    for obj in src:
+      if obj in self.received_key: continue
+      self.received_key.add(obj)
+      for typeobj in self.validkeys:
+        if obj.is_type(typeobj):
+          self.update_type(obj)
+          break
+      else:
+        s = '|'.join(map(repr, self.validkeys))
+        self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError('key of %s' % self.blame, obj, s))
+    return
+
+  def recv_value(self, src):
+    from pyntch.config import ErrorConfig
+    for obj in src:
+      if obj in self.received_value: continue
+      self.received_value.add(obj)
+      for typeobj in self.validtypes:
+        if obj.is_type(typeobj):
+          self.update_type(obj)
+          break
+      else:
+        s = '|'.join(map(repr, self.validtypes))
+        self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError('value of %s' % self.blame, obj, s))
+    return

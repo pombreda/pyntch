@@ -5,7 +5,7 @@
 
 from pyntch.typenode import TypeNode, CompoundTypeNode, NodeAttrError, NodeAssignError, UndefinedTypeNode
 from pyntch.typenode import BuiltinObject, BuiltinType, BuiltinCallable, BuiltinConstCallable, BuiltinConstMethod
-from pyntch.exception import TypeChecker, KeyValueTypeChecker
+from pyntch.typenode import TypeChecker
 from pyntch.config import ErrorConfig
 from pyntch.klass import InstanceObject
 
@@ -332,6 +332,7 @@ class UnicodeType(BaseStringType):
 
   class TranslateFunc(BuiltinConstMethod):
     def accept_arg(self, frame, anchor, i, arg1):
+      from pyntch.aggregate_types import KeyValueTypeChecker
       checker = KeyValueTypeChecker(frame, [IntType.get_typeobj()],
                                     [IntType.get_typeobj(), UnicodeType.get_typeobj(), NoneType.get_typeobj()],
                                     'arg %d' % i)

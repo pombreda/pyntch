@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from pyntch.typenode import SimpleTypeNode, CompoundTypeNode, NodeTypeError, NodeAttrError, NodeAssignError
-from pyntch.exception import SequenceTypeChecker, StopIterationType
+from pyntch.exception import StopIterationType
 from pyntch.frame import ExecutionFrame, ExceptionCatcher
 from pyntch.config import ErrorConfig
 
@@ -283,6 +283,7 @@ class SliceAssign(ExpressionNode):
 class FunCall(ExpressionNode):
   
   def __init__(self, frame, anchor, func, args=None, kwargs=None, star=None, dstar=None):
+    from pyntch.aggregate_types import SequenceTypeChecker
     self.func = func
     self.args = tuple(args or ())
     self.kwargs = kwargs or {}

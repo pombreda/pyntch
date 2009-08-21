@@ -205,6 +205,45 @@ class UndefinedTypeNode(TypeNode):
     return self
 
 
+##  TypeChecker
+##
+class TypeChecker(CompoundTypeNode):
+
+  ANY = 'any'
+  
+  def __init__(self, parent_frame, types, blame):
+    self.parent_frame = parent_frame
+    self.blame = blame
+    self.received = set()
+    if types == self.ANY:
+      self.validtypes = self.ANY
+    else:
+      self.validtypes = CompoundTypeNode(types)
+    CompoundTypeNode.__init__(self)
+    return
+
+  def __repr__(self):
+    return ('<TypeChecker: %s: %s>' % 
+            (','.join(map(repr, self.types)), self.validtypes))
+
+  def recv(self, src):
+    from pyntch.config import ErrorConfig
+    from pyntch.basic_types import TypeType
+    if self.validtypes == self.ANY: return
+    for obj in src:
+      if obj in self.received: continue
+      self.received.add(obj)
+      for typeobj in self.validtypes:
+        if typeobj.is_type(TypeType.get_typeobj()) and obj.is_type(typeobj):
+          self.update_type(obj)
+          break
+      else:
+        s = '|'.join( typeobj.get_name() for typeobj in self.validtypes
+                      if typeobj.is_type(TypeType.get_typeobj()) )
+        self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError(self.blame, obj, s))
+    return
+
+
 ##  BuiltinObject
 ##
 class BuiltinObject(SimpleTypeNode):
@@ -241,12 +280,12 @@ class BuiltinType(BuiltinObject):
   
   @classmethod
   def get_type(klass):
-    from basic_types import TypeType
+    from pyntch.basic_types import TypeType
     return TypeType.get_typeobj()
   
   @classmethod
   def is_type(klass, *typeobjs):
-    from basic_types import TypeType
+    from pyntch.basic_types import TypeType
     return TypeType.get_typeobj() in typeobjs
 
   # get_name()
@@ -271,7 +310,7 @@ class BuiltinType(BuiltinObject):
   # default methods
   class InitMethod(BuiltinObject):
     def call(self, frame, anchor, args, kwargs):
-      from basic_types import NoneType
+      from pyntch.basic_types import NoneType
       return NoneType.get_object()
 
   def get_attr(self, frame, anchor, name, write=False):
@@ -295,7 +334,7 @@ class BuiltinCallable(object):
     return
   
   def call(self, frame, anchor, args, kwargs):
-    from config import ErrorConfig
+    from pyntch.config import ErrorConfig
     if len(args) < self.minargs:
       frame.raise_expt(ErrorConfig.InvalidNumOfArgs(self.minargs, len(args)))
       return UndefinedTypeNode.get_object()
@@ -318,7 +357,7 @@ class BuiltinConstCallable(BuiltinCallable):
     return
 
   def process_args(self, frame, anchor, args, kwargs):
-    from config import ErrorConfig
+    from pyntch.config import ErrorConfig
     if kwargs:
       frame.raise_expt(ErrorConfig.NoKeywordArgs())
     for (i,arg1) in enumerate(args):
@@ -329,7 +368,7 @@ class BuiltinConstCallable(BuiltinCallable):
     return self.retobj
 
   def accept_arg(self, frame, anchor, i, arg1):
-    from exception import TypeChecker, SequenceTypeChecker
+    from pyntch.aggregate_types import SequenceTypeChecker
     s = 'arg %d' % i
     spec = self.args[i]
     if isinstance(spec, list):

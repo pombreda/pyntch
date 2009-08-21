@@ -79,7 +79,7 @@ class ModuleObject(BuiltinObject):
     return self.name
 
   def get_attr(self, frame, anchor, name, write=False):
-    from basic_types import StrType
+    from pyntch.basic_types import StrType
     if name == '__file__':
       if write: raise NodeAssignError(name)
       return StrType.get_object()
