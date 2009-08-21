@@ -89,7 +89,7 @@ class ModuleObject(BuiltinObject):
     self.space.register_var(name).bind(module)
     return
 
-  def load_module(self, name, stdpath=True):
+  def load_module(self, name):
     raise ModuleNotFound(name)
   
   def import_object(self, name):
@@ -106,8 +106,9 @@ class ModuleType(BuiltinType):
 ##
 class PythonModuleObject(ModuleObject, TreeReporter):
 
-  def __init__(self, name, parent_space, path=None, level=0):
+  def __init__(self, name, parent_space, path, modpath, level=0):
     self.path = path
+    self.modpath = modpath + [os.path.dirname(self.path)]
     self.frame = ExecutionFrame(None, None)
     ModuleObject.__init__(self, name, Namespace(parent_space, name), level=level)
     TreeReporter.__init__(self, None, name)
@@ -136,12 +137,12 @@ class PythonModuleObject(ModuleObject, TreeReporter):
     self.frame.show(out)
     return
 
-  def load_module(self, name, stdpath=True):
+  def load_module(self, name):
     if self.name == 'os' and name == 'path':
       # os.path hack
-      return Interpreter.load_module('posixpath', [], level=self.level+1, stdpath=True)
+      return Interpreter.load_module('posixpath', [], level=self.level+1)
     else:
-      return Interpreter.load_module(name, [os.path.dirname(self.path)], level=self.level+1, stdpath=stdpath)
+      return Interpreter.load_module(name, self.modpath, level=self.level+1)
 
   def import_object(self, name):
     if name in self.space:
@@ -158,17 +159,15 @@ class Interpreter(object):
   lines = 0
   files = 0
   
-  module_path = None
   stub_path = None
   PATH2MODULE = None
   BUILTIN_MODULE = None
   DEFAULT_NAMESPACE = None
 
   @classmethod
-  def initialize(klass, module_path, stub_path):
+  def initialize(klass, stub_path):
     # global parameters.
     from pyntch.namespace import BuiltinTypesNamespace, BuiltinExceptionsNamespace, BuiltinNamespace, DefaultNamespace
-    klass.module_path = module_path
     klass.stub_path = stub_path
     default = DefaultNamespace()
     builtin = BuiltinNamespace(default)
@@ -189,10 +188,8 @@ class Interpreter(object):
   # find_module(name)
   #   return the full path for a given module name.
   @classmethod
-  def find_module(klass, name, modpath, stdpath=False):
+  def find_module(klass, name, modpath):
     modpath = klass.stub_path + modpath
-    if stdpath:
-      modpath += klass.module_path
     if klass.debug:
       print >>sys.stderr, 'find_module: name=%r' % name, modpath
     for dirname in modpath:
@@ -209,14 +206,14 @@ class Interpreter(object):
 
   # load_file
   @classmethod
-  def load_file(klass, path, modname, level=0):
+  def load_file(klass, modname, path, modpath, level=0):
     path = os.path.normpath(path)
     if path in klass.PATH2MODULE:
       module = klass.PATH2MODULE[path]
     else:
       if klass.verbose:
         print >>sys.stderr, ' '*level+'loading: %r as %r' % (path, modname)
-      module = PythonModuleObject(modname, klass.DEFAULT_NAMESPACE, path, level=level)
+      module = PythonModuleObject(modname, klass.DEFAULT_NAMESPACE, path, modpath, level=level)
       klass.PATH2MODULE[path] = module
       try:
         fp = file(path)
@@ -238,7 +235,7 @@ class Interpreter(object):
 
   # load_module
   @classmethod
-  def load_module(klass, fullname, modpath, level=0, stdpath=True):
+  def load_module(klass, fullname, modpath, level=0):
     if klass.debug:
       print >>sys.stderr, 'load_module: %r...' % fullname
     if fullname in klass.BUILTIN_MODULE:
@@ -247,11 +244,11 @@ class Interpreter(object):
     module = None
     for name in fullname.split('.'):
       if module:
-        module = module.load_module(name, stdpath=False)[-1]
+        module = module.load_module(name)[-1]
       else:
         try:
-          path = klass.find_module(name, modpath, stdpath=stdpath)
-          module = klass.load_file(path, name, level=level)
+          path = klass.find_module(name, modpath)
+          module = klass.load_file(name, path, modpath, level=level)
         except ModuleNotFound:
           if klass.verbose:
             print >>sys.stderr, ' '*level+'not found: %r' % name
