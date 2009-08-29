@@ -5,7 +5,7 @@
 
 from pyntch.typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, UndefinedTypeNode
 from pyntch.typenode import BuiltinType, BuiltinCallable, BuiltinConstCallable
-from pyntch.typenode import TypeChecker
+from pyntch.typenode import TypeChecker, SequenceTypeChecker
 from pyntch.basic_types import TypeType, NoneType, NumberType, BoolType, IntType, LongType, \
      FloatType, BaseStringType, StrType, UnicodeType, ANY
 from pyntch.aggregate_types import ListType, TupleType, DictType, IterType, ListObject
@@ -71,6 +71,24 @@ class IterFuncChecker(CompoundTypeNode):
         obj.call(self.frame, self.anchor, (self.target.elemall,))
       except NodeTypeError:
         self.frame.raise_expt(ErrorConfig.NotCallable(obj))
+    return
+
+##  TypeSpecChecker
+class TypeSpecChecker(CompoundTypeNode):
+  
+  def __init__(self, frame, anchor, spec):
+    self.checker = TypeChecker(frame, [TypeType.get_typeobj()], 'typespec')
+    self.tuplechecker = SequenceTypeChecker(frame, anchor, [TypeType.get_typeobj()], 'typespec')
+    CompoundTypeNode.__init__(self)
+    spec.connect(self.recv)
+    return
+
+  def recv(self, src):
+    for obj in src:
+      if obj.is_type(TupleType.get_typeobj()):
+        obj.connect(self.tuplechecker.recv)
+      else:
+        obj.connect(self.checker.recv)
     return
 
 
@@ -244,18 +262,28 @@ class IdFunc(BuiltinConstFunc):
 class IsInstanceFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'isinstance', BoolType.get_object(), [ANY, TypeType])
+    BuiltinConstFunc.__init__(self, 'isinstance', BoolType.get_object(), [ANY, ANY])
     return
 
+  def accept_arg(self, frame, anchor, i, arg1):
+    if i == 1:
+      TypeSpecChecker(frame, anchor, arg1)
+    return
+    
 
 ##  IsSubclassFunc
 ##
 class IsSubclassFunc(BuiltinConstFunc):
 
   def __init__(self):
-    BuiltinConstFunc.__init__(self, 'issubclass', BoolType.get_object(), [TypeType, TypeType])
+    BuiltinConstFunc.__init__(self, 'issubclass', BoolType.get_object(), [TypeType, ANY])
     return
 
+  def accept_arg(self, frame, anchor, i, arg1):
+    if i == 1:
+      TypeSpecChecker(frame, anchor, arg1)
+    return
+    
 
 ##  IterFunc
 ##

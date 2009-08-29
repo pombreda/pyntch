@@ -4,7 +4,7 @@ from pyntch import __version__
 
 setup(name='pyntch',
       version=__version__,
-      description='Examine python code and detect possible errors',
+      description='Examine Python code and detect possible errors',
       license='MIT/X',
       author='Yusuke Shinyama',
       author_email='yusuke at cs dot nyu dot edu',
