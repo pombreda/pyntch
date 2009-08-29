@@ -29,8 +29,11 @@ class Variable(CompoundTypeNode):
 ##
 class TypedVariable(Variable, TypeChecker):
   
-  def __init__(self, space, name, frame, validtypes):
+  def __init__(self, space, name):
     Variable.__init__(self, space, name)
+    return
+  
+  def setup(self, frame, validtypes):
     TypeChecker.__init__(self, frame, validtypes, repr(self))
     return
   
@@ -83,9 +86,9 @@ class Namespace(object):
       var = self.vars[name]
     return var
   
-  def register_typed_var(self, name, obj):
-    assert name in self.vars
-    self.vars[name] = obj
+  def register_typed_var(self, name):
+    var = TypedVariable(self, name)
+    self.vars[name] = var
     return
 
   # register_names
@@ -333,6 +336,20 @@ class Namespace(object):
       self.register_names(tree.test)
       if tree.fail:
         self.register_names(tree.fail)
+      if isinstance(tree.test, ast.CallFunc):
+        tests = [ tree.test ]
+      elif isinstance(tree.test, ast.And):
+        tests = tree.test.nodes
+      else:
+        tests = []
+      for test in tests:
+        if (isinstance(test, ast.CallFunc) and
+            isinstance(test.node, ast.Name) and
+            test.node.name == 'isinstance' and
+            len(test.args) == 2):
+          (a,b) = test.args
+          if isinstance(a, ast.Name):
+            self.register_typed_var(a.name)
     
     # Ellipsis
     elif isinstance(tree, ast.Ellipsis):

@@ -2,7 +2,6 @@
 
 from compiler import ast
 from pyntch.typenode import TypeNode, UndefinedTypeNode, CompoundTypeNode, TypeChecker
-from pyntch.namespace import TypedVariable
 from pyntch.frame import ExecutionFrame, ExceptionCatcher, ExceptionMaker
 from pyntch.config import ErrorConfig
 from pyntch.klass import PythonClassType
@@ -43,8 +42,8 @@ def build_assert(reporter, frame, space, tree, arg, evals):
       if arg and isinstance(arg, ast.Const):
         checker = TypeChecker(frame, validtypes, arg.value)
       elif isinstance(a, ast.Name):
-        checker = TypedVariable(space, a.name, frame, validtypes)
-        #space.register_typed_var(a.name, checker)
+        checker = space[a.name]
+        checker.setup(frame, validtypes)
       else:
         checker = TypeChecker(frame, validtypes, repr(a))
       build_expr(reporter, frame, space, a, evals).connect(checker.recv)

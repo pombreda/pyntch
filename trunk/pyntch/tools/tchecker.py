@@ -2,7 +2,7 @@
 
 import sys, os, os.path, time
 import pyntch
-from pyntch.typenode import TypeNode, CompoundTypeNode
+from pyntch.typenode import TypeNode, CompoundTypeNode, TypeChecker
 from pyntch.frame import ExecutionFrame
 from pyntch.expression import MustBeDefinedNode
 from pyntch.namespace import Namespace
@@ -16,18 +16,19 @@ from pyntch.config import ErrorConfig
 def main(argv):
   import getopt
   def usage():
-    print 'usage: %s [-d] [-q] [-a] [-c config] [-C key=val] [-p pythonpath] [-P stubpath] [file ...]' % argv[0]
+    print 'usage: %s [-d] [-q] [-a] [-c config] [-C key=val] [-D] [-p pythonpath] [-P stubpath] [file ...]' % argv[0]
     return 100
   try:
-    (opts, args) = getopt.getopt(argv[1:], 'dqac:C:p:P:')
+    (opts, args) = getopt.getopt(argv[1:], 'dqac:CD:p:P:')
   except getopt.GetoptError:
     return usage()
   if not args:
     return usage()
   stubdir = os.path.join(os.path.dirname(pyntch.__file__), 'stub')
   debug = 0
+  defaultpath = True
   verbose = 1
-  modpath = sys.path[:]
+  modpath = []
   stubpath = [stubdir]
   for (k, v) in opts:
     if k == '-d': debug += 1
@@ -37,13 +38,17 @@ def main(argv):
     elif k == '-C':
       (k,v) = v.split('=')
       ErrorConfig.set(k, eval(v))
+    elif k == '-D': defaultpath = False
     elif k == '-p': modpath.extend(v.split(':'))
     elif k == '-P': stubpath.extend(v.split(':'))
+  if defaultpath:
+    modpath.extend(sys.path)
   TypeNode.debug = debug
   TypeNode.verbose = verbose
   Interpreter.debug = debug
   Interpreter.verbose = verbose
   Interpreter.initialize(stubpath)
+  TypeChecker.reset()
   MustBeDefinedNode.reset()
   t = time.time()
   modules = []
@@ -62,6 +67,8 @@ def main(argv):
     print >>sys.stderr, 'modules not found:', ', '.join(sorted(ErrorConfig.unfound_modules))
   TypeNode.run()
   MustBeDefinedNode.check()
+  TypeChecker.check()
+  TypeNode.run()
   if verbose:
     print >>sys.stderr, 'total files=%d, lines=%d in %.2fsec' % (Interpreter.files, Interpreter.lines, time.time()-t)
   for module in modules:
