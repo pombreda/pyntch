@@ -28,8 +28,6 @@ def build_assert(reporter, frame, space, tree, arg, evals):
   # "assert isinstance() and isinstance() and ...
   if isinstance(tree, ast.CallFunc):
     tests = [ tree ]
-  elif isinstance(tree, ast.And):
-    tests = tree.nodes
   else:
     return
   for node in tests:
@@ -38,7 +36,11 @@ def build_assert(reporter, frame, space, tree, arg, evals):
         node.node.name == 'isinstance' and
         len(node.args) == 2):
       (a,b) = node.args
-      validtypes = [build_expr(reporter, frame, space, b, evals)]
+      if isinstance(b, ast.Tuple):
+        b = b.nodes
+      else:
+        b = [b]
+      validtypes = [ build_expr(reporter, frame, space, t, evals) for t in b ]
       if arg and isinstance(arg, ast.Const):
         checker = TypeChecker(frame, validtypes, arg.value)
       elif isinstance(a, ast.Name):
