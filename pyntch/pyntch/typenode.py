@@ -205,45 +205,6 @@ class UndefinedTypeNode(TypeNode):
     return self
 
 
-##  TypeChecker
-##
-class TypeChecker(CompoundTypeNode):
-
-  ANY = 'any'
-  
-  def __init__(self, parent_frame, types, blame):
-    self.parent_frame = parent_frame
-    self.blame = blame
-    self.received = set()
-    if types == self.ANY:
-      self.validtypes = self.ANY
-    else:
-      self.validtypes = CompoundTypeNode(types)
-    CompoundTypeNode.__init__(self)
-    return
-
-  def __repr__(self):
-    return ('<TypeChecker: %s: %s>' % 
-            (','.join(map(repr, self.types)), self.validtypes))
-
-  def recv(self, src):
-    from pyntch.config import ErrorConfig
-    from pyntch.basic_types import TypeType
-    if self.validtypes == self.ANY: return
-    for obj in src:
-      if obj in self.received: continue
-      self.received.add(obj)
-      for typeobj in self.validtypes:
-        if typeobj.is_type(TypeType.get_typeobj()) and obj.is_type(typeobj):
-          self.update_type(obj)
-          break
-      else:
-        s = '|'.join( typeobj.get_name() for typeobj in self.validtypes
-                      if typeobj.is_type(TypeType.get_typeobj()) )
-        self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError(self.blame, obj, s))
-    return
-
-
 ##  BuiltinObject
 ##
 class BuiltinObject(SimpleTypeNode):
@@ -368,7 +329,6 @@ class BuiltinConstCallable(BuiltinCallable):
     return self.retobj
 
   def accept_arg(self, frame, anchor, i, arg1):
-    from pyntch.aggregate_types import SequenceTypeChecker
     s = 'arg %d' % i
     spec = self.args[i]
     if isinstance(spec, list):
@@ -415,3 +375,106 @@ class BuiltinConstMethod(BuiltinConstCallable, BuiltinObject):
 
   def __repr__(self):
     return '<callable %s>' % self.name
+
+
+##  TypeChecker
+##
+class TypeChecker(CompoundTypeNode):
+
+  ANY = 'any'
+  nodes = None
+  
+  def __init__(self, parent_frame, types, blame):
+    self.parent_frame = parent_frame
+    self.blame = blame
+    self.received = set()
+    if types == self.ANY:
+      self.validtypes = self.ANY
+    else:
+      self.validtypes = CompoundTypeNode(types)
+    CompoundTypeNode.__init__(self)
+    TypeChecker.nodes.append(self)
+    return
+
+  def __repr__(self):
+    return ('<TypeChecker: %s: %s>' % 
+            (','.join(map(repr, self.types)), self.validtypes))
+
+  @classmethod
+  def reset(klass):
+    klass.nodes = []
+    return
+  
+  @classmethod
+  def check(klass):
+    for node in klass.nodes:
+      node.check_type()
+    return
+
+  def recv(self, src):
+    for obj in src:
+      self.received.add(obj)
+    return
+
+  def check_type(self):
+    from pyntch.config import ErrorConfig
+    from pyntch.basic_types import TypeType
+    if self.validtypes == self.ANY: return
+    for obj in self.received:
+      for typeobj in self.validtypes:
+        if typeobj.is_type(TypeType.get_typeobj()) and obj.is_type(typeobj):
+          self.update_type(obj)
+          break
+      else:
+        s = '|'.join( typeobj.get_name() for typeobj in self.validtypes
+                      if typeobj.is_type(TypeType.get_typeobj()) )
+        self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError(self.blame, obj, s))
+    return
+
+
+##  SequenceTypeChecker
+##
+class SequenceTypeChecker(CompoundTypeNode):
+  
+  def __init__(self, parent_frame, anchor, types, blame):
+    CompoundTypeNode.__init__(self)
+    self.parent_frame = parent_frame
+    self.anchor = anchor
+    self.received = set()
+    self.elemchecker = TypeChecker(parent_frame, types, blame+' element')
+    return
+  
+  def recv(self, src):
+    from pyntch.expression import IterElement
+    for obj in src:
+      if obj in self.received: continue
+      self.received.add(obj)
+      IterElement(self.parent_frame, self.anchor, obj).connect(self.elemchecker.recv)
+    return
+
+
+##  KeyValueTypeChecker
+##
+class KeyValueTypeChecker(CompoundTypeNode):
+  
+  def __init__(self, parent_frame, keys, values, blame):
+    CompoundTypeNode.__init__(self)
+    self.parent_frame = parent_frame
+    self.anchor = anchor
+    self.received = set()
+    self.keychecker = TypeChecker(parent_frame, keys, blame+' dict key')
+    self.valuechecker = TypeChecker(parent_frame, values, blame+' dict value')
+    return
+    
+  def recv(self, src):
+    from pyntch.config import ErrorConfig
+    from pyntch.aggregate_types import DictObject
+    for obj in src:
+      if obj in self.received: continue
+      self.received.add(obj)
+      if isinstance(obj, DictObject):
+        obj.key.connect(self.keychecker.recv)
+        obj.value.connect(self.valuechecker.recv)
+      else:
+        self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError(self.blame, obj, 'dict'))
+    return

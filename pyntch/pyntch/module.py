@@ -140,7 +140,7 @@ class PythonModuleObject(ModuleObject, TreeReporter):
   def load_module(self, name):
     if self.name == 'os' and name == 'path':
       # os.path hack
-      return Interpreter.load_module('posixpath', [], level=self.level+1)
+      return Interpreter.load_module('posixpath', self.modpath, level=self.level+1)
     else:
       return Interpreter.load_module(name, self.modpath, level=self.level+1)
 

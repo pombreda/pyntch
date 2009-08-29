@@ -109,6 +109,8 @@ class ExecutionFrame(CompoundTypeNode):
 ##
 class ExceptionHandler(ExecutionFrame):
 
+  nodes = None
+  
   def __init__(self, parent, expt):
     self.var = CompoundTypeNode()
     self.expt = expt
@@ -122,6 +124,17 @@ class ExceptionHandler(ExecutionFrame):
 
   def __repr__(self):
     return '<Handler for %r>' % ','.join(map(repr, self.catchtypes))
+
+  @classmethod
+  def reset(klass):
+    klass.nodes = []
+    return
+  
+  @classmethod
+  def check(klass):
+    for node in klass.nodes:
+      node.check_type()
+    return
 
   def recv_expt(self, src):
     from pyntch.aggregate_types import TupleType
