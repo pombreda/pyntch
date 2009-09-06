@@ -262,7 +262,7 @@ def build_expr(reporter, frame, space, tree, evals):
 
 ##  build_stmt
 ##
-def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
+def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False, parent_space=None):
   from pyntch.basic_types import NoneType, StrType
   from pyntch.module import ModuleNotFound
   from pyntch.config import ErrorConfig
@@ -275,7 +275,8 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, ast.Function):
     name = tree.name
     defaults = [ build_expr(reporter, frame, space, value, evals) for value in tree.defaults ]
-    func = FuncType(reporter, frame, space, tree, name, tree.argnames,
+    parent_space = parent_space or space # class definition
+    func = FuncType(reporter, frame, parent_space, tree, name, tree.argnames,
                     defaults, tree.varargs, tree.kwargs, tree.code, tree)
     if tree.decorators:
       for node in tree.decorators:
@@ -321,7 +322,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False):
   elif isinstance(tree, ast.Stmt):
     stmt = None
     for stmt in tree.nodes:
-      build_stmt(reporter, frame, space, stmt, evals)
+      build_stmt(reporter, frame, space, stmt, evals, parent_space=parent_space)
     if isfuncdef:
       # if the last statement is not a Return or Raise
       if not isinstance(stmt, ast.Return) and not isinstance(stmt, ast.Raise):

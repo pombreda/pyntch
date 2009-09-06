@@ -183,7 +183,7 @@ class ExceptionHandler(ExecutionFrame):
     return
 
   def __repr__(self):
-    return '<Handler for %r>' % ','.join(map(repr, self.catchtypes))
+    return '<Handler %r>' % self.expt
 
   def recv_expt(self, src):
     from pyntch.aggregate_types import TupleType
