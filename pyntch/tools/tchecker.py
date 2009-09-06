@@ -3,7 +3,7 @@
 import sys, os, os.path, time
 import pyntch
 from pyntch.typenode import TypeNode, CompoundTypeNode, TypeChecker
-from pyntch.frame import ExecutionFrame
+from pyntch.frame import ExecutionFrame, ExceptionCatcher
 from pyntch.expression import MustBeDefinedNode
 from pyntch.namespace import Namespace
 from pyntch.module import Interpreter, IndentedStream, ModuleNotFound
@@ -50,6 +50,7 @@ def main(argv):
   Interpreter.initialize(stubpath)
   TypeChecker.reset()
   MustBeDefinedNode.reset()
+  ExceptionCatcher.reset()
   t = time.time()
   modules = []
   for name in args:
@@ -66,8 +67,9 @@ def main(argv):
   if ErrorConfig.unfound_modules:
     print >>sys.stderr, 'modules not found:', ', '.join(sorted(ErrorConfig.unfound_modules))
   TypeNode.run()
-  MustBeDefinedNode.check()
   TypeChecker.check()
+  MustBeDefinedNode.check()
+  ExceptionCatcher.check()
   TypeNode.run()
   if verbose:
     print >>sys.stderr, 'total files=%d, lines=%d in %.2fsec' % (Interpreter.files, Interpreter.lines, time.time()-t)
