@@ -6,6 +6,9 @@ def asctime(x):
 def clock():
   return 0.0
 
+def time():
+  return 0.0
+
 def ctime(x=0):
   assert isinstance(x, int)
   return ''

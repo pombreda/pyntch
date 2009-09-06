@@ -137,7 +137,7 @@ class PythonClassType(ClassType, TreeReporter):
     self.space = Namespace(parent_space, name)
     if code:
       self.space.register_names(code)
-      build_stmt(self, parent_frame, self.space, code, evals)
+      build_stmt(self, parent_frame, self.space, code, evals, parent_space=parent_space)
     for (name,var) in self.space:
       # Do not consider the values of attributes inherited from the base class
       # if they are explicitly overriden.
