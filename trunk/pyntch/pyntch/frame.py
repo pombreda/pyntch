@@ -29,10 +29,10 @@ class TracebackObject(TypeNode):
 
 ##  ExecutionFrame
 ##
-##  An ExecutionFrame object is a place where an exception belongs.
-##  Normally it's a body of function. Exceptions that are raised
-##  within this frame are propagated to other ExecutionFrames which
-##  invoke the function.
+##  An ExecutionFrame object represents a place where an exception
+##  occurs.  Normally it's a body of every function and
+##  method. Exceptions that are raised within this frame are
+##  propagated to other ExecutionFrames which invoke the function.
 ##
 class ExecutionFrame(CompoundTypeNode):
 
@@ -105,67 +105,23 @@ class ExecutionFrame(CompoundTypeNode):
     return
 
 
-##  ExceptionHandler
-##
-class ExceptionHandler(ExecutionFrame):
-
-  nodes = None
-  
-  def __init__(self, parent, expt):
-    self.var = CompoundTypeNode()
-    self.expt = expt
-    self.reraise = False
-    self.catchtypes = set()
-    self.received = set()
-    ExecutionFrame.__init__(self, parent, None)
-    if expt:
-      expt.connect(self.recv_expt)
-    return
-
-  def __repr__(self):
-    return '<Handler for %r>' % ','.join(map(repr, self.catchtypes))
-
-  @classmethod
-  def reset(klass):
-    klass.nodes = []
-    return
-  
-  @classmethod
-  def check(klass):
-    for node in klass.nodes:
-      node.check_type()
-    return
-
-  def recv_expt(self, src):
-    from pyntch.aggregate_types import TupleType
-    for obj in src:
-      if obj in self.received: continue
-      self.received.add(obj)
-      if obj.is_type(TupleType.get_typeobj()):
-        self.recv_expt(obj.elemall)
-      else:
-        self.catchtypes.add(obj)
-    return
-
-  def set_reraise(self):
-    self.reraise = True
-    return
-
-  def handle_expt(self, expt):
-    if (not self.expt) or (expt.get_type() in self.catchtypes):
-      expt.connect(self.var.recv)
-      return not self.reraise
-    return False
-
-
 ##  ExceptionCatcher
+##
+##  An ExceptionCatcher object represents a try...except block.
+##  This is a specialized ExceptionFrame that is able to catch
+##  specified exceptions. For each exception to be catched, an
+##  ExceptionHandler object needs to be added by calling
+##  add_handler().
 ##
 class ExceptionCatcher(ExecutionFrame):
 
+  nodes = None
+  
   def __init__(self, parent):
     self.handlers = []
     self.received = set()
     ExecutionFrame.__init__(self, parent, None)
+    ExceptionCatcher.nodes.append(self)
     return
 
   def __repr__(self):
@@ -178,20 +134,83 @@ class ExceptionCatcher(ExecutionFrame):
       return '<Catch %s at ???>' % s
   
   def add_handler(self, src):
-    handler = ExceptionHandler(self.parent, src)
+    handler = ExceptionHandler(self, src)
     self.handlers.append(handler)
     return handler
 
+  @classmethod
+  def reset(klass):
+    klass.nodes = []
+    return
+  
+  @classmethod
+  def check(klass):
+    for node in klass.nodes:
+      node.check_expt()
+    return
+
   def recv(self, src):
     for obj in src:
-      if obj in self.received: continue
-      self.received.add(obj)
       assert isinstance(obj, TracebackObject), obj
+      self.received.add(obj)
+    return
+
+  def check_expt(self):
+    for obj in self.received:
       for frame in self.handlers:
         if frame.handle_expt(obj.expt): break
       else:
         self.update_type(obj)
     return
+
+
+##  ExceptionHandler
+##
+##  An ExceptionHandler object represents an "except" clause.
+##
+class ExceptionHandler(ExecutionFrame):
+
+  def __init__(self, parent, expt):
+    self.received = set()
+    self.reraise = False
+    self.var = CompoundTypeNode()
+    if expt:
+      self.expt = CompoundTypeNode()
+      expt.connect(self.recv_expt)
+    else:
+      self.expt = None
+    ExecutionFrame.__init__(self, parent, None)
+    return
+
+  def __repr__(self):
+    return '<Handler for %r>' % ','.join(map(repr, self.catchtypes))
+
+  def recv_expt(self, src):
+    from pyntch.aggregate_types import TupleType
+    for obj in src:
+      if obj in self.received: continue
+      self.received.add(obj)
+      if obj.is_type(TupleType.get_typeobj()):
+        obj.elemall.connect(self.expt.recv)
+      else:
+        obj.connect(self.expt.recv)
+    return
+
+  def set_reraise(self):
+    self.reraise = True
+    return
+
+  def handle_expt(self, obj):
+    handled = True
+    if self.expt:
+      for typeobj in self.expt:
+        if obj.is_type(typeobj): break
+      else:
+        handled = False
+      if handled:
+        obj.connect(self.var.recv)
+        return not self.reraise
+    return False
 
 
 ##  ExceptionMaker
