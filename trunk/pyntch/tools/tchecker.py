@@ -19,7 +19,7 @@ def main(argv):
     print 'usage: %s [-d] [-q] [-a] [-c config] [-C key=val] [-D] [-p pythonpath] [-P stubpath] [file ...]' % argv[0]
     return 100
   try:
-    (opts, args) = getopt.getopt(argv[1:], 'dqac:CD:p:P:')
+    (opts, args) = getopt.getopt(argv[1:], 'dqac:CDp:P:')
   except getopt.GetoptError:
     return usage()
   if not args:
