@@ -19,7 +19,7 @@ Python type checker / source code analyzer
 
 <div align=right class=lastmod>
 <!-- hhmts start -->
-Last Modified: Sun Sep  6 20:01:57 JST 2009
+Last Modified: Mon Sep  7 18:59:53 JST 2009
 <!-- hhmts end -->
 </div>
 
@@ -67,8 +67,8 @@ Analyzed 67,000 lines of code in 28 minutes.
 <a name="source"></a>
 <p>
 <strong>Download:</strong><br>
-<a href="http://www.unixuser.org/~euske/python/pyntch/pyntch-dist-20090906.tar.gz">
-http://www.unixuser.org/~euske/python/pyntch/pyntch-dist-20090906.tar.gz
+<a href="http://www.unixuser.org/~euske/python/pyntch/pyntch-dist-20090907.tar.gz">
+http://www.unixuser.org/~euske/python/pyntch/pyntch-dist-20090907.tar.gz
 </a>
 (56KBytes)
 
@@ -118,6 +118,10 @@ done by examining the code without executing it. The goal of
 Pyntch is to try to analyze every possible execution path and
 all possible combinations of data.
 <p>
+Sounds impossible? Well, I can show you at least this is partially
+possible, by using a technique called "typeflow analysis." 
+For the details, see <a href="#howitworks">How it works?</a> section.
+However, there's also a couple of drawbacks.
 Because the purpose of Pyntch is to catch as many obscure errors
 as possible before the code is acutally used in a production, it
 focuses on the coverage of the analysis at the expense of its accuracy.
@@ -155,26 +159,26 @@ Take this sample code:
 3 print f(3, 'a')
 </pre></blockquote>
 <p>
-To check this code, simply run the check.py against the source file:
+To check this code, simply run the tchecker.py against the source file:
 <blockquote><pre>
    $ tchecker.py mycode.py
- 0 === basic.py ===
- 1 loading: 'basic.py'
+ 0 === mycode.py ===
+ 1 loading: 'mycode.py'
  2 [basic]
- 3   (raises &lt;TypeError: unsupported operand Add for &lt;int&gt; and &lt;int&gt;&gt; at basic.py(2))
+ 3   (raises &lt;TypeError: unsupported operand Add for &lt;int&gt; and &lt;int&gt;&gt; at mycode.py(2))
  4
- 5   ### basic.py(1)
- 6   # called at basic.py(4)
- 7   # called at basic.py(3)
+ 5   ### mycode.py(1)
+ 6   # called at mycode.py(4)
+ 7   # called at mycode.py(3)
  8   def f(x=&lt;int&gt;, y=&lt;int&gt;|&lt;str&gt;):
  9     return &lt;int&gt;
-10     raises &lt;TypeError: unsupported operand Add for &lt;int&gt; and &lt;int&gt;&gt; at basic.py(2)
+10     raises &lt;TypeError: unsupported operand Add for &lt;int&gt; and &lt;int&gt;&gt; at mycode.py(2)
 </pre></blockquote>
 <p>
 The output shows several things:
 <ul>
 <li> Line 3 shows that running this entire code might raise a TypeError exception
-   that is caused at line 2 of basic.py.
+   that is caused at line 2 of mycode.py.
 <li> Line 5-10 tells about the function defined at line 1.
 <li> Line 6,7 says that this function is called from line 3 and 4.
 <li> Line 8 shows the possible types of parameters to this function:
@@ -385,6 +389,7 @@ Fig 2. Handling function call
 <hr noshade>
 <h2>Changes</h2>
 <ul>
+<li> 2009/09/06: More bugfixes.
 <li> 2009/08/19: Bugfixes and improved speed.
 <li> 2009/06/15: Several bugfixes.
 <li> 2009/05/31: Initial release.

@@ -108,7 +108,7 @@ class PythonModuleObject(ModuleObject, TreeReporter):
 
   def __init__(self, name, parent_space, path, modpath, level=0):
     self.path = path
-    self.modpath = modpath + [os.path.dirname(self.path)]
+    self.modpath = [os.path.dirname(self.path)] + modpath
     self.frame = ExecutionFrame(None, None)
     ModuleObject.__init__(self, name, Namespace(parent_space, name), level=level)
     TreeReporter.__init__(self, None, name)
@@ -137,17 +137,20 @@ class PythonModuleObject(ModuleObject, TreeReporter):
     self.frame.show(out)
     return
 
-  def load_module(self, name):
+  def load_module(self, name, strict=False):
     if self.name == 'os' and name == 'path':
       # os.path hack
       return Interpreter.load_module('posixpath', self.modpath, level=self.level+1)
+    elif strict:
+      return Interpreter.load_module(name, self.modpath, level=self.level+1,
+                                     searchpath=[os.path.dirname(self.path)])
     else:
       return Interpreter.load_module(name, self.modpath, level=self.level+1)
 
   def import_object(self, name):
     if name in self.space:
       return self.space[name]
-    return self.load_module(name)[-1]
+    return self.load_module(name, strict=True)[-1]
   
 
 ##  Interpreter
@@ -235,7 +238,7 @@ class Interpreter(object):
 
   # load_module
   @classmethod
-  def load_module(klass, fullname, modpath, level=0):
+  def load_module(klass, fullname, modpath, level=0, searchpath=None):
     if klass.debug:
       print >>sys.stderr, 'load_module: %r...' % fullname
     if fullname in klass.BUILTIN_MODULE:
@@ -244,10 +247,10 @@ class Interpreter(object):
     module = None
     for name in fullname.split('.'):
       if module:
-        module = module.load_module(name)[-1]
+        module = module.load_module(name, strict=True)[-1]
       else:
         try:
-          path = klass.find_module(name, modpath)
+          path = klass.find_module(name, searchpath or modpath)
           module = klass.load_file(name, path, modpath, level=level)
         except ModuleNotFound:
           if klass.verbose:

@@ -460,7 +460,6 @@ class KeyValueTypeChecker(CompoundTypeNode):
   def __init__(self, parent_frame, keys, values, blame):
     CompoundTypeNode.__init__(self)
     self.parent_frame = parent_frame
-    self.anchor = anchor
     self.received = set()
     self.keychecker = TypeChecker(parent_frame, keys, blame+' dict key')
     self.valuechecker = TypeChecker(parent_frame, values, blame+' dict value')
