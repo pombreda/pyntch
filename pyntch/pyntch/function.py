@@ -79,25 +79,24 @@ class FuncType(BuiltinType, TreeReporter):
     # handle normal args.
     self.argnames = tuple(argnames)
     maprec(lambda argname: self.space.register_var(argname), self.argnames)
+    # build the function body.
+    self.space.register_names(code)
+    self.body = self.FuncBody(name)
+    self.body.set_retval(self.build_evals(code))
     self.argvars = maprec(lambda argname: self.space[argname], self.argnames)
     # assign the default values.
     self.defaults = tuple(defaults)
     for (var1,arg1) in zip(self.argvars[-len(defaults):], self.defaults):
       assign_arg(parent_frame, anchor, var1, arg1)
-    # build the function body.
-    self.body = self.build_body(name, code)
     self.frames = set()
     BuiltinType.__init__(self)
     return
 
-  def build_body(self, name, tree):
+  def build_evals(self, code):
     from pyntch.syntax import build_stmt
-    body = self.FuncBody(name)
     evals = []
-    self.space.register_names(tree)
-    build_stmt(self, self.frame, self.space, tree, evals, isfuncdef=True)
-    body.set_retval(evals)
-    return body
+    build_stmt(self, self.frame, self.space, code, evals, isfuncdef=True)
+    return evals
 
   def __repr__(self):
     return ('<function %s>' % self.fullname())
@@ -201,13 +200,11 @@ class LambdaFuncType(FuncType):
                       name, argnames, defaults, variargs, kwargs, code, tree)
     return
 
-  def build_body(self, name, tree):
+  def build_evals(self, code):
     from pyntch.syntax import build_expr
-    body = self.FuncBody(name)
     evals = []
-    evals.append(('r', build_expr(self, self.frame, self.space, tree, evals)))
-    body.set_retval(evals)
-    return body
+    evals.append( ('r', build_expr(self, self.frame, self.space, code, evals)) )
+    return evals
   
   def __repr__(self):
     return ('<lambda %s>' % self.space.fullname())

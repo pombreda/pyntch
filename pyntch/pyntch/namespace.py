@@ -32,7 +32,7 @@ class TypedVariable(Variable, TypeChecker):
   def __init__(self, space, name):
     Variable.__init__(self, space, name)
     return
-  
+
   def setup(self, frame, validtypes):
     TypeChecker.__init__(self, frame, validtypes, repr(self))
     return
