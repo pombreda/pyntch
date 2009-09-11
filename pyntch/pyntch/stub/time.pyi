@@ -27,3 +27,8 @@ def mktime((_,_,_,_,_,_,_,_,_)):
 def sleep(x):
   assert isinstance(x, int)
   return
+
+def strftime(fmt, tup=(0,0,0,0,0,0,0,0,0)):
+  assert isinstance(fmt, str)
+  (_,_,_,_,_,_,_,_,_) = tup
+  return ''
