@@ -41,11 +41,11 @@ def build_assert(reporter, frame, space, tree, arg, evals):
       else:
         b = [b]
       validtypes = [ build_expr(reporter, frame, space, t, evals) for t in b ]
-      if arg and isinstance(arg, ast.Const):
-        checker = TypeChecker(frame, validtypes, arg.value)
-      elif isinstance(a, ast.Name):
+      if isinstance(a, ast.Name):
         checker = space[a.name]
-        checker.setup(frame, validtypes)
+        checker.setup(frame, validtypes, arg)
+      elif arg and isinstance(arg, ast.Const):
+        checker = TypeChecker(frame, validtypes, arg.value)
       else:
         checker = TypeChecker(frame, validtypes, repr(a))
       build_expr(reporter, frame, space, a, evals).connect(checker.recv)
@@ -312,46 +312,53 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False, parent_spac
   elif isinstance(tree, ast.Return):
     value = build_expr(reporter, frame, space, tree.value, evals)
     evals.append(('r', value))
+    return True
 
   # yield (for python 2.4)
   elif isinstance(tree, ast.Yield):
     value = build_expr(reporter, frame, space, tree.value, evals)
     evals.append(('y', value))
+    return True
 
   # (mutliple statements)
   elif isinstance(tree, ast.Stmt):
     stmt = None
     for stmt in tree.nodes:
-      build_stmt(reporter, frame, space, stmt, evals, parent_space=parent_space)
-    if isfuncdef:
+      exit = build_stmt(reporter, frame, space, stmt, evals, parent_space=parent_space)
+    if isfuncdef and not exit:
       # if the last statement is not a Return or Raise
-      if not isinstance(stmt, ast.Return) and not isinstance(stmt, ast.Raise):
-        value = NoneType.get_object()
-        evals.append(('r', value))
+      value = NoneType.get_object()
+      evals.append(('r', value))
+    return exit
 
   # if, elif, else
   elif isinstance(tree, ast.If):
     for (expr,stmt) in tree.tests:
       value = build_expr(reporter, frame, space, expr, evals)
-      build_stmt(reporter, frame, space, stmt, evals)
+      exit = build_stmt(reporter, frame, space, stmt, evals)
     if tree.else_:
-      build_stmt(reporter, frame, space, tree.else_, evals)
+      exit = build_stmt(reporter, frame, space, tree.else_, evals) and exit
+    else:
+      exit = False
+    return exit
 
   # for
   elif isinstance(tree, ast.For):
     seq = build_expr(reporter, frame, space, tree.list, evals)
     elem = IterElement(ExecutionFrame(frame, tree.list), tree.list, seq)
     build_assign(reporter, frame, space, tree.assign, elem, evals)
-    build_stmt(reporter, frame, space, tree.body, evals)
+    exit = build_stmt(reporter, frame, space, tree.body, evals)
     if tree.else_:
-      build_stmt(reporter, frame, space, tree.else_, evals)
+      exit = build_stmt(reporter, frame, space, tree.else_, evals) and exit
+    return exit
 
   # while
   elif isinstance(tree, ast.While):
     value = build_expr(reporter, frame, space, tree.test, evals)
-    build_stmt(reporter, frame, space, tree.body, evals)
+    exit = build_stmt(reporter, frame, space, tree.body, evals)
     if tree.else_:
-      build_stmt(reporter, frame, space, tree.else_, evals)
+      exit = build_stmt(reporter, frame, space, tree.else_, evals) and exit
+    return exit
 
   # try ... except
   elif isinstance(tree, ast.TryExcept):
@@ -364,15 +371,17 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False, parent_spac
           build_assign(reporter, handler, space, e, handler.var, evals)
       else:
         handler = catcher.add_handler(None)
-      build_stmt(reporter, handler, space, stmt, evals)
-    build_stmt(reporter, catcher, space, tree.body, evals)
+      exit = build_stmt(reporter, handler, space, stmt, evals)
+    exit = build_stmt(reporter, catcher, space, tree.body, evals) and exit
     if tree.else_:
-      build_stmt(reporter, frame, space, tree.else_, evals)
+      exit = build_stmt(reporter, frame, space, tree.else_, evals) and exit
+    return exit
 
   # try ... finally
   elif isinstance(tree, ast.TryFinally):
-    build_stmt(reporter, frame, space, tree.body, evals)
-    build_stmt(reporter, frame, space, tree.final, evals)
+    exit = build_stmt(reporter, frame, space, tree.body, evals)
+    exit = build_stmt(reporter, frame, space, tree.final, evals) and exit
+    return exit
 
   # raise
   elif isinstance(tree, ast.Raise):
@@ -473,4 +482,4 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False, parent_spac
   else:
     raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._module.get_path(), tree.lineno))
 
-  return
+  return False
