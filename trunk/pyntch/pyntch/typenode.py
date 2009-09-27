@@ -116,6 +116,9 @@ class SimpleTypeNode(TypeNode):
   def desc1(self, _):
     return repr(self)
   
+  def get_type(self):
+    raise NotImplementedError
+
 
 ##  CompoundTypeNode
 ##
