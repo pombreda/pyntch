@@ -1,4 +1,4 @@
 #!/usr/bin/env python
-__version__ = '20090907'
+__version__ = '20090927'
 
 if __name__ == '__main__': print __version__
