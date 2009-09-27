@@ -323,6 +323,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False, parent_spac
   # (mutliple statements)
   elif isinstance(tree, ast.Stmt):
     stmt = None
+    exit = False
     for stmt in tree.nodes:
       exit = build_stmt(reporter, frame, space, stmt, evals, parent_space=parent_space)
     if isfuncdef and not exit:

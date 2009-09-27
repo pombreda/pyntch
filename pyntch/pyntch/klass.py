@@ -1,10 +1,39 @@
 #!/usr/bin/env python
 
-from pyntch.typenode import CompoundTypeNode, \
-     NodeTypeError, NodeAttrError, NodeAssignError, BuiltinType, BuiltinObject
+from pyntch.typenode import CompoundTypeNode, UndefinedTypeNode, \
+     NodeTypeError, NodeAttrError, NodeAssignError, BuiltinType, BuiltinObject, \
+     TypeChecker
 from pyntch.namespace import Namespace
 from pyntch.module import TreeReporter
 from pyntch.frame import ExecutionFrame
+
+
+##  MethodType
+##
+class MethodType(BuiltinType):
+
+  TYPE_NAME = 'method'
+
+  def __init__(self, klass, func):
+    self.klass = klass
+    self.func = func
+    BuiltinType.__init__(self)
+    return
+
+  def __repr__(self):
+    return '<method %r.%r>' % (self.klass, self.func)
+  
+  def get_type(self):
+    return self
+
+  def call(self, frame, anchor, args, kwargs):
+    from pyntch.config import ErrorConfig
+    if len(args) == 0:
+      frame.raise_expt(ErrorConfig.InvalidNumOfArgs(1, len(args)))
+      return UndefinedTypeNode.get_object()
+    arg0checker = TypeChecker(frame, [self.klass.instance], 'arg0')
+    args[0].connect(arg0checker.recv)
+    return self.func.call(frame, anchor, args, kwargs)
 
 
 ##  BoundMethodType
@@ -30,6 +59,7 @@ class BoundMethodType(BuiltinType):
 
 
 ##  ClassType
+##  Built-in class or class defined in Python code.
 ##
 class ClassType(BuiltinType, TreeReporter):
 
@@ -39,25 +69,22 @@ class ClassType(BuiltinType, TreeReporter):
   ##
   class ClassAttr(CompoundTypeNode):
 
-    def __init__(self, frame, anchor, name, klass, baseklass=None):
+    def __init__(self, frame, anchor, name, klass, klasses=None):
       self.frame = frame
       self.anchor = anchor
       self.name = name
       self.klass = klass
-      self.received_base = set()
       self.processed = set()
       CompoundTypeNode.__init__(self)
-      if baseklass:
-        baseklass.connect(self.recv_baseklass)
+      if klasses:
+        klasses.connect(self.recv_klass)
       return
 
     def __repr__(self):
       return '%r.%s' % (self.klass, self.name)
 
-    def recv_baseklass(self, src):
+    def recv_klass(self, src):
       for klass in src:
-        if klass in self.received_base: continue
-        self.received_base.add(klass)
         try:
           klass.get_attr(self.frame, self.anchor, self.name).connect(self.recv)
         except NodeAttrError:
@@ -65,6 +92,7 @@ class ClassType(BuiltinType, TreeReporter):
       return
 
     def recv(self, src):
+      from pyntch.function import FuncType
       from pyntch.basic_types import StaticMethodObject, ClassMethodObject
       for obj in src:
         if obj in self.processed: continue
@@ -73,6 +101,8 @@ class ClassType(BuiltinType, TreeReporter):
           obj = obj.get_object()
         elif isinstance(obj, ClassMethodObject):
           obj = self.klass.bind_func(obj.get_object())
+        elif isinstance(obj, FuncType):
+          obj = MethodType(self.klass, obj)
         self.update_type(obj)
       return
     
@@ -81,9 +111,9 @@ class ClassType(BuiltinType, TreeReporter):
     self.bases = bases
     self.attrs = {}
     self.boundmethods = {}
-    self.baseklass = CompoundTypeNode(bases)
     self.frames = set()
     BuiltinType.__init__(self)
+    self.klasses = CompoundTypeNode(bases+[self])
     self.instance = InstanceObject(self)
     return
 
@@ -95,8 +125,8 @@ class ClassType(BuiltinType, TreeReporter):
   
   def is_subclass(self, klassobj):
     if self is klassobj: return True
-    for klass in self.baseklass:
-      if isinstance(klass, ClassType):
+    for klass in self.klasses:
+      if klass is not self and isinstance(klass, ClassType):
         if klass.is_subclass(klassobj): return True
     return False
 
@@ -105,7 +135,7 @@ class ClassType(BuiltinType, TreeReporter):
       if write: raise NodeAssignError(name)
       return self.get_type()
     elif name not in self.attrs:
-      attr = self.ClassAttr(frame, anchor, name, self, self.baseklass)
+      attr = self.ClassAttr(frame, anchor, name, self, self.klasses)
       self.attrs[name] = attr
     else:
       attr = self.attrs[name]
@@ -123,18 +153,22 @@ class ClassType(BuiltinType, TreeReporter):
     from pyntch.expression import OptMethodCall
     assert isinstance(frame, ExecutionFrame)
     self.frames.add(frame)
-    OptMethodCall(frame, anchor, self, '__init__', (self.instance,)+tuple(args), kwargs)
+    OptMethodCall(frame, anchor, self.instance, '__init__', args, kwargs)
     return self.instance
-  
+
+
+##  PythonClassType
+##  A class type that is associated with an actual Python code.
+##
 class PythonClassType(ClassType, TreeReporter):
   
   def __init__(self, parent_reporter, parent_frame, parent_space, anchor, name, bases, code, evals, tree):
-    TreeReporter.__init__(self, parent_reporter, name)
-    ClassType.__init__(self, name, bases)
     from pyntch.syntax import build_stmt
     self.anchor = anchor
     self.loc = (tree._module, tree.lineno)
     self.space = Namespace(parent_space, name)
+    TreeReporter.__init__(self, parent_reporter, name)
+    ClassType.__init__(self, name, bases)
     if code:
       self.space.register_names(code)
       build_stmt(self, parent_frame, self.space, code, evals, parent_space=parent_space)
@@ -156,7 +190,7 @@ class PythonClassType(ClassType, TreeReporter):
       (module,lineno) = frame.getloc()
       out.write('# instantiated at %s(%d)' % (module.get_path(), lineno))
     if self.bases:
-      out.write('class %s(%s):' % (self.name, ', '.join( base.fullname() for base in self.baseklass.types )))
+      out.write('class %s(%s):' % (self.name, ', '.join( base.fullname() for base in self.klasses if base is not self )))
     else:
       out.write('class %s:' % self.name)
     blocks = set( name for (name,_) in self.children )
@@ -174,44 +208,54 @@ class PythonClassType(ClassType, TreeReporter):
 class InstanceObject(BuiltinObject):
 
   TYPE_NAME = 'instance'
-  
+
   ##  InstanceAttr
   ##
-  class InstanceAttr(ClassType.ClassAttr):
+  class InstanceAttr(CompoundTypeNode):
 
-    def __init__(self, frame, anchor, name, instance):
+    def __init__(self, frame, anchor, name, klass, instance):
+      self.frame = frame
+      self.anchor = anchor
+      self.name = name
+      self.klass = klass
       self.instance = instance
       self.processed = set()
-      ClassType.ClassAttr.__init__(self, frame, anchor, name, instance.klass, instance.klass.baseklass)
-      instance.klass.connect(self.recv_baseklass)
+      CompoundTypeNode.__init__(self)
+      klass.connect(self.recv_klass)
       return
 
     def __repr__(self):
       return '%r.%s' % (self.instance, self.name)
+      
+    def recv_klass(self, src):
+      for klass in src:
+        try:
+          klass.get_attr(self.frame, self.anchor, self.name).connect(self.recv)
+        except NodeAttrError:
+          pass
+        try:
+          klass.instance.get_attr(self.frame, self.anchor, self.name).connect(self.recv)
+        except NodeAttrError:
+          pass
+      return
 
     def recv(self, src):
-      from pyntch.function import FuncType
-      from pyntch.basic_types import StaticMethodObject, ClassMethodObject
       for obj in src:
         if obj in self.processed: continue
         self.processed.add(obj)
-        if isinstance(obj, StaticMethodObject):
-          obj = obj.get_object()
-        elif isinstance(obj, ClassMethodObject):
-          obj = self.klass.bind_func(obj.get_object())
-        elif isinstance(obj, FuncType):
-          obj = self.instance.bind_func(obj)
+        if isinstance(obj, MethodType):
+          obj = self.instance.bind_func(obj.func)
         self.update_type(obj)
       return
-
+    
   #
   def __init__(self, klass):
     self.klass = klass
     self.attrs = {}
     self.boundmethods = {}
     BuiltinObject.__init__(self, klass)
-    for (name, value) in klass.attrs.iteritems():
-      value.connect(self.get_attr(None, None, name, True).recv)
+    for name in klass.attrs.iterkeys():
+      self.attrs[name] = self.InstanceAttr(None, None, name, self.klass, self)
     return
   
   def __repr__(self):
@@ -230,7 +274,7 @@ class InstanceObject(BuiltinObject):
       if write: raise NodeAssignError(name)
       return self.get_type()
     elif name not in self.attrs:
-      attr = self.InstanceAttr(frame, anchor, name, self)
+      attr = self.InstanceAttr(frame, anchor, name, self.klass, self)
       self.attrs[name] = attr
     else:
       attr = self.attrs[name]
