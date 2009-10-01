@@ -31,7 +31,7 @@ class MethodType(BuiltinType):
     if len(args) == 0:
       frame.raise_expt(ErrorConfig.InvalidNumOfArgs(1, len(args)))
       return UndefinedTypeNode.get_object()
-    arg0checker = TypeChecker(frame, [self.klass.instance], 'arg0')
+    arg0checker = TypeChecker(frame, [self.klass], 'arg0')
     args[0].connect(arg0checker.recv)
     return self.func.call(frame, anchor, args, kwargs)
 
