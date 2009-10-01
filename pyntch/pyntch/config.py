@@ -116,7 +116,7 @@ class ErrorConfig(object):
 
   @classmethod
   def TypeCheckerError(klass, src, obj, validtype):
-    return TypeErrorType.occur('%s (%s) must be %s' % (src, obj ,validtype))
+    return TypeErrorType.occur('%s (%s) must be %s' % (src, obj, validtype))
 
   # maybe
   @classmethod
