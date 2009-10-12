@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from pyntch.typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, NodeAssignError, UndefinedTypeNode
+from pyntch.typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, NodeAssignError, UndefinedTypeNode, Element
 from pyntch.typenode import BuiltinObject, BuiltinType, BuiltinCallable, BuiltinMethod, BuiltinConstMethod
 from pyntch.typenode import TypeChecker
 from pyntch.exception import StopIterationType
@@ -27,9 +27,6 @@ class BuiltinAggregateObject(BuiltinObject):
       attr = self.create_attr(frame, anchor, name)
       self.attrs[name] = attr
     return attr
-
-  def signature(self):
-    return self.get_type()
 
 
 ##  BuiltinAggregateType
@@ -218,12 +215,20 @@ class ListObject(BuiltinSequenceObject):
       return NoneType.get_object()
 
   # ListObject
-  def desc1(self, done):
+  def desctxt(self, done):
     if self in done:
       return '...'
     else:
-      done.add(self)
-      return '[%s]' % self.elemall.desc1(done)
+      done[self] = len(done)
+      return '[%s]' % self.elemall.desctxt(done)
+  def descxml(self, done):
+    if self in done:
+      e = Element('ref', id=str(done[self]))
+    else:
+      done[self] = len(done)
+      e = Element('list', id=str(done[self]))
+      e.append(self.elemall.descxml(done))
+    return e
 
   def get_element(self, frame, anchor, sub, write=False):
     frame.raise_expt(ErrorConfig.MaybeOutOfRange())
@@ -311,19 +316,31 @@ class TupleObject(BuiltinSequenceObject):
 
   def __repr__(self):
     if self.elements == None:
-      return '(*%s)' % self.elemall.describe()
+      return '(*%r)' % self.elemall
     else:
-      return '(%s)' % ','.join( obj.describe() for obj in self.elements )
+      return '(%s)' % ','.join( repr(obj) for obj in self.elements )
 
-  def desc1(self, done):
+  def desctxt(self, done):
     if self in done:
       return '...'
     else:
-      done.add(self)
+      done[self] = len(done)
       if self.elements == None:
-        return '(*%s)' % self.elemall.desc1(done)
+        return '(*%s)' % self.elemall.desctxt(done)
       else:
-        return '(%s)' % ','.join( obj.desc1(done) for obj in self.elements )
+        return '(%s)' % ','.join( obj.desctxt(done) for obj in self.elements )
+  def descxml(self, done):
+    if self in done:
+      e = Element('ref', id=str(done[self]))
+    else:
+      done[self] = len(done)
+      e = Element('tuple', id=str(done[self]))
+      if self.elements == None:
+        e.append(self.elemall.descxml(done))
+      else:
+        for obj in self.elements:
+          e.append(obj.descxml(done))
+    return e
 
   def get_element(self, frame, anchor, sub, write=False):
     if write: raise NodeAssignError
@@ -434,12 +451,20 @@ class FrozenSetObject(BuiltinSequenceObject):
       return self.retobj
 
   #
-  def desc1(self, done):
+  def desctxt(self, done):
     if self in done:
       return '...'
     else:
-      done.add(self)
-      return '([%s])' % self.elemall.desc1(done)
+      done[self] = len(done)
+      return '([%s])' % self.elemall.desctxt(done)
+  def descxml(self, done):
+    if self in done:
+      e = Element('ref', id=str(done[self]))
+    else:
+      done[self] = len(done)
+      e = Element('set', id=str(done[self]))
+      e.append(self.elemall.descxml(done))
+    return e
 
   def create_attr(self, frame, anchor, name):
     if name == 'copy':
@@ -556,12 +581,20 @@ class IterObject(BuiltinAggregateObject):
   def __repr__(self):
     return '(%s, ...)' % self.elemall
 
-  def desc1(self, done):
+  def desctxt(self, done):
     if self in done:
       return '...'
     else:
-      done.add(self)
-      return '(%s, ...)' % self.elemall.desc1(done)
+      done[self] = len(done)
+      return '(%s, ...)' % self.elemall.desctxt(done)
+  def descxml(self, done):
+    if self in done:
+      e = Element('ref', id=str(done[self]))
+    else:
+      done[self] = len(done)
+      e = Element('iter', id=str(done[self]))
+      e.append(self.elemall.descxml(done))
+    return e
 
   def get_iter(self, frame, anchor):
     return self
@@ -865,12 +898,21 @@ class DictObject(BuiltinAggregateObject):
   def __repr__(self):
     return '{%s: %s}' % (self.key, self.value)
 
-  def desc1(self, done):
+  def desctxt(self, done):
     if self in done:
       return '...'
     else:
-      done.add(self)
-      return '{%s: %s}' % (self.key.desc1(done), self.value.desc1(done))
+      done[self] = len(done)
+      return '{%s: %s}' % (self.key.desctxt(done), self.value.desctxt(done))
+  def descxml(self, done):
+    if self in done:
+      e = Element('ref', id=str(done[self]))
+    else:
+      done[self] = len(done)
+      e = Element('dict', id=str(done[self]))
+      e.append(self.key.descxml(done))
+      e.append(self.value.descxml(done))
+    return e
 
   def create_attr(self, frame, anchor, name):
     if name == 'clear':

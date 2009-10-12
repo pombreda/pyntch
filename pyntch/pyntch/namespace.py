@@ -15,10 +15,7 @@ class Variable(CompoundTypeNode):
     return
   
   def __repr__(self):
-    return '@'+self.fullname()
-
-  def fullname(self):
-    return '%s.%s' % (self.space.fullname()[1:], self.name)
+    return '@'+self.name
 
   def bind(self, obj):
     obj.connect(self.recv)
@@ -64,12 +61,6 @@ class Namespace(object):
 
   def __iter__(self):
     return self.vars.iteritems()
-
-  def fullname(self):
-    if self.parent_space:
-      return '%s.%s' % (self.parent_space.fullname(), self.name)
-    else:
-      return self.name
 
   def get_var(self, name):
     while self:
@@ -509,6 +500,3 @@ class DefaultNamespace(Namespace):
     self.register_var('__file__').bind(basic_types.StrType.get_object())
     self.register_var('__name__').bind(basic_types.StrType.get_object())
     return
-  
-  def fullname(self):
-    return ''

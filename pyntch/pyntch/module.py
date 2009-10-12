@@ -1,8 +1,31 @@
 #!/usr/bin/env python
 import sys, os.path, compiler
+try:
+  from xml.etree.cElementTree import Element, ElementTree
+except ImportError:
+  from xml.etree.ElementTree import Element, ElementTree
+try:
+  from cStringIO import StringIO
+except ImportError:
+  from StringIO import StringIO
 from pyntch.typenode import BuiltinType, BuiltinObject, NodeAssignError
 from pyntch.frame import ExecutionFrame
 from pyntch.namespace import Namespace
+
+def enc(x):
+  return unicode(x).replace('&','&amp;').replace('>','&gt;').replace('<','&lt;').replace('"','&quote;').encode('ascii', 'xmlcharrefreplace')
+
+def encattrs(attrs):
+  s = ''
+  for (k,v) in attrs.iteritems():
+    if not v: continue
+    s += ' %s="%s"' % (k,enc(v))
+  return s
+
+def tostr(e):
+  fp = StringIO()
+  ElementTree(e).write(fp)
+  return fp.getvalue()
 
 
 ##  IndentedStream
@@ -23,31 +46,46 @@ class IndentedStream(object):
     self.i += d
     return
 
+  def write_value(self, name, value):
+    self.write('%s = %s' % (name, value.desctxt({})))
+    return
+
+  def start_xmltag(self, tag, **attrs):
+    self.write('<%s%s>' % (tag, encattrs(attrs)))
+    self.indent(+1)
+    return
+  def end_xmltag(self, tag):
+    self.indent(-1)
+    self.write('</%s>' % tag)
+    return
+  def show_xmltag(self, tag, **attrs):
+    self.write('<%s%s />' % (tag, encattrs(attrs)))
+    return
+  def show_xmlvalue(self, tag, value, **attrs):
+    e = Element(tag, **attrs)
+    e.append(value.descxml({}))
+    self.write(tostr(e))
+    return
+
   
 ##  TreeReporter
 ##
 class TreeReporter(object):
 
-  def __init__(self, parent=None, name=None):
+  def __init__(self, parent=None):
     self.children = []
     if parent:
-      parent.register(name, self)
+      parent.register(self)
     return
 
-  def register(self, name, child):
-    self.children.append((name, child))
+  def register(self, child):
+    self.children.append(child)
     return
 
-  def show(self, out):
+  def showtxt(self, out):
     return
 
-  def showrec(self, out):
-    self.show(out)
-    out.write('')
-    out.indent(+1)
-    for (name,reporter) in self.children:
-      reporter.showrec(out)
-    out.indent(-1)
+  def showxml(self, out):
     return
   
   
@@ -106,12 +144,12 @@ class ModuleType(BuiltinType):
 ##
 class PythonModuleObject(ModuleObject, TreeReporter):
 
-  def __init__(self, name, parent_space, path, modpath, level=0):
+  def __init__(self, name, space, path, modpath, level=0):
     self.path = path
     self.modpath = [os.path.dirname(self.path)] + modpath
     self.frame = ExecutionFrame(None, None)
-    ModuleObject.__init__(self, name, Namespace(parent_space, name), level=level)
-    TreeReporter.__init__(self, None, name)
+    ModuleObject.__init__(self, name, Namespace(space, ''), level=level)
+    TreeReporter.__init__(self, None)
     return
   
   def __repr__(self):
@@ -128,29 +166,50 @@ class PythonModuleObject(ModuleObject, TreeReporter):
   def get_path(self):
     return self.path
 
-  def show(self, out):
+  def showtxt(self, out):
     out.write('[%s]' % self.name)
-    blocks = set( name for (name,_) in self.children )
-    for (name,v) in sorted(self.space):
+    out.indent(+1)
+    blocks = set( child.name for child in self.children )
+    for (name,value) in sorted(self.space):
       if name in blocks: continue
-      out.write('  %s = %s' % (name, v.describe()))
-    self.frame.show(out)
+      out.write_value(name, value)
+    for child in self.children:
+      child.showtxt(out)
+    self.frame.showtxt(out)
+    out.indent(-1)
+    out.write('')
     return
 
-  def load_module(self, name, strict=False):
+  def showxml(self, out):
+    out.start_xmltag('module', name=self.get_name(), src=self.path)
+    blocks = set( child.name for child in self.children )
+    for (name,value) in sorted(self.space):
+      if name in blocks: continue
+      out.show_xmlvalue('var', value, name=name)
+    for child in self.children:
+      child.showxml(out)
+    self.frame.showxml(out)
+    out.end_xmltag('module')
+    return
+
+  def load_module(self, name, subdir=False):
     if self.name == 'os' and name == 'path':
       # os.path hack
-      return Interpreter.load_module('posixpath', self.modpath, level=self.level+1)
-    elif strict:
-      return Interpreter.load_module(name, self.modpath, level=self.level+1,
+      return Interpreter.load_module('posixpath', self.modpath,
+                                     level=self.level+1)
+    elif subdir:
+      return Interpreter.load_module(name, self.modpath,
+                                     level=self.level+1,
+                                     modname=self.name+'.'+name,
                                      searchpath=[os.path.dirname(self.path)])
     else:
-      return Interpreter.load_module(name, self.modpath, level=self.level+1)
+      return Interpreter.load_module(name, self.modpath,
+                                     level=self.level+1)
 
   def import_object(self, name):
     if name in self.space:
       return self.space[name]
-    return self.load_module(name, strict=True)[-1]
+    return self.load_module(name, subdir=True)[-1]
   
 
 ##  Interpreter
@@ -188,6 +247,10 @@ class Interpreter(object):
     klass.PATH2MODULE = {}
     return
 
+  @classmethod
+  def get_python_modules(klass):
+    return klass.PATH2MODULE.iteritems()
+  
   # find_module(name)
   #   return the full path for a given module name.
   @classmethod
@@ -216,7 +279,8 @@ class Interpreter(object):
     else:
       if klass.verbose:
         print >>sys.stderr, ' '*level+'loading: %r as %r' % (path, modname)
-      module = PythonModuleObject(modname, klass.DEFAULT_NAMESPACE, path, modpath, level=level)
+      module = PythonModuleObject(modname, klass.DEFAULT_NAMESPACE, path, modpath,
+                                  level=level)
       klass.PATH2MODULE[path] = module
       try:
         fp = file(path)
@@ -238,7 +302,8 @@ class Interpreter(object):
 
   # load_module
   @classmethod
-  def load_module(klass, fullname, modpath, level=0, searchpath=None):
+  def load_module(klass, fullname, modpath, level=0,
+                  modname=None, searchpath=None):
     if klass.debug:
       print >>sys.stderr, 'load_module: %r...' % fullname
     if fullname in klass.BUILTIN_MODULE:
@@ -247,11 +312,11 @@ class Interpreter(object):
     module = None
     for name in fullname.split('.'):
       if module:
-        module = module.load_module(name, strict=True)[-1]
+        module = module.load_module(name, subdir=True)[-1]
       else:
         try:
           path = klass.find_module(name, searchpath or modpath)
-          module = klass.load_file(name, path, modpath, level=level)
+          module = klass.load_file(modname or name, path, modpath, level=level)
         except ModuleNotFound:
           if klass.verbose:
             print >>sys.stderr, ' '*level+'not found: %r' % name

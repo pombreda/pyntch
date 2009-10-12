@@ -450,7 +450,7 @@ class ObjectType(BuiltinConstCallable, BuiltinBasicType):
     return
 
 BUILTIN_OBJECT = dict(
-  (cls.get_name(), cls.get_object()) for cls in
+  (cls.typename(), cls.get_object()) for cls in
   ( NoneType, BoolType, IntType, LongType, FloatType, ComplexType, StrType, UnicodeType, FileType ))
 
 
