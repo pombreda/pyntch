@@ -338,6 +338,7 @@ class TupleObject(BuiltinSequenceObject):
       if self.elements == None:
         e.append(self.elemall.descxml(done))
       else:
+        e.set('len', str(self.elements))
         for obj in self.elements:
           e.append(obj.descxml(done))
     return e
@@ -780,27 +781,6 @@ class DictObject(BuiltinAggregateObject):
         IterElement(self.frame, self.anchor, obj).connect(self.target.key.recv)
       return
 
-  # dict.fromkeys
-  class FromKeys(BuiltinConstMethod):
-    
-    def __init__(self, _, name):
-      self.cache_fromkeys = {}
-      self.dictobj = DictType.create_dict()
-      BuiltinConstMethod.__init__(self, name, self.dictobj, [ANY], [ANY])
-      return
-    
-    def process_args(self, frame, anchor, args, kwargs):
-      if 2 <= len(args):
-        args[1].connect(self.dictobj.value.recv)
-      else:
-        NoneType.get_object().connect(self.dictobj.value.recv)
-      v = args[0]
-      if v not in self.cache_fromkeys:
-        converter = DictObject.DictConverterFromKeys(frame, anchor, self.dictobj)
-        self.cache_fromkeys[v] = converter
-        v.connect(converter.recv)
-      return self.dictobj
-    
   # dict.get
   class Get(BuiltinConstMethod):
     
@@ -921,7 +901,7 @@ class DictObject(BuiltinAggregateObject):
       dictobj = self.get_type().create_copy(frame, anchor, self)
       return BuiltinConstMethod('dict.copy', dictobj)
     elif name == 'fromkeys':
-      return DictObject.FromKeys(self, 'dict.fromkeys')
+      return DictType.FromKeys('dict.fromkeys')
     elif name == 'get':
       return DictObject.Get(self, 'dict.get')
     elif name == 'has_key':
@@ -978,6 +958,27 @@ class DictType(BuiltinAggregateType):
   TYPE_NAME = 'dict'
   CACHE = {}
 
+  # dict.fromkeys
+  class FromKeys(BuiltinConstMethod):
+    
+    def __init__(self, name):
+      self.cache_fromkeys = {}
+      self.dictobj = DictType.create_dict()
+      BuiltinConstMethod.__init__(self, name, self.dictobj, [ANY], [ANY])
+      return
+    
+    def process_args(self, frame, anchor, args, kwargs):
+      if 2 <= len(args):
+        args[1].connect(self.dictobj.value.recv)
+      else:
+        NoneType.get_object().connect(self.dictobj.value.recv)
+      v = args[0]
+      if v not in self.cache_fromkeys:
+        converter = DictObject.DictConverterFromKeys(frame, anchor, self.dictobj)
+        self.cache_fromkeys[v] = converter
+        v.connect(converter.recv)
+      return self.dictobj
+    
   @classmethod
   def create_dict(klass, items=None, key=None, value=None):
     return DictObject(klass.get_typeobj(), items=items, key=key, value=value)
@@ -1023,6 +1024,11 @@ class DictType(BuiltinAggregateType):
     if args:
       return self.create_sequence(frame, anchor, args[0])
     return self.create_null(frame, anchor)
+
+  def get_attr(self, frame, anchor, name, write=False):
+    if name == 'fromkeys' and not write:
+      return DictType.FromKeys('dict.fromkeys')
+    return BuiltinAggregateType.get_attr(self, frame, anchor, name, write=write)
 
 
 ##  EnumerateType

@@ -23,6 +23,7 @@ c1['x'] = 'y'
 d1 = {}.fromkeys(1)
 d2 = {}.fromkeys([1,2,3])
 d3 = {}.fromkeys([1,2,3], 'b')
+d4 = dict.fromkeys([1,2,3])
 d2.update({'a':2})
 d2.update([(1,'b')])
 
