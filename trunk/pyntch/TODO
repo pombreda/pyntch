@@ -1,6 +1,6 @@
 TODO:
 
-- code annotation.
+- cross referencing variables/attributes.
 - add more test cases and stub modules.
 - support __all__
 - type coercion (bool -> int etc.)
