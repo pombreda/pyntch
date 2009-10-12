@@ -483,7 +483,7 @@ class BinaryOp(MustBeDefinedNode):
         robj.connect(self.recv)
         return
     # other valid operations.
-    k = (ltype.get_name(), self.op, rtype.get_name())
+    k = (ltype.typename(), self.op, rtype.typename())
     if k in self.VALID_TYPES:
       self.computed.add((lobj,robj))
       BUILTIN_OBJECT[self.VALID_TYPES[k]].connect(self.recv)

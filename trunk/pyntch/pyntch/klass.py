@@ -118,10 +118,10 @@ class ClassType(BuiltinType, TreeReporter):
     return
 
   def __repr__(self):
-    return ('<class %s>' % self.fullname())
+    return ('<class %s>' % self.name)
   
-  def get_name(self):
-    return self.fullname()
+  def typename(self):
+    return self.name
   
   def is_subclass(self, klassobj):
     if self is klassobj: return True
@@ -167,7 +167,7 @@ class PythonClassType(ClassType, TreeReporter):
     self.anchor = anchor
     self.loc = (tree._module, tree.lineno)
     self.space = Namespace(parent_space, name)
-    TreeReporter.__init__(self, parent_reporter, name)
+    TreeReporter.__init__(self, parent_reporter)
     ClassType.__init__(self, name, bases)
     if code:
       self.space.register_names(code)
@@ -180,26 +180,50 @@ class PythonClassType(ClassType, TreeReporter):
       self.attrs[name] = attr
     return
 
-  def fullname(self):
-    return self.space.fullname()
-  
-  def show(self, out):
+  def showtxt(self, out):
     (module,lineno) = self.loc
-    out.write('### %s(%s)' % (module.get_path(), lineno))
+    out.write('### %s(%s)' % (module.get_name(), lineno))
     for frame in self.frames:
       (module,lineno) = frame.getloc()
-      out.write('# instantiated at %s(%d)' % (module.get_path(), lineno))
+      out.write('# instantiated at %s(%d)' % (module.get_name(), lineno))
     if self.bases:
-      out.write('class %s(%s):' % (self.name, ', '.join( base.fullname() for base in self.klasses if base is not self )))
+      out.write('class %s(%s):' % (self.name,
+                                   ', '.join( base.typename() for base in self.klasses if base is not self )))
     else:
       out.write('class %s:' % self.name)
-    blocks = set( name for (name,_) in self.children )
+    out.indent(+1)
+    blocks = set( child.name for child in self.children )
     for (name, attr) in self.attrs.iteritems():
       if name in blocks or not attr.types: continue
-      out.write('  class.%s = %s' % (name, attr.describe()))
+      out.write_value('class.'+name, attr)
     for (name, attr) in self.instance.attrs.iteritems():
       if name in blocks or not attr.types: continue
-      out.write('  instance.%s = %s' % (name, attr.describe()))
+      out.write_value('instance.'+name, attr)
+    out.indent(-1)
+    out.write('')
+    return
+
+  def showxml(self, out):
+    (module,lineno) = self.loc
+    out.start_xmltag('class', name=self.name,
+                     loc='%s:%s' % (module.get_name(), lineno))
+    for frame in self.frames:
+      (module,lineno) = frame.getloc()
+      out.show_xmltag('caller',
+                      loc='%s:%s' % (module.get_name(), lineno))
+    for base in self.klasses:
+      if base is self: continue
+      out.show_xmltag('base', name=base.typename())
+    blocks = set( child.name for child in self.children )
+    for (name, attr) in self.attrs.iteritems():
+      if name in blocks or not attr.types: continue
+      out.show_xmlvalue('classattr', attr, name=name)
+    for (name, attr) in self.instance.attrs.iteritems():
+      if name in blocks or not attr.types: continue
+      out.show_xmlvalue('instanceattr', attr, name=name)
+    for child in self.children:
+      child.showxml(out)
+    out.end_xmltag('class')
     return
 
 
@@ -259,7 +283,7 @@ class InstanceObject(BuiltinObject):
     return
   
   def __repr__(self):
-    return ('<instance %s>' % self.klass.fullname())
+    return ('<instance %s>' % self.klass.name)
   
   def get_type(self):
     return self.klass

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys
-from pyntch.typenode import TypeNode, CompoundTypeNode, NodeTypeError
+from pyntch.typenode import TypeNode, CompoundTypeNode, NodeTypeError, Element
 
 
 ##  TracebackObject
@@ -10,8 +10,8 @@ from pyntch.typenode import TypeNode, CompoundTypeNode, NodeTypeError
 ##
 class TracebackObject(TypeNode):
 
-  def __init__(self, expt, frame):
-    self.expt = expt
+  def __init__(self, exptobj, frame):
+    self.exptobj = exptobj
     self.frame = frame
     TypeNode.__init__(self, [self])
     return
@@ -19,12 +19,9 @@ class TracebackObject(TypeNode):
   def __repr__(self):
     try:
       (module,lineno) = self.frame.getloc()
-      return '%s at %s(%s)' % (self.expt, module.get_path(), lineno)
+      return '%s at %s:%s' % (self.exptobj, module.get_name(), lineno)
     except TypeError:
-      return '%s at ???' % self.expt
-
-  def desc1(self, _):
-    return repr(self)
+      return '%s at ???' % self.exptobj
 
 
 ##  ExecutionFrame
@@ -57,7 +54,7 @@ class ExecutionFrame(CompoundTypeNode):
     loc = self.getloc()
     if loc:
       (module,lineno) = loc
-      return '<Frame at %s(%s)>' % (module.get_path(), lineno)
+      return '<Frame at %s:%s>' % (module.get_name(), lineno)
     else:
       return '<Frame at ???>'
 
@@ -84,7 +81,7 @@ class ExecutionFrame(CompoundTypeNode):
     TracebackObject(expt, self).connect(self.recv)
     return
 
-  def show(self, out):
+  def showtxt(self, out):
     from pyntch.config import ErrorConfig
     expts_here = []
     expts_there = []
@@ -98,10 +95,35 @@ class ExecutionFrame(CompoundTypeNode):
       else:
         expts_there.append(expt)
     for expt in sorted(expts_here, key=lambda expt:expt.frame.getloc()):
-      out.write('  raises %r' % expt)
+      out.write('raises %s' % expt)
     if ErrorConfig.show_all:
       for expt in sorted(expts_there, key=lambda expt:expt.frame.getloc()):
-        out.write('  [raises %r]' % expt)
+        out.write('[raises %s]' % expt)
+    return
+
+  def showxml(self, out):
+    from pyntch.config import ErrorConfig
+    expts_here = []
+    expts_there = []
+    for expt in self:
+      frame = expt.frame
+      while frame:
+        if frame == self:
+          expts_here.append(expt)
+          break
+        frame = frame.parent
+      else:
+        expts_there.append(expt)
+    for expt in sorted(expts_here, key=lambda expt:expt.frame.getloc()):
+      (module, lineno) = expt.frame.getloc()
+      obj = expt.exptobj
+      out.show_xmltag('raise', type=obj.get_type().typename(), msg=str(obj),
+                      loc='%s:%s' % (module.get_name(), lineno))
+    if ErrorConfig.show_all:
+      for expt in sorted(expts_there, key=lambda expt:expt.frame.getloc()):
+        obj = expt.exptobj
+        out.show_xmltag('iraise', type=obj.get_type().typename(), msg=str(obj),
+                        loc='%s:%s' % (module.get_name(), lineno))
     return
 
 
@@ -129,7 +151,7 @@ class ExceptionCatcher(ExecutionFrame):
     x = self.getloc()
     if x:
       (module,lineno) = x
-      return '<catch %s at %s(%s)>' % (s, module.get_path(), lineno)
+      return '<catch %s at %s:%s>' % (s, module.get_name(), lineno)
     else:
       return '<Catch %s at ???>' % s
   
@@ -158,7 +180,7 @@ class ExceptionCatcher(ExecutionFrame):
   def check_expt(self):
     for obj in self.received:
       for frame in self.handlers:
-        if frame.handle_expt(obj.expt): break
+        if frame.handle_expt(obj.exptobj): break
       else:
         self.update_type(obj)
     return
@@ -230,7 +252,7 @@ class ExceptionMaker(CompoundTypeNode):
     return
   
   def __repr__(self):
-    return '<exception %s>' % (self.describe())
+    return '<exceptionmaker %d>' % len(self.types)
 
   def recv_type(self, src):
     from pyntch.klass import ClassType

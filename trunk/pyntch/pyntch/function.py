@@ -54,7 +54,7 @@ class FuncType(BuiltinType, TreeReporter):
 
   def __init__(self, parent_reporter, parent_frame, parent_space, anchor,
                name, argnames, defaults, variargs, kwargs, code, tree):
-    TreeReporter.__init__(self, parent_reporter, name)
+    TreeReporter.__init__(self, parent_reporter)
     def maprec(func, x):
       if isinstance(x, tuple):
         return tuple( maprec(func, y) for y in x )
@@ -99,10 +99,7 @@ class FuncType(BuiltinType, TreeReporter):
     return evals
 
   def __repr__(self):
-    return ('<function %s>' % self.fullname())
-
-  def fullname(self):
-    return self.space.fullname()
+    return ('<function %s>' % self.name)
 
   def get_type(self):
     return self
@@ -155,12 +152,12 @@ class FuncType(BuiltinType, TreeReporter):
     self.frame.connect(frame.recv)
     return self.body
 
-  def show(self, out):
+  def showtxt(self, out):
     (module,lineno) = self.frame.getloc()
-    out.write('### %s(%s)' % (module.get_path(), lineno))
+    out.write('### %s(%s)' % (module.get_name(), lineno))
     for frame in self.frames:
       (module,lineno) = frame.getloc()
-      out.write('# called at %s(%s)' % (module.get_path(), lineno))
+      out.write('# called at %s(%s)' % (module.get_name(), lineno))
     names = set()
     def recjoin(sep, seq):
       for x in seq:
@@ -168,7 +165,7 @@ class FuncType(BuiltinType, TreeReporter):
           yield '(%s)' % sep.join(recjoin(sep, x))
         else:
           names.add(x)
-          yield '%s=%s' % (x, self.space[x].describe())
+          yield '%s=%s' % (x, self.space[x].desctxt({}))
       return
     r = list(recjoin(', ', self.argnames))
     if self.variarg:
@@ -176,12 +173,47 @@ class FuncType(BuiltinType, TreeReporter):
     if self.kwarg:
       r.append('**'+self.kwarg)
     out.write('def %s(%s):' % (self.name, ', '.join(r)) )
-    names.update( name for (name,_) in self.children )
+    out.indent(+1)
+    names.update( child.name for child in self.children )
     for (k,v) in sorted(self.space):
       if k not in names:
-        out.write('  %s = %s' % (k, v.describe()))
-    out.write('  return %s' % self.body.describe())
-    self.frame.show(out)
+        out.write_value(k, v)
+    out.write_value('return', self.body)
+    self.frame.showtxt(out)
+    out.indent(-1)
+    out.write('')
+    return
+
+  def showxml(self, out):
+    (module,lineno) = self.frame.getloc()
+    out.start_xmltag('function', name=self.name,
+                     loc='%s:%s' % (module.get_name(), lineno))
+    for frame in self.frames:
+      (module,lineno) = frame.getloc()
+      out.show_xmltag('caller', loc='%s:%s' % (module.get_name(), lineno))
+    names = set()
+    def recjoin(seq):
+      for x in seq:
+        if isinstance(x, tuple):
+          recjoin(x)
+        else:
+          names.add(x)
+          out.show_xmlvalue('arg', self.space[x], name=x)
+      return
+    recjoin(self.argnames)
+    if self.variarg:
+      out.show_xmltag('vararg', name=self.variarg)
+    if self.kwarg:
+      out.show_xmltag('kwarg', name=self.kwarg)
+    names.update( child.name for child in self.children )
+    for (k,v) in sorted(self.space):
+      if k not in names:
+        out.show_xmlvalue('var', v, name=k)
+    out.show_xmlvalue('return', self.body)
+    self.frame.showxml(out)
+    for child in self.children:
+      child.showxml(out)
+    out.end_xmltag('function')
     return
 
 
@@ -207,6 +239,4 @@ class LambdaFuncType(FuncType):
     return evals
   
   def __repr__(self):
-    return ('<lambda %s>' % self.space.fullname())
-
-
+    return ('<lambda %s>' % self.name)

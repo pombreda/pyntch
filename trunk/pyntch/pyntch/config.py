@@ -109,10 +109,11 @@ class ErrorConfig(object):
   def NotSupportedOperand(klass, op, left, right=None):
     if right:
       if klass.is_ignored(left) or klass.is_ignored(right): return None
-      return TypeErrorType.occur('not supported operand %s(%s, %s)' % (op, left.describe(), right.describe()))
+      return TypeErrorType.occur('not supported operand %s(%s, %s)' %
+                                 (op, left.get_type().typename(), right.get_type().typename()))
     else:
       if klass.is_ignored(left): return None
-      return TypeErrorType.occur('not supported operand %s(%s)' % (op, left.describe()))
+      return TypeErrorType.occur('not supported operand %s(%s)' % (op, left.get_type().typename()))
 
   @classmethod
   def TypeCheckerError(klass, src, obj, validtype):

@@ -4,6 +4,10 @@
 ##
 
 import sys
+try:
+  from xml.etree.cElementTree import Element
+except ImportError:
+  from xml.etree.ElementTree import Element
 
 class NodeError(Exception): pass
 class NodeTypeError(NodeError): pass
@@ -83,17 +87,14 @@ class TypeNode(object):
     raise NodeTypeError('no len()')
   def call(self, frame, anchor, args, kwargs):
     raise NodeTypeError('not callable')
-  
-  def get_name(self):
-    raise NotImplementedError, self.__class__
-  def desc1(self, _):
-    raise NotImplementedError, self.__class__
-  def describe(self):
-    return self.desc1(set())
-  def signature(self):
-    return None
+
   def is_type(self, *_):
     return False
+  
+  def desctxt(self, _):
+    raise NotImplementedError, self.__class__
+  def descxml(self, _):
+    raise NotImplementedError, self.__class__
 
 
 ##  SimpleTypeNode
@@ -111,13 +112,16 @@ class SimpleTypeNode(TypeNode):
     return
 
   def __repr__(self):
-    return '<%s>' % self.typeobj.get_name()
+    return '<%s>' % self.get_type().typename()
 
-  def desc1(self, _):
+  def desctxt(self, _):
     return repr(self)
+  def descxml(self, done):
+    done[self] = len(done)
+    return Element(self.get_type().typename())
   
   def get_type(self):
-    raise NotImplementedError
+    return self.typeobj
 
 
 ##  CompoundTypeNode
@@ -137,7 +141,7 @@ class CompoundTypeNode(TypeNode):
     return
 
   def __repr__(self):
-    return '<CompoundTypeNode: %s>' % self.describe()
+    return '<CompoundTypeNode: %d>' % len(self.types)
 
   def recv(self, src):
     for obj in src:
@@ -152,14 +156,23 @@ class CompoundTypeNode(TypeNode):
       self.schedule(receiver, self)
     return True
 
-  def desc1(self, done):
+  def desctxt(self, done):
     if self in done:
       return '...'
     elif self.types:
-      done.add(self)
-      return '|'.join( sorted(set( obj.desc1(done) for obj in self )) )
+      done[self] = len(done)
+      return '|'.join( sorted(set( obj.desctxt(done) for obj in self )) )
     else:
       return '?'
+  def descxml(self, done):
+    if self in done:
+      e = Element('ref', id=str(done[self]))
+    else:
+      done[self] = len(done)
+      e = Element('compound', id=str(done[self]))
+      for obj in self:
+        e.append(obj.descxml(done))
+    return e
                                   
 
 ##  UndefinedTypeNode
@@ -187,8 +200,10 @@ class UndefinedTypeNode(TypeNode):
   def __repr__(self):
     return '(undef)'
   
-  def desc1(self, _):
+  def desctxt(self, _):
     return '(undef)'
+  def descxml(self, _):
+    return Element('undef')
 
   def recv(self, src):
     return
@@ -212,9 +227,6 @@ class UndefinedTypeNode(TypeNode):
 ##
 class BuiltinObject(SimpleTypeNode):
 
-  def get_type(self):
-    return self.typeobj
-  
   def get_attr(self, frame, anchor, name, write=False):
     if name == '__class__':
       if write: raise NodeAssignError(name)
@@ -240,7 +252,7 @@ class BuiltinType(BuiltinObject):
     return
 
   def __repr__(self):
-    return '<type %s>' % self.get_name()
+    return '<type %s>' % self.typename()
   
   @classmethod
   def get_type(klass):
@@ -252,12 +264,11 @@ class BuiltinType(BuiltinObject):
     from pyntch.basic_types import TypeType
     return TypeType.get_typeobj() in typeobjs
 
-  # get_name()
+  # typename()
   # returns the name of the Python type of this object.
   @classmethod
-  def get_name(klass):
+  def typename(klass):
     return klass.TYPE_NAME
-  fullname = get_name
 
   # get_typeobj()
   @classmethod
@@ -429,7 +440,7 @@ class TypeChecker(CompoundTypeNode):
           self.update_type(obj)
           break
       else:
-        s = '|'.join( typeobj.get_name() for typeobj in self.validtypes
+        s = '|'.join( typeobj.typename() for typeobj in self.validtypes
                       if typeobj.is_type(TypeType.get_typeobj()) )
         self.parent_frame.raise_expt(ErrorConfig.TypeCheckerError(self.blame, obj, s))
     return

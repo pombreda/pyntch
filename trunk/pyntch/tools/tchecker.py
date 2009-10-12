@@ -9,17 +9,14 @@ from pyntch.namespace import Namespace
 from pyntch.module import Interpreter, IndentedStream, ModuleNotFound
 from pyntch.config import ErrorConfig
 
-#sys.setrecursionlimit(3000)
-#sys.stderr = sys.stdout
-
 # main
 def main(argv):
   import getopt
   def usage():
-    print 'usage: %s [-d] [-q] [-a] [-c config] [-C key=val] [-D] [-p pythonpath] [-P stubpath] [file ...]' % argv[0]
+    print 'usage: %s [-d] [-q] [-a] [-c config] [-C key=val] [-D] [-p pythonpath] [-P stubpath] [-t format] [file ...]' % argv[0]
     return 100
   try:
-    (opts, args) = getopt.getopt(argv[1:], 'dqac:CDp:P:')
+    (opts, args) = getopt.getopt(argv[1:], 'dqac:CDp:P:t:')
   except getopt.GetoptError:
     return usage()
   if not args:
@@ -27,6 +24,7 @@ def main(argv):
   stubdir = os.path.join(os.path.dirname(pyntch.__file__), 'stub')
   debug = 0
   defaultpath = True
+  format = 'txt'
   verbose = 1
   modpath = []
   stubpath = [stubdir]
@@ -41,6 +39,7 @@ def main(argv):
     elif k == '-D': defaultpath = False
     elif k == '-p': modpath.extend(v.split(':'))
     elif k == '-P': stubpath.extend(v.split(':'))
+    elif k == '-t': format = v
   if defaultpath:
     modpath.extend(sys.path)
   TypeNode.debug = debug
@@ -52,7 +51,6 @@ def main(argv):
   MustBeDefinedNode.reset()
   ExceptionCatcher.reset()
   t = time.time()
-  modules = []
   for name in args:
     try:
       if name.endswith('.py'):
@@ -61,7 +59,6 @@ def main(argv):
         module = Interpreter.load_file(name, path, modpath)
       else:
         module = Interpreter.load_module(name, modpath)[-1]
-      modules.append(module)
     except ModuleNotFound, e:
       print >>sys.stderr, 'module not found:', name
   if ErrorConfig.unfound_modules:
@@ -72,10 +69,16 @@ def main(argv):
   ExceptionCatcher.check()
   TypeNode.run()
   if verbose:
-    print >>sys.stderr, 'total files=%d, lines=%d in %.2fsec' % (Interpreter.files, Interpreter.lines, time.time()-t)
-  for module in modules:
-    print '===', module.get_name(), '==='
-    module.showrec(IndentedStream(sys.stdout))
+    print >>sys.stderr, ('total files=%d, lines=%d in %.2fsec' %
+                         (Interpreter.files, Interpreter.lines, time.time()-t))
+  strm = IndentedStream(sys.stdout)
+  if format == 'xml': strm.write('<modules>')
+  for (path, module) in Interpreter.get_python_modules():
+    if format == 'xml':
+      module.showxml(strm)
+    else:
+      module.showtxt(strm)
+  if format == 'xml': strm.write('</modules>')
   return 0
 
 if __name__ == '__main__': sys.exit(main(sys.argv))
