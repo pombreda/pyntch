@@ -32,8 +32,11 @@ def dumpobj(e):
     return '<%s>' % e.tag
 
 def getlineno(loc):
-  i = loc.rindex(':')
-  return int(loc[i+1:])
+  r = loc.split(':')
+  if len(r) == 2:
+    return (int(r[1]), int(r[1]))
+  else:
+    return (int(r[1]), int(r[2]))
 
 def annot(fp, module):
   lines = {}
@@ -43,11 +46,9 @@ def annot(fp, module):
     lines[n].append(x)
     return
   def rec(e):
-    n = getlineno(e.get('loc', ':1'))
+    (_,n) = getlineno(e.get('loc', ':1'))
     for c in e.getchildren():
       if c.tag in ('module', 'class', 'function'):
-        i = getlineno(c.get('loc'))
-        add(i, '### %s' % c.get('name'))
         rec(c)
       elif c.tag in ('var', 'arg'):
         add(n, '# %s = %s' % (c.get('name'), dumpobj(c[0])))
@@ -58,7 +59,7 @@ def annot(fp, module):
       elif c.tag == 'return':
         add(n, '# return %s' % dumpobj(c[0]))
       elif c.tag == 'raise':
-        i = getlineno(c.get('loc'))
+        (i,_) = getlineno(c.get('loc'))
         add(i, '# raise %s' % c.get('msg'))
       elif c.tag == 'called':
         add(n, '# called: %s' % c.get('loc'))

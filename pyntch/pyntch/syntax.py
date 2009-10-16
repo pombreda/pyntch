@@ -12,6 +12,14 @@ from pyntch.expression import ExpressionNode, AttrRef, SubRef, SliceRef, \
      IterElement, TupleUnpack
 
 
+def getlineno(node):
+  if node.lineno: return node.lineno
+  for c in node.getChildNodes():
+    x = getlineno(c)
+    if x: return x
+  return None
+
+
 ##  SliceObject
 ##
 class SliceObject(ExpressionNode):
