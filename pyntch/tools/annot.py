@@ -26,6 +26,8 @@ def dumpobj(e):
       return '(*%s)' % dumpobj(e[0])
   elif e.tag == 'ref':
     return '...'
+  elif e.tag in ('class', 'instance', 'method', 'boundmethod', 'function'):
+    return '<%s %s>' % (e.tag, e.get('name'))
   else:
     return '<%s>' % e.tag
 
@@ -75,7 +77,7 @@ def annot(fp, module):
 def main(argv):
   import getopt
   def usage():
-    print 'usage: %s [-d] [-b basedir] files ...' % argv[0]
+    print 'usage: %s [-d] [-b basedir] xml files ...' % argv[0]
     return 100
   try:
     (opts, args) = getopt.getopt(argv[1:], 'db:')

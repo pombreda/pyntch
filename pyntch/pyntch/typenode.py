@@ -114,8 +114,10 @@ class SimpleTypeNode(TypeNode):
   def __repr__(self):
     return '<%s>' % self.get_type().typename()
 
-  def desctxt(self, _):
+  def desctxt(self, done):
+    done[self] = len(done)
     return repr(self)
+  
   def descxml(self, done):
     done[self] = len(done)
     return Element(self.get_type().typename())

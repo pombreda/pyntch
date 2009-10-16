@@ -22,6 +22,7 @@ class InternalException(InstanceObject):
 
   def __repr__(self):
     return '%s: %s' % (self.klass.typename(), self.message)
+  
   def typename(self):
     return self.klass.typename()
 

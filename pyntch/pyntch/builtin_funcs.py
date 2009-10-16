@@ -5,7 +5,7 @@
 
 from pyntch.typenode import CompoundTypeNode, NodeTypeError, NodeAttrError, UndefinedTypeNode
 from pyntch.typenode import BuiltinType, BuiltinCallable, BuiltinConstCallable
-from pyntch.typenode import TypeChecker, SequenceTypeChecker
+from pyntch.typenode import TypeChecker, SequenceTypeChecker, Element
 from pyntch.basic_types import TypeType, NoneType, NumberType, BoolType, IntType, LongType, \
      FloatType, BaseStringType, StrType, UnicodeType, ANY
 from pyntch.aggregate_types import ListType, TupleType, DictType, IterType, ListObject
@@ -25,6 +25,10 @@ class BuiltinFunc(BuiltinCallable, BuiltinType):
   
   def __repr__(self):
     return '<builtin %s>' % self.name
+
+  def descxml(self, done):
+    done[self] = len(done)
+    return Element(self.get_type().typename(), name=self.name)
 
 
 ##  BuiltinFuncNoKwd
@@ -52,6 +56,10 @@ class BuiltinConstFunc(BuiltinConstCallable, BuiltinType):
   
   def __repr__(self):
     return '<builtin %s>' % self.name
+
+  def descxml(self, done):
+    done[self] = len(done)
+    return Element(self.get_type().typename(), name=self.name)
 
 
 ##  IterFuncChecker

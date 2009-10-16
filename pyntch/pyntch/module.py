@@ -10,7 +10,7 @@ except ImportError:
   from StringIO import StringIO
 from pyntch.typenode import BuiltinType, BuiltinObject, NodeAssignError
 from pyntch.frame import ExecutionFrame
-from pyntch.namespace import Namespace
+from pyntch.namespace import ModuleNamespace
 
 def enc(x):
   return unicode(x).replace('&','&amp;').replace('>','&gt;').replace('<','&lt;').replace('"','&quote;').encode('ascii', 'xmlcharrefreplace')
@@ -110,6 +110,10 @@ class ModuleObject(BuiltinObject):
   def __repr__(self):
     return '<Module %s>' % (self.name,)
 
+  def descxml(self, done):
+    done[self] = len(done)
+    return Element('module', name=self.get_name())
+  
   def get_path(self):
     return '?'
 
@@ -148,7 +152,7 @@ class PythonModuleObject(ModuleObject, TreeReporter):
     self.path = path
     self.modpath = [os.path.dirname(self.path)] + modpath
     self.frame = ExecutionFrame(None, None)
-    ModuleObject.__init__(self, name, Namespace(space, ''), level=level)
+    ModuleObject.__init__(self, name, ModuleNamespace(space, name), level=level)
     TreeReporter.__init__(self, None)
     return
   

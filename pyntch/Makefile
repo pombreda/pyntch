@@ -19,10 +19,10 @@ install:
 	$(PYTHON) setup.py install --prefix=$(PREFIX)
 
 selfcheck:
-	PYTHONPATH=. $(PYTHON) $(TCHECKER) -a $(TCHECKER) > selfcheck.txt 2>&1
+	PYTHONPATH=. $(PYTHON) $(TCHECKER) -t xml $(TCHECKER) > selfcheck.xml
 
 clean:
-	-rm -rf build selfcheck.txt
+	-rm -rf build selfcheck.xml
 	-cd $(PACKAGE) && $(MAKE) clean
 	-cd tools && $(MAKE) clean
 

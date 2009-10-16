@@ -2,7 +2,7 @@
 
 from pyntch.typenode import CompoundTypeNode, UndefinedTypeNode, \
      NodeTypeError, NodeAttrError, NodeAssignError, BuiltinType, BuiltinObject, \
-     TypeChecker
+     TypeChecker, Element
 from pyntch.namespace import Namespace
 from pyntch.module import TreeReporter
 from pyntch.frame import ExecutionFrame
@@ -21,7 +21,11 @@ class MethodType(BuiltinType):
     return
 
   def __repr__(self):
-    return '<method %r.%r>' % (self.klass, self.func)
+    return '<method %r>' % self.func
+  
+  def descxml(self, done):
+    done[self] = len(done)
+    return Element('method', name=self.func.get_name())
   
   def get_type(self):
     return self
@@ -50,6 +54,10 @@ class BoundMethodType(BuiltinType):
 
   def __repr__(self):
     return '<boundmethod %r(arg0=%r)>' % (self.func, self.arg0)
+  
+  def descxml(self, done):
+    done[self] = len(done)
+    return Element('boundmethod', name=self.func.get_name())
   
   def get_type(self):
     return self
@@ -118,7 +126,14 @@ class ClassType(BuiltinType, TreeReporter):
     return
 
   def __repr__(self):
-    return ('<class %s>' % self.name)
+    return ('<class %s>' % self.get_name())
+
+  def get_name(self):
+    return self.name
+  
+  def descxml(self, done):
+    done[self] = len(done)
+    return Element('class', name=self.get_name())
   
   def typename(self):
     return self.name
@@ -180,6 +195,9 @@ class PythonClassType(ClassType, TreeReporter):
       self.attrs[name] = attr
     return
 
+  def get_name(self):
+    return self.space.get_name()
+  
   def showtxt(self, out):
     (module,lineno) = self.loc
     out.write('### %s(%s)' % (module.get_name(), lineno))
@@ -283,7 +301,11 @@ class InstanceObject(BuiltinObject):
     return
   
   def __repr__(self):
-    return ('<instance %s>' % self.klass.name)
+    return ('<instance %s>' % self.klass.get_name())
+  
+  def descxml(self, done):
+    done[self] = len(done)
+    return Element('instance', name=self.klass.get_name())
   
   def get_type(self):
     return self.klass

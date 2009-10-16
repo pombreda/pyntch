@@ -62,6 +62,12 @@ class Namespace(object):
   def __iter__(self):
     return self.vars.iteritems()
 
+  def get_name(self):
+    if self.parent_space:
+      return self.parent_space.get_name()+'.'+self.name
+    else:
+      return self.name
+
   def get_var(self, name):
     while self:
       if name in self.vars:
@@ -211,7 +217,6 @@ class Namespace(object):
             module = tree._module.load_module(modname)[-1]
             self.import_all(module.space)
           except ModuleNotFound, e:
-            print 'module_not_found: from:', e.name
             ErrorConfig.module_not_found(e.name)
         else:
           self.register_var(asname or name)
@@ -500,3 +505,9 @@ class DefaultNamespace(Namespace):
     self.register_var('__file__').bind(basic_types.StrType.get_object())
     self.register_var('__name__').bind(basic_types.StrType.get_object())
     return
+
+class ModuleNamespace(Namespace):
+
+  def get_name(self):
+    return self.name
+  
