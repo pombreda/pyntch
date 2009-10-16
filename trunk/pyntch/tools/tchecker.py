@@ -72,13 +72,13 @@ def main(argv):
     print >>sys.stderr, ('total files=%d, lines=%d in %.2fsec' %
                          (Interpreter.files, Interpreter.lines, time.time()-t))
   strm = IndentedStream(sys.stdout)
-  if format == 'xml': strm.write('<modules>')
+  if format == 'xml': strm.write('<output>')
   for (path, module) in Interpreter.get_python_modules():
     if format == 'xml':
       module.showxml(strm)
     else:
       module.showtxt(strm)
-  if format == 'xml': strm.write('</modules>')
+  if format == 'xml': strm.write('</output>')
   return 0
 
 if __name__ == '__main__': sys.exit(main(sys.argv))

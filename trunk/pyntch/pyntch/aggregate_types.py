@@ -221,6 +221,7 @@ class ListObject(BuiltinSequenceObject):
     else:
       done[self] = len(done)
       return '[%s]' % self.elemall.desctxt(done)
+    
   def descxml(self, done):
     if self in done:
       e = Element('ref', id=str(done[self]))
@@ -329,6 +330,7 @@ class TupleObject(BuiltinSequenceObject):
         return '(*%s)' % self.elemall.desctxt(done)
       else:
         return '(%s)' % ','.join( obj.desctxt(done) for obj in self.elements )
+      
   def descxml(self, done):
     if self in done:
       e = Element('ref', id=str(done[self]))
@@ -338,7 +340,7 @@ class TupleObject(BuiltinSequenceObject):
       if self.elements == None:
         e.append(self.elemall.descxml(done))
       else:
-        e.set('len', str(self.elements))
+        e.set('len', str(len(self.elements)))
         for obj in self.elements:
           e.append(obj.descxml(done))
     return e
@@ -458,6 +460,7 @@ class FrozenSetObject(BuiltinSequenceObject):
     else:
       done[self] = len(done)
       return '([%s])' % self.elemall.desctxt(done)
+    
   def descxml(self, done):
     if self in done:
       e = Element('ref', id=str(done[self]))
@@ -588,6 +591,7 @@ class IterObject(BuiltinAggregateObject):
     else:
       done[self] = len(done)
       return '(%s, ...)' % self.elemall.desctxt(done)
+    
   def descxml(self, done):
     if self in done:
       e = Element('ref', id=str(done[self]))
@@ -884,6 +888,7 @@ class DictObject(BuiltinAggregateObject):
     else:
       done[self] = len(done)
       return '{%s: %s}' % (self.key.desctxt(done), self.value.desctxt(done))
+    
   def descxml(self, done):
     if self in done:
       e = Element('ref', id=str(done[self]))

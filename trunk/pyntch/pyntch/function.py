@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from pyntch.typenode import CompoundTypeNode, \
-     NodeTypeError, NodeAttrError, BuiltinType, BuiltinObject
+     NodeTypeError, NodeAttrError, BuiltinType, BuiltinObject, Element
 from pyntch.namespace import Namespace, Variable
 from pyntch.config import ErrorConfig
 from pyntch.module import TreeReporter
@@ -99,8 +99,15 @@ class FuncType(BuiltinType, TreeReporter):
     return evals
 
   def __repr__(self):
-    return ('<function %s>' % self.name)
+    return ('<function %s>' % self.get_name())
 
+  def descxml(self, done):
+    done[self] = len(done)
+    return Element('function', name=self.get_name())
+  
+  def get_name(self):
+    return self.space.get_name()
+  
   def get_type(self):
     return self
 
