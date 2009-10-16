@@ -61,6 +61,7 @@ class FuncType(BuiltinType, TreeReporter):
       else:
         return func(x)
     self.name = name
+    self.code = code
     # prepare local variables that hold passed arguments.
     self.space = Namespace(parent_space, name)
     self.frame = ExecutionFrame(None, tree)
@@ -192,9 +193,10 @@ class FuncType(BuiltinType, TreeReporter):
     return
 
   def showxml(self, out):
+    from pyntch.syntax import getlineno
     (module,lineno) = self.frame.getloc()
     out.start_xmltag('function', name=self.name,
-                     loc='%s:%s' % (module.get_name(), lineno))
+                     loc='%s:%s:%s' % (module.get_name(), lineno, getlineno(self.code)))
     for frame in self.frames:
       (module,lineno) = frame.getloc()
       out.show_xmltag('caller', loc='%s:%s' % (module.get_name(), lineno))

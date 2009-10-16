@@ -181,6 +181,7 @@ class PythonClassType(ClassType, TreeReporter):
     from pyntch.syntax import build_stmt
     self.anchor = anchor
     self.loc = (tree._module, tree.lineno)
+    self.code = code
     self.space = Namespace(parent_space, name)
     TreeReporter.__init__(self, parent_reporter)
     ClassType.__init__(self, name, bases)
@@ -222,9 +223,10 @@ class PythonClassType(ClassType, TreeReporter):
     return
 
   def showxml(self, out):
+    from pyntch.syntax import getlineno
     (module,lineno) = self.loc
     out.start_xmltag('class', name=self.name,
-                     loc='%s:%s' % (module.get_name(), lineno))
+                     loc='%s:%s:%s' % (module.get_name(), lineno, getlineno(self.code)))
     for frame in self.frames:
       (module,lineno) = frame.getloc()
       out.show_xmltag('caller',
