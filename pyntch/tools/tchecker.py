@@ -13,10 +13,10 @@ from pyntch.config import ErrorConfig
 def main(argv):
   import getopt
   def usage():
-    print 'usage: %s [-d] [-q] [-a] [-c config] [-C key=val] [-D] [-p pythonpath] [-P stubpath] [-t format] [file ...]' % argv[0]
+    print 'usage: %s [-d] [-q] [-a] [-c config] [-C key=val] [-D] [-p pythonpath] [-P stubpath] [-o output] [-t format] [file ...]' % argv[0]
     return 100
   try:
-    (opts, args) = getopt.getopt(argv[1:], 'dqac:CDp:P:t:')
+    (opts, args) = getopt.getopt(argv[1:], 'dqac:CDp:P:o:t:')
   except getopt.GetoptError:
     return usage()
   if not args:
@@ -28,6 +28,7 @@ def main(argv):
   verbose = 1
   modpath = []
   stubpath = [stubdir]
+  output = None
   for (k, v) in opts:
     if k == '-d': debug += 1
     elif k == '-q': verbose -= 1
@@ -39,9 +40,16 @@ def main(argv):
     elif k == '-D': defaultpath = False
     elif k == '-p': modpath.extend(v.split(':'))
     elif k == '-P': stubpath.extend(v.split(':'))
+    elif k == '-o':
+      output = v
+      if v.endswith('.xml'):
+        format = 'xml'
     elif k == '-t': format = v
   if defaultpath:
     modpath.extend(sys.path)
+  outfp = sys.stdout
+  if output:
+    outfp = file(output, 'w')
   TypeNode.debug = debug
   TypeNode.verbose = verbose
   Interpreter.debug = debug
@@ -71,7 +79,7 @@ def main(argv):
   if verbose:
     print >>sys.stderr, ('total files=%d, lines=%d in %.2fsec' %
                          (Interpreter.files, Interpreter.lines, time.time()-t))
-  strm = IndentedStream(sys.stdout)
+  strm = IndentedStream(outfp)
   if format == 'xml': strm.write('<output>')
   for (path, module) in Interpreter.get_python_modules():
     if format == 'xml':
