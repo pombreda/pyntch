@@ -96,6 +96,7 @@ def main(argv):
   for module in root.getchildren():
     if module.tag != 'module': continue
     modules[module.get('name')] = module
+    modules[module.get('src')] = module
   for name in args:
     try:
       module = modules[name]

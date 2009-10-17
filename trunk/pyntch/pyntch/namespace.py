@@ -42,6 +42,7 @@ class Namespace(object):
 
   def __init__(self, parent_space, name):
     self.parent_space = parent_space
+    self.all_names = None
     self.name = name
     self.vars = {}
     if parent_space:
@@ -92,7 +93,7 @@ class Namespace(object):
   def register_names(self, tree):
     from pyntch.module import ModuleNotFound
     from pyntch.config import ErrorConfig
-    
+
     if isinstance(tree, ast.Module):
       self.register_names(tree.node)
       
@@ -113,9 +114,9 @@ class Namespace(object):
         self.register_names(base)
     # assign
     elif isinstance(tree, ast.Assign):
-      for v in tree.nodes:
+      for node in tree.nodes:
         self.register_names(tree.expr)
-        self.register_names(v)
+        self.register_names(node)
     elif isinstance(tree, ast.AugAssign):
       self.register_names(tree.expr)
     elif isinstance(tree, ast.AssTuple):
@@ -353,9 +354,35 @@ class Namespace(object):
       raise SyntaxError('unsupported syntax: %r (%s:%r)' % (tree, tree._module.get_path(), tree.lineno))
     return
 
+  def register_names_top(self, tree):
+    self.register_names(tree)
+    if not isinstance(tree, ast.Module): return
+    # find '__all__' property
+    node = tree.node
+    if isinstance(node, ast.Stmt):
+      nodes = node.nodes
+    else:
+      nodes = [node]
+    for node in nodes:
+      if not isinstance(node, ast.Assign): continue
+      if not isinstance(node.expr, ast.List): continue
+      for n in node.nodes:
+        if isinstance(n, ast.AssName) and n.name == '__all__':
+          self.all_names = [ n.value for n in node.expr.nodes
+                             if isinstance(n, ast.Const) and isinstance(n.value, str) ]
+    return
+
   def import_all(self, space):
-    for (k,v) in space.vars.iteritems():
-      self.vars[k] = v
+    from pyntch.config import ErrorConfig
+    if space.all_names:
+      names = space.all_names
+    else:
+      names = [ k for k in space.vars.iterkeys() if not k.startswith('_') ]
+    for k in names:
+      try:
+        self.vars[k] = space.vars[k]
+      except KeyError:
+        ErrorConfig.module_not_found(k)
     return
 
 

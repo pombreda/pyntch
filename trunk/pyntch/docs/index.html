@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
-<title>Pyntch - Python type checker / source code analyzer</title>
+<title>Pyntch - Static Code Analysis for Python</title>
 <style type="text/css"><!--
 blockquote { background: #eeeeee; }
 .anno { color: blue; }
@@ -11,7 +11,7 @@ blockquote { background: #eeeeee; }
 
 <h1>Pyntch</h1>
 <p>
-Python type checker / source code analyzer
+Static code analyzer for Python
 
 <p>
 <a href="http://www.unixuser.org/~euske/python/pyntch/index.html">Homepage</a>
@@ -20,7 +20,7 @@ Python type checker / source code analyzer
 
 <div align=right class=lastmod>
 <!-- hhmts start -->
-Last Modified: Fri Oct 16 00:07:08 JST 2009
+Last Modified: Sat Oct 17 13:54:59 JST 2009
 <!-- hhmts end -->
 </div>
 
@@ -28,25 +28,32 @@ Last Modified: Fri Oct 16 00:07:08 JST 2009
 <hr noshade>
 <h2>What's It?</h2>
 <p>
-Pyntch (pron.: "pinch") is a PYthoN Type CHecker. 
-It detects possible runtime errors before actually running a code
-(take a look at a <a href="#howtouse">sample output</a>).
-Pyntch examines a source
-code statically and infers all possible types of variables,
-attributes, function arguments, and return values of each function
-or method. Then it detects possible exceptions caused by type
+Pyntch (pron. "<em>pinch</em>", originally means PYthoN Type CHecker) is a
+static code analyzer for Python programming language.  It detects
+possible runtime errors before actually running a code.  Have you had a
+TypeError or AttributeError caused by giving a wrong type of
+objects? Then, Pyntch is a tool for you.  Pyntch examines a source
+code and infers all possible types of variables, attributes,
+function arguments, and return values of each function or
+method (take a look at a <a href="#howtouse">sample output</a>). 
+Then it detects possible exceptions caused by type
 mismatch, attribute not found, or other types of exceptions raised
 from each function. Unlike other Python code checkers (such as
-Pychecker or Pyflakes), Pyntch does not check the style issues.
+Pychecker or Pyflakes), Pyntch does not address style issues.
+Pyntch normally runs pretty fast. It can perform checking for
+several thousands of lines of code within a minute.
 <p>
-Pyntch can obtain the following information from a source code:
+<strong>Note:</strong>
+Pyntch currently supports Python 2.X only.
+<p>
+Pyntch can gather the following information by scanning source code:
 <ul>
-<li> Possible types of objects that variables, 
-function arguments or class attribtes might have.
+<li> Possible types of objects that each variable,
+function argument or class attribte might have.
 <li> Functions or instance methods that can be actually called at each
-function call, considering polymorphism.
-<li> A list of calling locations for each function or method.
-<li> The following types of uncaught exceptions that might occur in a certain function:
+function call (considering polymorphism).
+<li> Calling locations for each function or method.
+<li> Uncaught exceptions such as:
 <ul>
 <li> Type mismatch (e.g. adding an integer and a string).
 <li> Access to undefined attributes
@@ -60,10 +67,43 @@ function call, considering polymorphism.
 </ul>
 </ul>
 
+<h4>Sample output:</h4>
 <p>
-Performance:
-Analyzed 67,000 lines of code in 28 minutes.
-(Core 2 Duo, 2.4GHz)
+(Original code)
+<blockquote><pre>
+import sys, os
+
+directory = sys.argv[1]
+for name in os.listdir(directory):
+  n = 0
+  fp = file(name)
+  for line in fp:
+    n += line
+  fp.close()
+  print name, n
+</pre></blockquote>
+<p>
+(Annotated by Pyntch)
+<blockquote><pre>
+<strong># directory = &lt;str&gt;</strong>
+<strong># fp = &lt;file&gt;</strong>
+<strong># line = &lt;str&gt;</strong>
+<strong># n = &lt;int&gt;</strong>
+<strong># name = &lt;str&gt;</strong>
+<strong># os = &lt;module&gt;</strong>
+<strong># sys = &lt;module&gt;</strong>
+import sys, os
+
+directory = sys.argv[1]
+for name in os.listdir(directory):
+  n = 0
+  fp = file(name)
+  for line in fp:
+    <strong># raise TypeError: not supported operand Add(int, str)</strong>
+    n += line
+  fp.close()
+  print name, n
+</pre></blockquote>
 
 <a name="source"></a>
 <p>
@@ -90,7 +130,7 @@ http://code.google.com/p/pyntch/source/browse/trunk/pyntch
 <hr noshade>
 <h2>Background</h2>
 <p>
-Have you experienced a TypeError caused by giving a wrong type of
+Have you had a TypeError caused by giving a wrong type of
 arguments, say, a string object to numeric functions?  Or trying
 to access a nonexistent method of a wrongly passed class that
 would otherwise have such a method? 
@@ -149,6 +189,8 @@ which need to be further examined by human programmers.
 <a name="howtouse"></a>
 <hr noshade>
 <h2>How to Use</h2>
+<p>
+Pyntch comes in two different running modes.
 <p>
 The basic use of Pyntch is pretty simple and straightforward.
 Take this sample code:
@@ -440,6 +482,7 @@ Fig 2. Handling function call
 <hr noshade>
 <h2>Changes</h2>
 <ul>
+<li> 2009/10/17: Source code annotation support.
 <li> 2009/09/27: Another bugfixes.
 <li> 2009/09/06: More bugfixes.
 <li> 2009/08/19: Bugfixes and improved speed.

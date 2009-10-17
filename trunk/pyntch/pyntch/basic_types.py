@@ -47,11 +47,6 @@ class NoneType(BuiltinBasicType):
   TYPE_NAME = 'NoneType'
   TYPE_INSTANCE = NoneObject
 
-class BoolObject(BuiltinObject): pass
-class BoolType(BuiltinBasicType):
-  TYPE_NAME = 'bool'
-  TYPE_INSTANCE = BoolObject
-
 class NumberType(BuiltinBasicType):
   TYPE_NAME = 'number'
   RANK = 0
@@ -101,6 +96,12 @@ class IntType(BuiltinConstCallable, SimpleNumberType):
     BuiltinConstCallable.__init__(self, 'int', self.get_object(), [], [ANY, IntType])
     return
   
+class BoolObject(BuiltinObject): pass
+class BoolType(IntType):
+  TYPE_NAME = 'bool'
+  TYPE_INSTANCE = BoolObject
+  RANK = 0
+
 class LongObject(BuiltinObject): pass
 class LongType(IntType):
   TYPE_NAME = 'long'

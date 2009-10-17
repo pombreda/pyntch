@@ -163,7 +163,7 @@ class PythonModuleObject(ModuleObject, TreeReporter):
     from pyntch.syntax import build_stmt
     from pyntch.config import ErrorConfig
     from pyntch.exception import ImportErrorType
-    self.space.register_names(tree)
+    self.space.register_names_top(tree)
     build_stmt(self, self.frame, self.space, tree, [], isfuncdef=True)
     return
 
