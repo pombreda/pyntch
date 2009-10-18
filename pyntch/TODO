@@ -1,5 +1,6 @@
 TODO:
 
+- basic execution path analysis.
 - cross referencing variables/attributes.
 - add more test cases and stub modules.
 - support special function checking (e.g. pack, unpack).

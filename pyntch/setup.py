@@ -16,7 +16,7 @@ attributes, function arguments, and return values of each function
 or method. Then it detects possible errors caused by type
 mismatch, attribute not found, or other types of exceptions raised
 from each function. Unlike other Python code checkers (such as
-Pychecker or Pyflakes), Pyntch does not check the style issues.''',
+Pychecker or Pyflakes), Pyntch does not address style issues.''',
       packages=['pyntch'],
       package_data={ 'pyntch': ['stub/*.pyi'] },
       scripts=['tools/tchecker.py', 'tools/makestub.py', 'tools/annot.py'],

@@ -24,6 +24,7 @@ def main(argv):
   stubdir = os.path.join(os.path.dirname(pyntch.__file__), 'stub')
   debug = 0
   defaultpath = True
+  showall = False
   format = 'txt'
   verbose = 1
   modpath = []
@@ -32,7 +33,7 @@ def main(argv):
   for (k, v) in opts:
     if k == '-d': debug += 1
     elif k == '-q': verbose -= 1
-    elif k == '-a': ErrorConfig.show_all = True
+    elif k == '-a': showall = True
     elif k == '-c': ErrorConfig.load(v)
     elif k == '-C':
       (k,v) = v.split('=')
@@ -59,16 +60,19 @@ def main(argv):
   MustBeDefinedNode.reset()
   ExceptionCatcher.reset()
   t = time.time()
+  modules = []
   for name in args:
     try:
       if name.endswith('.py'):
         path = name
         (name,_) = os.path.splitext(os.path.basename(name))
-        module = Interpreter.load_file(name, path, modpath)
+        modules.append(Interpreter.load_file(name, path, modpath))
       else:
-        module = Interpreter.load_module(name, modpath)[-1]
+        modules.append(Interpreter.load_module(name, modpath)[-1])
     except ModuleNotFound, e:
       print >>sys.stderr, 'module not found:', name
+  if showall:
+    modules = Interpreter.get_all_modules()
   if ErrorConfig.unfound_modules:
     print >>sys.stderr, 'modules not found:', ', '.join(sorted(ErrorConfig.unfound_modules))
   TypeNode.run()
@@ -81,7 +85,7 @@ def main(argv):
                          (Interpreter.files, Interpreter.lines, time.time()-t))
   strm = IndentedStream(outfp)
   if format == 'xml': strm.write('<output>')
-  for (path, module) in Interpreter.get_python_modules():
+  for module in modules:
     if format == 'xml':
       module.showxml(strm)
     else:

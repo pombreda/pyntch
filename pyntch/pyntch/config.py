@@ -11,7 +11,7 @@ class ErrorConfig(object):
   
   ignore_none = True
 
-  show_all = False
+  show_all_exceptions = False
 
   unfound_modules = set()
   

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import sys, os, os.path
+import sys, os.path
 try:
   from xml.etree.cElementTree import ElementTree
 except ImportError:
@@ -26,7 +26,7 @@ def dumpobj(e):
       return '(*%s)' % dumpobj(e[0])
   elif e.tag == 'ref':
     return '...'
-  elif e.tag in ('class', 'instance', 'method', 'boundmethod', 'function'):
+  elif e.tag in ('class', 'instance', 'method', 'boundmethod', 'function', 'module'):
     return '<%s %s>' % (e.tag, e.get('name'))
   else:
     return '<%s>' % e.tag
