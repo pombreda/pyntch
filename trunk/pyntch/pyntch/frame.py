@@ -96,7 +96,7 @@ class ExecutionFrame(CompoundTypeNode):
         expts_there.append(expt)
     for expt in sorted(expts_here, key=lambda expt:expt.frame.getloc()):
       out.write('raises %s' % expt)
-    if ErrorConfig.show_all:
+    if ErrorConfig.show_all_exceptions:
       for expt in sorted(expts_there, key=lambda expt:expt.frame.getloc()):
         out.write('[raises %s]' % expt)
     return
@@ -119,7 +119,7 @@ class ExecutionFrame(CompoundTypeNode):
       obj = expt.exptobj
       out.show_xmltag('raise', type=obj.get_type().typename(), msg=str(obj),
                       loc='%s:%s' % (module.get_name(), lineno))
-    if ErrorConfig.show_all:
+    if ErrorConfig.show_all_exceptions:
       for expt in sorted(expts_there, key=lambda expt:expt.frame.getloc()):
         obj = expt.exptobj
         out.show_xmltag('iraise', type=obj.get_type().typename(), msg=str(obj),

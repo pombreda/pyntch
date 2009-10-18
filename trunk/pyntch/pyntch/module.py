@@ -171,7 +171,7 @@ class PythonModuleObject(ModuleObject, TreeReporter):
     return self.path
 
   def showtxt(self, out):
-    out.write('[%s]' % self.name)
+    out.write('[%s (%s)]' % (self.name, self.path))
     out.indent(+1)
     blocks = set( child.name for child in self.children )
     for (name,value) in sorted(self.space):
@@ -252,8 +252,8 @@ class Interpreter(object):
     return
 
   @classmethod
-  def get_python_modules(klass):
-    return klass.PATH2MODULE.iteritems()
+  def get_all_modules(klass):
+    return klass.PATH2MODULE.itervalues()
   
   # find_module(name)
   #   return the full path for a given module name.

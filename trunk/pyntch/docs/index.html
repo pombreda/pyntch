@@ -5,7 +5,8 @@
 <title>Pyntch - Static Code Analysis for Python</title>
 <style type="text/css"><!--
 blockquote { background: #eeeeee; }
-.anno { color: blue; }
+.note { color: blue; }
+.comment { color: darkgreen; }
 --></style>
 </head><body>
 
@@ -20,7 +21,7 @@ Static code analyzer for Python
 
 <div align=right class=lastmod>
 <!-- hhmts start -->
-Last Modified: Sat Oct 17 13:54:59 JST 2009
+Last Modified: Sun Oct 18 23:26:27 JST 2009
 <!-- hhmts end -->
 </div>
 
@@ -35,7 +36,7 @@ TypeError or AttributeError caused by giving a wrong type of
 objects? Then, Pyntch is a tool for you.  Pyntch examines a source
 code and infers all possible types of variables, attributes,
 function arguments, and return values of each function or
-method (take a look at a <a href="#howtouse">sample output</a>). 
+method (take a look at a <a href="#sample">sample output</a> below). 
 Then it detects possible exceptions caused by type
 mismatch, attribute not found, or other types of exceptions raised
 from each function. Unlike other Python code checkers (such as
@@ -44,7 +45,7 @@ Pyntch normally runs pretty fast. It can perform checking for
 several thousands of lines of code within a minute.
 <p>
 <strong>Note:</strong>
-Pyntch currently supports Python 2.X only.
+Pyntch currently supports Python 2.x only.
 <p>
 Pyntch can gather the following information by scanning source code:
 <ul>
@@ -67,42 +68,52 @@ function call (considering polymorphism).
 </ul>
 </ul>
 
-<h4>Sample output:</h4>
+<a name="sample"></a>
+<h3>Sample output:</h3>
 <p>
 (Original code)
 <blockquote><pre>
 import sys, os
 
-directory = sys.argv[1]
-for name in os.listdir(directory):
+# Count the total number of characters for each file in directory.
+def countchars(directory):
   n = 0
-  fp = file(name)
-  for line in fp:
-    n += line
-  fp.close()
-  print name, n
+  for name in os.listdir(directory):
+    fp = open(name)
+    for line in fp:
+      n += line
+    fp.fclose()
+  return n
+
+countchars(sys.argv[1])
 </pre></blockquote>
 <p>
 (Annotated by Pyntch)
 <blockquote><pre>
-<strong># directory = &lt;str&gt;</strong>
-<strong># fp = &lt;file&gt;</strong>
-<strong># line = &lt;str&gt;</strong>
-<strong># n = &lt;int&gt;</strong>
-<strong># name = &lt;str&gt;</strong>
-<strong># os = &lt;module&gt;</strong>
-<strong># sys = &lt;module&gt;</strong>
+<span class=comment># os = &lt;module os&gt;</span>
+<span class=comment># sys = &lt;module sys&gt;</span>
 import sys, os
 
-directory = sys.argv[1]
-for name in os.listdir(directory):
+# Count the total number of characters for each file in directory.
+def countchars(directory):
+  <span class=comment># directory = &lt;str&gt;</span>
+  <span class=comment># fp = &lt;file&gt;</span>
+  <span class=comment># line = &lt;str&gt;</span>
+  <span class=comment># n = &lt;int&gt;</span>
+  <span class=comment># name = &lt;str&gt;</span>
+  <span class=comment># return &lt;int&gt;</span>
   n = 0
-  fp = file(name)
-  for line in fp:
-    <strong># raise TypeError: not supported operand Add(int, str)</strong>
-    n += line
-  fp.close()
-  print name, n
+  for name in os.listdir(directory):
+    fp = open(name)
+    for line in fp:
+      <span class=comment># raise TypeError: not supported operand Add(int, str)</span>
+      n += line
+    <span class=comment># raise AttributeError: attribute not found: @fp.fclose</span>
+    <span class=comment># raise AttributeError: attribute not found: &lt;file&gt;.fclose</span>
+    fp.fclose()
+  return n
+
+countchars(sys.argv[1])
 </pre></blockquote>
 
 <a name="source"></a>
@@ -190,69 +201,141 @@ which need to be further examined by human programmers.
 <hr noshade>
 <h2>How to Use</h2>
 <p>
-Pyntch comes in two different running modes.
+Pyntch comes in two different running modes:
+summary mode and annotation mode.
 <p>
-The basic use of Pyntch is pretty simple and straightforward.
+In summary mode, Pyntch only shows the types of each variable and
+exceptions in a succinct text format.  In annotation mode,
+there're two stages. First, the analyzer program produces an XML
+file that contains all information about a source code. Then
+another program uses that information to annotate the source texts.
+
+<h3>Summary Mode</h3>
+<p>
+The basic use of summary mode is pretty simple and straightforward.
 Take this sample code:
 <blockquote><pre>
-$ <strong>cat -n sample1.py</strong>
-  1 def f(x,y):
-  2   return x+y
-  3 print f(3, 4)
-  4 print f(3, 'a')
+$ <strong>cat -n sample.py</strong>
+     1  import sys, os
+     2
+     3  # Count the total number of characters for each file in directory.
+     4  def countchars(directory):
+     5    n = 0
+     6    for name in os.listdir(directory):
+     7      fp = open(name)
+     8      for line in fp:
+     9        n += line
+    10      fp.fclose()
+    11    return n
+    12
+    13  countchars(sys.argv[1])
 </pre></blockquote>
 <p>
 To check this code, simply run the tchecker.py against the source file:
 <blockquote><pre>
-$ <strong>tchecker.py sample1.py</strong>
-=== sample1 ===
-[sample1]
-
-  ### sample1.py(1) <span class=anno>......................................[A]</span>
-  # called at sample1.py(3) <span class=anno>..............................[B]</span>
-  # called at sample1.py(4) <span class=anno>..............................[B]</span>
-  def f(x=&lt;int&gt;, y=&lt;int&gt;|&lt;str&gt;): <span class=anno>.........................[C]</span>
-    return &lt;int&gt; <span class=anno>.........................................[D]</span>
-    raises &lt;TypeError: not supported operand Add(&lt;int&gt;, &lt;str&gt;)&gt; at sample1.py(2) <span class=anno>...[E]</span>
+$ <strong>tchecker.py sample.py</strong>
+loading: 'sample.py' as 'sample'
+...
+total files=9, lines=1435 in 0.38sec <span class=note>.........................................[A]</span>
+[sample (sample.py)]
+  os = &lt;Module os (/home/euske/work/pyntch/pyntch/stub/os.pyi)&gt;
+  sys = &lt;Module sys (/home/euske/work/pyntch/pyntch/stub/sys.pyi)&gt;
+  ### sample(4) <span class=note>..............................................................[B]</span>
+  # called at sample(13) <span class=note>.....................................................[C]</span>
+  def countchars(directory=&lt;str&gt;): <span class=note>...........................................[D]</span>
+    fp = &lt;file&gt; <span class=note>..............................................................[D]</span>
+    line = &lt;str&gt; <span class=note>.............................................................[D]</span>
+    n = &lt;int&gt; <span class=note>................................................................[D]</span>
+    name = &lt;str&gt; <span class=note>.............................................................[D]</span>
+    return = &lt;int&gt; <span class=note>...........................................................[E]</span>
+    raises TypeError: not supported operand Add(int, str) at sample:9 <span class=note>........[F]</span>
+    raises AttributeError: attribute not found: @fp.fclose at sample:10 <span class=note>......[G]</span>
+    raises AttributeError: attribute not found: &lt;file&gt;.fclose at sample:10 <span class=note>...[H]</span>
 </pre></blockquote>
 <p>
 The output shows several things:
 <ul>
-<li> <span class=anno>[A]</span>: Function <code>f</code> starts from line 1 in <code>sample1.py</code>.
-<li> <span class=anno>[B]</span>: This function is called from line 3 and 4.
-<li> <span class=anno>[C]</span>: The possible types of parameters:
-<code>x</code> is <code>int</code>, and <code>y</code> is either <code>int</code> or <code>str</code>.
-<li> <span class=anno>[D]</span>: The function returns <code>int</code>.
-<li> <span class=anno>[E]</span>: The function might raise a <code>TypeError</code> exception at line 2 by
-attempting to add an integer and string.
+<li> <span class=note>[A]</span>: The analyzer read 9 Python modules (1 target + 8 imported) that have 1,435 lines in total.
+The analysis took 0.38 seconds.
+<li> <span class=note>[B]</span>: Function <code>countchars</code> starts from line 4 in <code>sample1.py</code>.
+<li> <span class=note>[C]</span>: The function is called from line 13.
+<li> <span class=note>[D]</span>: This shows the possible type of each variable.
+<li> <span class=note>[E]</span>: The function returns an integer.
+<li> <span class=note>[F]</span>: The function might raise a <code>TypeError</code> exception at line 10
+by attempting to add an integer and string.
+<li> <span class=note>[G]</span>: A file object does not have <code>fclose</code> attribute. (It should have been <code>close</code>.)
+<li> <span class=note>[H]</span>: Attribute reference <code>fp.fclose</code> fails for any type of objects that
+<code>fp</code> could have contained.
 </ul>
-<p>
-Take a look at another example:
-<blockquote><pre>
-$ <strong>cat -n sample2.py</strong>
-  1 import sys
-  2 fp = file(sys.argv[1])
-  3 while 1:
-  4   line = fp.readln()
-  5   if not line: break
-  6   print line
 
-$ <strong>tchecker.py sample2.py</strong>
-=== sample2 ===
-[sample2]
-  fp = &lt;file&gt; <span class=anno>......................................[A]</span>
-  line = ? <span class=anno>.........................................[B]</span>
-  sys = &lt;Module sys (/usr/local/lib/python2.5/site-packages/pyntch/stub/sys.pyi)&gt; <span class=anno>......[C]</span>
-  raises &lt;AttributeError: attribute not found: &lt;file&gt;.readln&gt; at sample2.py(4) <span class=anno>.........[D]</span>
-  raises &lt;AttributeError: attribute not found: @sample2.fp.readln&gt; at sample2.py(4) <span class=anno>....[E]</span>
+<h3>Annotation Mode</h3>
+<p>
+In annotation mode, first you need to run the analyzer program to
+produce the result in an XML format.  Then give the XML file to
+another program called <code>annot.py</code>. This program inserts
+the analysis results into appropriate places in the source code,
+producing an annotated source text.
+
+<p>
+<u>Step 1:</u>
+<blockquote><pre>
+$ <strong>tchecker -o output.xml sample.py</strong>
+loading: 'sample.py' as 'sample'
+...
+total files=9, lines=1435 in 0.40sec
 </pre></blockquote>
-<ul>
-<li> <span class=anno>[A]</span>: Variable <code>fp</code> contains a file object.
-<li> <span class=anno>[B]</span>: The content of variable <code>line</code> is not determined (due to the exceptions).
-<li> <span class=anno>[C]</span>: Variable <code>sys</code> points to the <code>sys</code> module.
-<li> <span class=anno>[D]</span>: A file object does not have <code>readln</code> attribute. (It should be <code>readline</code>.)
-<li> <span class=anno>[E]</span>: Attribute reference <code>fp.readln</code> fails for any type of objects that <code>fp</code> could have contained.
-</ul>
+Now <code>output.xml</code> looks like this:
+<blockquote><pre>
+&lt;output&gt;
+&lt;module src="sample.py" name="sample"&gt;
+  &lt;var name="os"&gt;&lt;compound id="0"&gt;&lt;module name="os" /&gt;&lt;/compound&gt;&lt;/var&gt;
+  &lt;var name="sys"&gt;&lt;compound id="0"&gt;&lt;module name="sys" /&gt;&lt;/compound&gt;&lt;/var&gt;
+  &lt;function loc="sample:4:5" name="countchars"&gt;
+    &lt;caller loc="sample:13" /&gt;
+    &lt;arg name="directory"&gt;&lt;compound id="0"&gt;&lt;str /&gt;&lt;/compound&gt;&lt;/arg&gt;
+    &lt;var name="fp"&gt;&lt;compound id="0"&gt;&lt;file /&gt;&lt;/compound&gt;&lt;/var&gt;
+    &lt;var name="line"&gt;&lt;compound id="0"&gt;&lt;str /&gt;&lt;/compound&gt;&lt;/var&gt;
+    &lt;var name="n"&gt;&lt;compound id="0"&gt;&lt;int /&gt;&lt;/compound&gt;&lt;/var&gt;
+    &lt;var name="name"&gt;&lt;compound id="0"&gt;&lt;str /&gt;&lt;/compound&gt;&lt;/var&gt;
+    &lt;return&gt;&lt;compound id="0"&gt;&lt;int /&gt;&lt;/compound&gt;&lt;/return&gt;
+    &lt;raise msg="TypeError: not supported operand Add(int, str)" loc="sample:9" type="TypeError" /&gt;
+    &lt;raise msg="AttributeError: attribute not found: @fp.fclose" loc="sample:10" type="AttributeError" /&gt;
+    &lt;raise msg="AttributeError: attribute not found: &amp;lt;file&amp;gt;.fclose" loc="sample:10" type="AttributeError" /&gt;
+  &lt;/function&gt;
+&lt;/module&gt;
+&lt;/output&gt;
+</pre></blockquote>
+
+<p>
+<u>Step 2:</u>
+<blockquote><pre>
+$ <strong>annot.py output.xml sample.py</strong>
+# os = &lt;module os&gt;
+# sys = &lt;module sys&gt;
+import sys, os
+
+# Count the total number of characters for each file in directory.
+def countchars(directory):
+  # directory = &lt;str&gt;
+  # fp = &lt;file&gt;
+  # line = &lt;str&gt;
+  # n = &lt;int&gt;
+  # name = &lt;str&gt;
+  # return &lt;int&gt;
+  n = 0
+  for name in os.listdir(directory):
+    fp = open(name)
+    for line in fp:
+      # raise TypeError: not supported operand Add(int, str)
+      n += line
+    # raise AttributeError: attribute not found: @fp.fclose
+    # raise AttributeError: attribute not found: &lt;file&gt;.fclose
+    fp.fclose()
+  return n
+
+countchars(sys.argv[1])
+</pre></blockquote>
+
 
 <h3>Adding a module path</h3>
 <p>
@@ -300,30 +383,30 @@ Pyntch cannot correctly analyze a built-in function that returns
 different types of values depending on its parameters
 (notably <code>struct.unpack</code>).
 
-<h3>Annotations</h3>
+<h3>Putting Extra Constraints</h3>
 <p>
 It is possible to inform Pyntch that a certain variable can only have
-a specific type. These annotations can be done by Python's <code>assert</code> statement, as in:
+a specific type. These constraints can be embedded in a source code
+using Python's <code>assert</code> statement, as in:
 <blockquote><pre>
 $ <strong>cat -n assert1.py</strong>
-  1 def f(x):
-  2   assert isinstance(x, (float,int))
-  3   return x*2
-  5 f(1)
-  6 f(2.3)
-  7 f('foo')
+     1  def f(x):
+     2    assert isinstance(x, (float,int))
+     3    return x*2
+     4
+     5  f(1)
+     6  f(2.3)
+     7  f('foo')
 
 $ <strong>tchecker.py assert1.py</strong>
-=== assert1 ===
-[assert1]
-
-  ### assert1.py(1)
-  # called at assert1.py(5)
-  # called at assert1.py(6)
-  # called at assert1.py(7)
+[assert1 (assert1.py)]
+  ### assert1(1)
+  # called at assert1(5)
+  # called at assert1(7)
+  # called at assert1(6)
   def f(x=&lt;float&gt;|&lt;int&gt;):
-    return &lt;float&gt;|&lt;int&gt;
-    raises &lt;TypeError: @assert1.f.x (&lt;str&gt;) must be float|int&gt; at assert1.py(2)
+    return = &lt;float&gt;|&lt;int&gt;
+    raises TypeError: @x (&lt;str&gt;) must be int|float at assert1:2
 </pre></blockquote>
 
 <h3>Controlling warnings</h3>
@@ -335,12 +418,13 @@ outputs in order to provide the desired information.
 
 <h4>Command line options:</h4>
 <dl>
-<dt> <code>-C <u>key</u>=<u>value</u></code>
-<dd> Specify a configuration parameter (described below).
+<dt> <code>-o <u>filename</u></code>
+<dd> Specify an output file name.
+When it ends with ".xml" it automatically assumes the output format is XML.
 
-<dt> <code>-c <u>config_file</u></code>
-<dd> Specify a configuration file. A configuration file is a Python 
-script that defines parameters for <code>ErrorConfig</code> settings.
+<dt> <code>-f <u>type</u></code>
+<dd> Specify the output format. 
+Currently <code>txt</code> or <code>xml</code> is supported.
 
 <dt> <code>-p <u>python_path</u></code>
 <dd> Add a search path for Python modules. Multiple <code>-p</code> options are allowed.
@@ -351,7 +435,15 @@ are always used instead of a real Python module.
 Multiple <code>-P</code> options are allowed.
 
 <dt> <code>-a</code>
-<dd> Same as <code>show_all=True</code>.
+<dd> Show the result of all modules that are imported,
+instead of the ones specified in the command line arguments.
+
+<dt> <code>-c <u>config_file</u></code>
+<dd> Specify a configuration file. A configuration file is a Python 
+script that defines parameters for <code>ErrorConfig</code> settings.
+
+<dt> <code>-C <u>key</u>=<u>value</u></code>
+<dd> Specify a configuration parameter (described below).
 
 </dl>
 
@@ -365,7 +457,7 @@ These are defined in <code>ErrorConfig</code> class (config.py).
 <dt> <code>ignore_none</code> <em>(boolean)</em>
 <dd> Supress warnings for operations against a None object.
 
-<dt> <code>show_all</code> <em>(boolean)</em>
+<dt> <code>show_all_exceptions</code> <em>(boolean)</em>
 <dd> Displays all the possible uncatched exceptions for each function,
 including exceptions that occur indirectly inside the internal function calls.
 
