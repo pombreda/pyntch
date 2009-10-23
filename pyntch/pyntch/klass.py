@@ -218,6 +218,8 @@ class PythonClassType(ClassType, TreeReporter):
     for (name, attr) in self.instance.attrs.iteritems():
       if name in blocks or not attr.types: continue
       out.write_value('instance.'+name, attr)
+    for child in self.children:
+      child.showtxt(out)
     out.indent(-1)
     out.write('')
     return

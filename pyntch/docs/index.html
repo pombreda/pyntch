@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
-<title>Pyntch - Static Code Analysis for Python</title>
+<title>Pyntch - Static code analyzer for Python</title>
 <style type="text/css"><!--
 blockquote { background: #eeeeee; }
 .note { color: blue; }
@@ -21,7 +21,7 @@ Static code analyzer for Python
 
 <div align=right class=lastmod>
 <!-- hhmts start -->
-Last Modified: Sun Oct 18 23:29:39 JST 2009
+Last Modified: Thu Oct 22 08:01:29 JST 2009
 <!-- hhmts end -->
 </div>
 
@@ -31,9 +31,9 @@ Last Modified: Sun Oct 18 23:29:39 JST 2009
 <p>
 Pyntch (pron. "<em>pinch</em>", originally means PYthoN Type CHecker) is a
 static code analyzer for Python programming language.  It detects
-possible runtime errors before actually running a code.  Have you had a
-TypeError or AttributeError caused by giving a wrong type of
-objects? Then, Pyntch is a tool for you.  Pyntch examines a source
+possible runtime errors before actually running a code.  If you have been 
+constantly bothered by a TypeError or AttributeError caused by giving a wrong type of
+objects, Pyntch is a tool for you.  Pyntch examines a source
 code and infers all possible types of variables, attributes,
 function arguments, and return values of each function or
 method (take a look at a <a href="#sample">sample output</a> below). 
@@ -263,9 +263,9 @@ The analysis took 0.38 seconds.
 <li> <span class=note>[E]</span>: The function returns an integer.
 <li> <span class=note>[F]</span>: The function might raise a <code>TypeError</code> exception at line 10
 by attempting to add an integer and string.
-<li> <span class=note>[G]</span>: A file object does not have <code>fclose</code> attribute. (It should have been <code>close</code>.)
-<li> <span class=note>[H]</span>: Attribute reference <code>fp.fclose</code> fails for any type of objects that
+<li> <span class=note>[G]</span>: Attribute reference <code>fp.fclose</code> fails for any type of objects that
 <code>fp</code> could have contained.
+<li> <span class=note>[H]</span>: A file object does not have <code>fclose</code> attribute. (It should have been <code>close</code>.)
 </ul>
 
 <h3>Annotation Mode</h3>

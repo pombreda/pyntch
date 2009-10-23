@@ -188,6 +188,8 @@ class FuncType(BuiltinType, TreeReporter):
         out.write_value(k, v)
     out.write_value('return', self.body)
     self.frame.showtxt(out)
+    for child in self.children:
+      child.showtxt(out)
     out.indent(-1)
     out.write('')
     return
