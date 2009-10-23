@@ -215,6 +215,9 @@ class ListObject(BuiltinSequenceObject):
       return NoneType.get_object()
 
   # ListObject
+  def __repr__(self):
+    return '[%r]' % self.elemall
+
   def desctxt(self, done):
     if self in done:
       return '...'
@@ -454,6 +457,9 @@ class FrozenSetObject(BuiltinSequenceObject):
       return self.retobj
 
   #
+  def __repr__(self):
+    return '([%r])' % self.elemall
+  
   def desctxt(self, done):
     if self in done:
       return '...'
@@ -673,7 +679,7 @@ class ReversedType(BuiltinCallable, IterType):
 class GeneratorSlot(CompoundTypeNode):
   
   def __init__(self, value):
-    self.sent = CompoundTypeNode()
+    self.received = CompoundTypeNode()
     CompoundTypeNode.__init__(self, [value])
     return
 
@@ -693,12 +699,13 @@ class GeneratorObject(IterObject):
 
   # GeneratorObject
   def __init__(self, typeobj, elemall=None, elements=None):
+    IterObject.__init__(self, typeobj, elemall=elemall)
     self.sent = CompoundTypeNode()
     if elements:
       for obj in elements:
         if isinstance(obj, GeneratorSlot):
-          self.sent.connect(obj.sent.recv)
-    IterObject.__init__(self, typeobj, elemall=elemall)
+          self.sent.connect(obj.received.recv)
+        obj.connect(self.elemall.recv)
     return
 
   def create_attr(self, frame, anchor, name):
@@ -880,7 +887,7 @@ class DictObject(BuiltinAggregateObject):
     return
   
   def __repr__(self):
-    return '{%s: %s}' % (self.key, self.value)
+    return '{%r: %r}' % (self.key, self.value)
 
   def desctxt(self, done):
     if self in done:
