@@ -240,7 +240,7 @@ def build_expr(reporter, frame, space, tree, evals):
     value = build_expr(reporter, frame, space, tree.value, evals)
     slot = GeneratorType.create_slot(value)
     evals.append(('y', slot))
-    expr = slot.sent
+    expr = slot.received
 
   # ifexp
   elif isinstance(tree, ast.IfExp):

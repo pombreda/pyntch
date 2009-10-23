@@ -45,7 +45,7 @@ class FuncType(BuiltinType, TreeReporter):
       returns = [ obj for (t,obj) in evals if t == 'r' ]
       yields = [ obj for (t,obj) in evals if t == 'y' ]
       if yields:
-        retvals = [ GeneratorType.create_generator(CompoundTypeNode(yields)) ]
+        retvals = [ GeneratorType.create_generator(yields) ]
       else:
         retvals = returns
       for obj in retvals:

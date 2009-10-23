@@ -18,7 +18,7 @@ def dumpobj(e):
   elif e.tag == 'dict':
     return '{%s: %s}' % (dumpobj(e[0]), dumpobj(e[1]))
   elif e.tag == 'iter':
-    return '(%s ...)' % dumpobj(e[0])
+    return '(%s, ...)' % dumpobj(e[0])
   elif e.tag == 'tuple':
     if e.get('len'):
       return '(%s)' % ','.join( dumpobj(c) for c in e.getchildren() )
