@@ -460,6 +460,10 @@ class SequenceTypeChecker(CompoundTypeNode):
     self.elemchecker = TypeChecker(parent_frame, types, blame+' element')
     return
   
+  def __repr__(self):
+    return ('<SequenceTypeChecker: %s: %s>' % 
+            (','.join(map(repr, self.types)), self.elemchecker))
+
   def recv(self, src):
     from pyntch.expression import IterElement
     for obj in src:
@@ -481,6 +485,10 @@ class KeyValueTypeChecker(CompoundTypeNode):
     self.valuechecker = TypeChecker(parent_frame, values, blame+' dict value')
     return
     
+  def __repr__(self):
+    return ('<KeyValueTypeChecker: %s: %s:%s>' % 
+            (','.join(map(repr, self.types)), self.keychecker, self.valuechecker))
+
   def recv(self, src):
     from pyntch.config import ErrorConfig
     from pyntch.aggregate_types import DictObject
