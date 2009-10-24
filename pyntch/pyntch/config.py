@@ -68,22 +68,22 @@ class ErrorConfig(object):
   @classmethod
   def NotCallable(klass, obj):
     if klass.is_ignored(obj): return None
-    return TypeErrorType.occur('not callable: %r' % obj)
+    return TypeErrorType.occur('not callable: %s' % obj)
   
   @classmethod
   def NotIterable(klass, obj):
     if klass.is_ignored(obj): return None
-    return TypeErrorType.occur('not iterable: %r' % obj)
+    return TypeErrorType.occur('not iterable: %s' % obj)
   
   @classmethod
   def NotSubscriptable(klass, obj):
     if klass.is_ignored(obj): return None
-    return TypeErrorType.occur('not subscriptable: %r' % obj)
+    return TypeErrorType.occur('not subscriptable: %s' % obj)
   
   @classmethod
   def NotAssignable(klass, obj):
     if klass.is_ignored(obj): return None
-    return TypeErrorType.occur('cannot assign item: %r' % obj)
+    return TypeErrorType.occur('cannot assign item: %s' % obj)
   
   @classmethod
   def NoLength(klass, obj):
@@ -93,17 +93,17 @@ class ErrorConfig(object):
   @classmethod
   def AttributeNotFound(klass, obj, attrname):
     if klass.is_ignored(obj): return None
-    return AttributeErrorType.occur('attribute not found: %r.%s' % (obj, attrname))
+    return AttributeErrorType.occur('attribute not found: %s.%s' % (obj, attrname))
   
   @classmethod
   def AttributeNotAssignable(klass, obj, attrname):
     if klass.is_ignored(obj): return None
-    return AttributeErrorType.occur('attribute cannot be assigned: %r.%s' % (obj, attrname))
+    return AttributeErrorType.occur('attribute cannot be assigned: %s.%s' % (obj, attrname))
   
   @classmethod
   def NotUnpackable(klass, obj):
     if klass.is_ignored(obj): return None
-    return ValueErrorType.occur('tuple cannot be unpacked: %r' % obj)
+    return ValueErrorType.occur('tuple cannot be unpacked: %s' % obj)
   
   @classmethod
   def NotSupportedOperand(klass, op, left, right=None):

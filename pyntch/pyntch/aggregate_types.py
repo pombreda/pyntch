@@ -217,6 +217,8 @@ class ListObject(BuiltinSequenceObject):
   # ListObject
   def __repr__(self):
     return '[%r]' % self.elemall
+  def __str__(self):
+    return self.desctxt({})
 
   def desctxt(self, done):
     if self in done:
@@ -323,6 +325,8 @@ class TupleObject(BuiltinSequenceObject):
       return '(*%r)' % self.elemall
     else:
       return '(%s)' % ','.join( repr(obj) for obj in self.elements )
+  def __str__(self):
+    return self.desctxt({})
 
   def desctxt(self, done):
     if self in done:
@@ -459,6 +463,8 @@ class FrozenSetObject(BuiltinSequenceObject):
   #
   def __repr__(self):
     return '([%r])' % self.elemall
+  def __str__(self):
+    return self.desctxt({})
   
   def desctxt(self, done):
     if self in done:
@@ -589,7 +595,9 @@ class IterObject(BuiltinAggregateObject):
     return
   
   def __repr__(self):
-    return '(%s, ...)' % self.elemall
+    return '(%r, ...)' % self.elemall
+  def __str__(self):
+    return self.desctxt({})
 
   def desctxt(self, done):
     if self in done:
@@ -888,6 +896,8 @@ class DictObject(BuiltinAggregateObject):
   
   def __repr__(self):
     return '{%r: %r}' % (self.key, self.value)
+  def __str__(self):
+    return self.desctxt({})
 
   def desctxt(self, done):
     if self in done:
