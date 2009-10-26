@@ -151,6 +151,7 @@ class CompoundTypeNode(TypeNode):
     return
   
   def update_type(self, obj):
+    assert not isinstance(obj, CompoundTypeNode)
     if obj in self.types: return
     #print 'add', id(self), id(obj), obj
     self.types.add(obj)
@@ -166,6 +167,7 @@ class CompoundTypeNode(TypeNode):
       return '|'.join( sorted(set( obj.desctxt(done) for obj in self )) )
     else:
       return '?'
+    
   def descxml(self, done):
     if self in done:
       e = Element('ref', id=str(done[self]))

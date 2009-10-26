@@ -88,7 +88,7 @@ class ErrorConfig(object):
   @classmethod
   def NoLength(klass, obj):
     if klass.is_ignored(obj): return None
-    return TypeErrorType.occur('length not defined' % obj)
+    return TypeErrorType.occur('length not defined: %s' % obj)
   
   @classmethod
   def AttributeNotFound(klass, obj, attrname):

@@ -21,7 +21,7 @@ Static code analyzer for Python
 
 <div align=right class=lastmod>
 <!-- hhmts start -->
-Last Modified: Thu Oct 22 08:01:29 JST 2009
+Last Modified: Sun Oct 25 11:47:59 JST 2009
 <!-- hhmts end -->
 </div>
 
@@ -42,15 +42,15 @@ mismatch, attribute not found, or other types of exceptions raised
 from each function. Unlike other Python code checkers (such as
 Pychecker or Pyflakes), Pyntch does not address style issues.
 Pyntch normally runs pretty fast. It can perform checking for
-several thousands of lines of code within a minute.
+tens of thousands of lines of code within a minute.
 <p>
 <strong>Note:</strong>
 Pyntch currently supports Python 2.x only.
 <p>
-Pyntch can gather the following information by scanning source code:
+The following information can be gathered by static checking:
 <ul>
 <li> Possible types of objects that each variable,
-function argument or class attribte might have.
+function argument or class attribte might potentially have.
 <li> Functions or instance methods that can be actually called at each
 function call (considering polymorphism).
 <li> Calling locations for each function or method.
@@ -265,7 +265,7 @@ The analysis took 0.38 seconds.
 by attempting to add an integer and string.
 <li> <span class=note>[G]</span>: Attribute reference <code>fp.fclose</code> fails for any type of objects that
 <code>fp</code> could have contained.
-<li> <span class=note>[H]</span>: A file object does not have <code>fclose</code> attribute. (It should have been <code>close</code>.)
+<li> <span class=note>[H]</span>: A file object does not have <code>fclose</code> attribute. (It should have been <code>close</code> instead.)
 </ul>
 
 <h3>Annotation Mode</h3>
