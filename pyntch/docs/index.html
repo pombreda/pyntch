@@ -21,9 +21,32 @@ Static code analyzer for Python
 
 <div align=right class=lastmod>
 <!-- hhmts start -->
-Last Modified: Sun Oct 25 11:47:59 JST 2009
+Last Modified: Thu Oct 29 00:27:38 JST 2009
 <!-- hhmts end -->
 </div>
+
+<p>
+<strong>Table of Contents:</strong>
+<ul>
+<li> <a href="#intro">What's It?</a>
+<li> <a href="#source">Download</a>
+<li> <a href="#background">Background</a>
+<li> <a href="#install">Install</a> 
+<li> <a href="#usage">How to Use</a>
+<ul>
+<li> <a href="#summary">Summary Mode</a> 
+<li> <a href="#annot">Annotation Mode</a> 
+<li> <a href="#modpath">Adding a Module Path</a> 
+<li> <a href="#stub">Creating a Stub Module</a> 
+<li> <a href="#constraint">Putting Extra Constraints</a> 
+</ul>
+<li> <a href="#limitations">Limitations</a>
+<li> <a href="#howitworks">How It Works</a>
+<li> <a href="#todos">TODOs</a>
+<li> <a href="#changes">Changes</a>
+<li> <a href="#related">Related Projects</a>
+<li> <a href="#license">Terms and Conditions</a>
+</ul>
 
 <a name="intro"></a>
 <hr noshade>
@@ -69,7 +92,7 @@ function call (considering polymorphism).
 </ul>
 
 <a name="sample"></a>
-<h3>Sample output:</h3>
+<h3>Sample Output:</h3>
 <p>
 (Original code)
 <blockquote><pre>
@@ -119,8 +142,8 @@ countchars(sys.argv[1])
 <a name="source"></a>
 <p>
 <strong>Download:</strong><br>
-<a href="http://www.unixuser.org/~euske/python/pyntch/pyntch-dist-20091018.tar.gz">
-http://www.unixuser.org/~euske/python/pyntch/pyntch-dist-20091018.tar.gz
+<a href="http://www.unixuser.org/~euske/python/pyntch/pyntch-20091028.tar.gz">
+http://www.unixuser.org/~euske/python/pyntch/pyntch-20091028.tar.gz
 </a>
 (62KBytes)
 
@@ -183,7 +206,7 @@ which need to be further examined by human programmers.
 
 <a name="install"></a>
 <hr noshade>
-<h2>How to Install</h2>
+<h2>Install</h2>
 
 <ol>
 <li> Install <a href="http://www.python.org/download/">Python</a> 2.4 or newer.
@@ -197,11 +220,12 @@ which need to be further examined by human programmers.
 </ol>
 
 
-<a name="howtouse"></a>
+<a name="usage"></a>
 <hr noshade>
 <h2>How to Use</h2>
 <p>
-Pyntch comes in two different running modes:
+The main checking program is <a href="#tchecker.py"><code>tchecker.py</code></a>.
+It comes in two different running modes:
 summary mode and annotation mode.
 <p>
 In summary mode, Pyntch only shows the types of each variable and
@@ -210,6 +234,7 @@ there're two stages. First, the analyzer program produces an XML
 file that contains all information about a source code. Then
 another program uses that information to annotate the source texts.
 
+<a name="summary"></a>
 <h3>Summary Mode</h3>
 <p>
 The basic use of summary mode is pretty simple and straightforward.
@@ -268,6 +293,7 @@ by attempting to add an integer and string.
 <li> <span class=note>[H]</span>: A file object does not have <code>fclose</code> attribute. (It should have been <code>close</code> instead.)
 </ul>
 
+<a name="annot"></a>
 <h3>Annotation Mode</h3>
 <p>
 In annotation mode, first you need to run the analyzer program to
@@ -336,8 +362,94 @@ def countchars(directory):
 countchars(sys.argv[1])
 </pre></blockquote>
 
+<a name="tchecker.py"></a>
+<h3>tchecker.py</h3>
+<p>
+<code>tchecker.py</code> is the main checking tool.
+It scans Python source codes and shows the result of analysis.
+The output can be later used for annotation purposes.
 
-<h3>Adding a module path</h3>
+<h4>Syntax:</h4>
+<blockquote>
+<code>tchecker.py [<em><u>options</u></em>] <em><u>file.py</u></em> ...</code>
+</blockquote>
+
+<h4>Options:</h4>
+<dl>
+
+<dt> <code>-a</code>
+<dd> Shows the result of all modules that are imported,
+instead of the ones specified in the command line arguments.
+
+<dt> <code>-c <u>config_file</u></code>
+<dd> Specifies a configuration file. A configuration file is a Python 
+script that defines parameters for <code>ErrorConfig</code> settings.
+
+<dt> <code>-C <u><em>key</em>=<em>value</em></u></code>
+<dd> Specifies a configuration parameter (described below).
+
+<dt> <code>-d</code>
+<dd> Increases the debug level.
+
+<dt> <code>-D</code>
+<dd> Ignore all the default Python module paths.
+
+<dt> <code>-f <u><em>type</em></u></code>
+<dd> Specifies the output format. 
+Currently <code>txt</code> (summary mode) or 
+<code>xml</code> (annotation mode) is supported.
+
+<dt> <code>-o <u><em>filename</em></u></code>
+<dd> Specifies an output file name.
+When it ends with ".xml" it automatically assumes the output format is XML.
+
+<dt> <code>-p <u<em>>python_path</em></u></code>
+<dd> Adds a search path for Python modules. Multiple <code>-p</code> options are allowed.
+
+<dt> <code>-P <u><em>stub_path</em></u></code>
+<dd> Adds a stub path for Python modules. Stub files in these directories
+are always used instead of a real Python module.
+Multiple <code>-P</code> options are allowed.
+
+<dt> <code>-q</code>
+<dd> Quiet mode. Suppresses to show the progress.
+
+</dl>
+
+<a name="annot.py"></a>
+<h3>annot.py</h3>
+<p>
+<code>annot.py</code> is an annotation tool.
+It takes an XML output of <code>tchecker.py</code> and combines it 
+with the source codes to produce annotated output.
+A source file can be specified either by an actual pathname or
+by a Python module name (as used with a "<code>import</code>" statement).
+When a pathname is used, the pathname string must be exactly the one 
+contained in the "<code>src</code>" attribute in an XML output.
+
+<h4>Syntax:</h4>
+<blockquote>
+<code>annot.py [<em><u>options</u></em>] <em><u>output_xml</u></em> <em><u>file.py</u></em> ...</code>
+</blockquote>
+or
+<blockquote>
+<code>annot.py [<em><u>options</u></em>] <em><u>output_xml</u></em> <em><u>module_name</u></em> ...</code>
+</blockquote>
+
+<h4>Options:</h4>
+<dl>
+<dt> <code>-p <u><em>basepath</em></u></code>
+<dd> Specifies the base pathname of source files which is to be
+prepended to relative pathnames contained in the output_xml file.
+
+<dt> <code>-d</code>
+<dd> Increases the debug level.
+
+</dl>
+
+
+<a name="modpath"></a>
+<h3>Adding a Module Path</h3>
 <p>
 Pyntch can take module names instead of actual file names as input.
 Pyntch searches the Python search path that is specified by <code>PYTHONPATH</code>
@@ -348,7 +460,8 @@ the module search path:
 $ <strong>tchecker.py -p /path/to/your/modules mypackage.mymodule</strong>
 </pre></blockquote>
 
-<h3>Creating a stub module</h3>
+<a name="stub"></a>
+<h3>Creating a Stub Module</h3>
 <p>
 Due to the nature of source level analysis, Pyntch cannot analyze
 a program that uses external modules, in which the behavior of
@@ -383,6 +496,7 @@ Pyntch cannot correctly analyze a built-in function that returns
 different types of values depending on its parameters
 (notably <code>struct.unpack</code>).
 
+<a name="constraint"></a>
 <h3>Putting Extra Constraints</h3>
 <p>
 It is possible to inform Pyntch that a certain variable can only have
@@ -409,6 +523,7 @@ $ <strong>tchecker.py assert1.py</strong>
     raises TypeError: @x (&lt;str&gt;) must be int|float at assert1:2
 </pre></blockquote>
 
+<a name="warning"></a>
 <h3>Controlling warnings</h3>
 <p>
 Since Pyntch can produce a lot of information about a code, a user
@@ -416,43 +531,12 @@ might be overwhelmed by the amount or complexity of its
 result. Pyntch offers a couple of ways for controlling the
 outputs in order to provide the desired information.
 
-<h4>Command line options:</h4>
-<dl>
-<dt> <code>-o <u>filename</u></code>
-<dd> Specify an output file name.
-When it ends with ".xml" it automatically assumes the output format is XML.
-
-<dt> <code>-f <u>type</u></code>
-<dd> Specify the output format. 
-Currently <code>txt</code> or <code>xml</code> is supported.
-
-<dt> <code>-p <u>python_path</u></code>
-<dd> Add a search path for Python modules. Multiple <code>-p</code> options are allowed.
-
-<dt> <code>-P <u>stub_path</u></code>
-<dd> Add a stub path for Python modules. Stub files in these directories
-are always used instead of a real Python module.
-Multiple <code>-P</code> options are allowed.
-
-<dt> <code>-a</code>
-<dd> Show the result of all modules that are imported,
-instead of the ones specified in the command line arguments.
-
-<dt> <code>-c <u>config_file</u></code>
-<dd> Specify a configuration file. A configuration file is a Python 
-script that defines parameters for <code>ErrorConfig</code> settings.
-
-<dt> <code>-C <u>key</u>=<u>value</u></code>
-<dd> Specify a configuration parameter (described below).
-
-</dl>
-
 <h4>Configuration parameters:</h4>
 <p>
 These are defined in <code>ErrorConfig</code> class (config.py).
 <dl>
 <dt> <code>raise_uncertain</code> <em>(boolean)</em>
-<dd> Include uncertain runtime exceptions (such as file error).
+<dd> Include exceptions that might occur at runtime (such as IndexError or IOError).
 
 <dt> <code>ignore_none</code> <em>(boolean)</em>
 <dd> Supress warnings for operations against a None object.
@@ -570,10 +654,23 @@ Fig 2. Handling function call
 (todo)
 
 
+<a name="todos"></a>
+<hr noshade>
+<h2>TODOs</h2>
+<ul>
+<li> Better representation of aggregate types (too many "..."s).
+<li> Basic execution path analysis.
+<li> Cross referencing variables/attributes.
+<li> Support special function checking (e.g. pack, unpack, array).
+<li> Add more test cases and stub modules.
+<li> Finer control of errors/warnings: ignore exceptions raised in certain class/functions.
+</ul>
+
 <a name="changes"></a>
 <hr noshade>
 <h2>Changes</h2>
 <ul>
+<li> 2009/10/28: Another batch of bugfixes.
 <li> 2009/10/18: Source code annotation support.
 <li> 2009/09/27: Another bugfixes.
 <li> 2009/09/06: More bugfixes.
@@ -589,8 +686,8 @@ Fig 2. Handling function call
 <h2>Related Projects</h2>
 <ul>
 <li> <a href="http://pychecker.sourceforge.net/">PyChecker: a python source code checking tool</a>
+<li> <a href="http://www.logilab.org/project/pylint">pylint (analyzes Python source code looking for bugs and signs of poor quality)</title>
 <li> <a href="http://divmod.org/trac/wiki/DivmodPyflakes">Pyflakes</a>
-<li> <a href="http://www.logilab.org/project/pylint">pylint</a>
 </ul>
 
 
