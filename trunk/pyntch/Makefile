@@ -1,16 +1,15 @@
 # Makefile for pyntch
 
 PACKAGE=pyntch
-
-SVN=svn
-GNUTAR=tar
-PYTHON=python
-TMPDIR=/tmp
-VERSION=`$(PYTHON) $(PACKAGE)/__init__.py`
-DISTNAME=$(PACKAGE)-dist-$(VERSION)
-DISTFILE=$(DISTNAME).tar.gz
 PREFIX=/usr/local
 
+SVN=svn
+RM=rm -f
+CP=cp -f
+PYTHON=python
+
+VERSION=`$(PYTHON) $(PACKAGE)/__init__.py`
+DISTFILE=$(PACKAGE)-$(VERSION).tar.gz
 TCHECKER=tools/tchecker.py
 
 all:
@@ -18,28 +17,28 @@ all:
 install:
 	$(PYTHON) setup.py install --prefix=$(PREFIX)
 
-selfcheck:
-	PYTHONPATH=. $(PYTHON) $(TCHECKER) -t xml $(TCHECKER) > selfcheck.xml
-
 clean:
-	-rm -rf build selfcheck.xml
+	-$(PYTHON) setup.py clean
+	-$(RM) -r build dist selfcheck.xml
 	-cd $(PACKAGE) && $(MAKE) clean
 	-cd tools && $(MAKE) clean
+
+commit: clean
+	$(SVN) commit
 
 check:
 	cd test && $(MAKE) check
 
-# Maintainance:
-commit: clean
-	$(SVN) commit
+selfcheck:
+	PYTHONPATH=. $(PYTHON) $(TCHECKER) -t xml $(TCHECKER) > selfcheck.xml
 
-dist: clean
-	$(SVN) cleanup
-	$(SVN) export . $(TMPDIR)/$(DISTNAME)
-	$(GNUTAR) c -z -C$(TMPDIR) -f $(TMPDIR)/$(DISTFILE) $(DISTNAME) --dereference --numeric-owner
-	-rm -rf $(TMPDIR)/$(DISTNAME)
+sdist: clean
+	$(PYTHON) setup.py sdist
 
-WEBDIR=$$HOME/Site/unixuser.org/python/pyntch
-publish: dist
-	cp $(TMPDIR)/$(DISTFILE) $(WEBDIR)/
+register: clean
+	$(PYTHON) setup.py sdist upload register
+
+WEBDIR=$$HOME/Site/unixuser.org/python/$(PACKAGE)
+publish: sdist
+	cp dist/$(DISTFILE) $(WEBDIR)/
 	cp docs/index.html docs/*.png $(WEBDIR)/

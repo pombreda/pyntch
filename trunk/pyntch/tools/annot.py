@@ -78,10 +78,10 @@ def annot(fp, module):
 def main(argv):
   import getopt
   def usage():
-    print 'usage: %s [-d] [-b basedir] xml files ...' % argv[0]
+    print 'usage: %s [-d] [-p basedir] xml files ...' % argv[0]
     return 100
   try:
-    (opts, args) = getopt.getopt(argv[1:], 'db:')
+    (opts, args) = getopt.getopt(argv[1:], 'dp:')
   except getopt.GetoptError:
     return usage()
   if not args:
@@ -90,7 +90,7 @@ def main(argv):
   basedir = '.'
   for (k, v) in opts:
     if k == '-d': debug += 1
-    elif k == '-b': basedir = v
+    elif k == '-p': basedir = v
   modules = {}
   root = ElementTree().parse(args.pop(0))
   for module in root.getchildren():
