@@ -55,6 +55,8 @@ class ExceptionType(ClassType):
     return expt
   maybe = occur
 
+class KeyboardInterruptType(ExceptionType):
+  TYPE_NAME = 'KeyboardInterrupt'
 class StopIterationType(ExceptionType):
   TYPE_NAME = 'StopIteration'
 class StandardErrorType(ExceptionType):

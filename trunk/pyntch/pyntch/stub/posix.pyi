@@ -165,13 +165,13 @@ def dup2(fd1,fd2):
   assert isinstance(fd2, int)
   return
 
-def _execv(path, args):
+def execv(path, args):
   assert isinstance(path, str)
   for arg in args:
     assert isinstance(arg, str)
   return
 
-def _execve(path, args, env):
+def execve(path, args, env):
   assert isinstance(path, str)
   for arg in args:
     assert isinstance(arg, str)
@@ -194,8 +194,7 @@ def fdopen(fd, mode='', bufsize=0):
   assert isinstance(bufsize, int)
   return file('')
 
-def fork(pid):
-  assert isinstance(pid, int)
+def fork():
   return 0
 
 def forkpty(pid, fd):
@@ -249,7 +248,8 @@ def getloadavg():
 def getlogin():
   return ''
 
-def getpgid():
+def getpgid(pid):
+  assert isinstance(pid, int)
   return 0
 
 def getpgrp():

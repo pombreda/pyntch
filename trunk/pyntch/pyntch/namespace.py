@@ -440,6 +440,7 @@ class BuiltinExceptionsNamespace(Namespace):
     Namespace.__init__(self, parent, 'exceptions')
     # exceptions
     self.register_var('Exception').bind(exception.ExceptionType.get_typeobj())
+    self.register_var('KeyboardInterrupt').bind(exception.KeyboardInterruptType.get_typeobj())
     self.register_var('StopIteration').bind(exception.StopIterationType.get_typeobj())
     self.register_var('StandardError').bind(exception.StandardErrorType.get_typeobj())
     self.register_var('ArithmeticError').bind(exception.ArithmeticErrorType.get_typeobj())

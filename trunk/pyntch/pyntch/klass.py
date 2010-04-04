@@ -177,17 +177,16 @@ class ClassType(BuiltinType, TreeReporter):
 ##
 class PythonClassType(ClassType, TreeReporter):
   
-  def __init__(self, parent_reporter, parent_frame, parent_space, anchor, name, bases, code, evals, tree):
+  def __init__(self, parent_reporter, parent_frame, parent_space, anchor, name, bases, evals, tree):
     from pyntch.syntax import build_stmt
     self.anchor = anchor
     self.loc = (tree._module, tree.lineno)
-    self.code = code
     self.space = Namespace(parent_space, name)
     TreeReporter.__init__(self, parent_reporter)
     ClassType.__init__(self, name, bases)
-    if code:
-      self.space.register_names(code)
-      build_stmt(self, parent_frame, self.space, code, evals, parent_space=parent_space)
+    if tree.code:
+      self.space.register_names(tree.code)
+      build_stmt(self, parent_frame, self.space, tree.code, evals, parent_space=parent_space)
     for (name,var) in self.space:
       # Do not consider the values of attributes inherited from the base class
       # if they are explicitly overriden.
@@ -225,10 +224,8 @@ class PythonClassType(ClassType, TreeReporter):
     return
 
   def showxml(self, out):
-    from pyntch.syntax import getlineno
     (module,lineno) = self.loc
-    out.start_xmltag('class', name=self.name,
-                     loc='%s:%s:%s' % (module.get_name(), lineno, getlineno(self.code)))
+    out.start_xmltag('class', name=self.name)
     for frame in self.frames:
       (module,lineno) = frame.getloc()
       out.show_xmltag('caller',

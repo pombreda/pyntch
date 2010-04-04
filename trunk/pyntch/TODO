@@ -1,7 +1,8 @@
 TODO:
 
+- socket module
 - better representation of aggregate types (too many "..."s).
-- basic execution path analysis.
+- basic execution path analysis. (ignore overriden values)
 - cross referencing variables/attributes.
 - support special function checking (e.g. pack, unpack, array).
 - add more test cases and stub modules.

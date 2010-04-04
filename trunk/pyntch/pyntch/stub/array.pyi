@@ -9,6 +9,9 @@ class ArrayType(object):
       self.seq.append(x)
     return
 
+  def __len__(self):
+    return 0
+
   def append(self, x):
     self.seq.append(x)
     return

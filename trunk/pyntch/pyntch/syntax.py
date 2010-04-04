@@ -12,14 +12,6 @@ from pyntch.expression import ExpressionNode, AttrRef, SubRef, SliceRef, \
      IterElement, TupleUnpack
 
 
-def getlineno(node):
-  if node.lineno: return node.lineno
-  for c in node.getChildNodes():
-    x = getlineno(c)
-    if x: return x
-  return None
-
-
 ##  SliceObject
 ##
 class SliceObject(ExpressionNode):
@@ -210,7 +202,7 @@ def build_expr(reporter, frame, space, tree, evals):
   elif isinstance(tree, ast.Lambda):
     defaults = [ build_expr(reporter, frame, space, value, evals) for value in tree.defaults ]
     expr = LambdaFuncType(reporter, frame, space, tree, tree.argnames,
-                          defaults, tree.varargs, tree.kwargs, tree.code, tree)
+                          defaults, tree.varargs, tree.kwargs, tree)
 
   # list comprehension
   elif isinstance(tree, ast.ListComp):
@@ -285,7 +277,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False, parent_spac
     defaults = [ build_expr(reporter, frame, space, value, evals) for value in tree.defaults ]
     parent_space = parent_space or space # class definition
     func = FuncType(reporter, frame, parent_space, tree, name, tree.argnames,
-                    defaults, tree.varargs, tree.kwargs, tree.code, tree)
+                    defaults, tree.varargs, tree.kwargs, tree)
     if tree.decorators:
       for node in tree.decorators:
         decor = build_expr(reporter, frame, space, node, evals)
@@ -296,7 +288,7 @@ def build_stmt(reporter, frame, space, tree, evals, isfuncdef=False, parent_spac
   elif isinstance(tree, ast.Class):
     name = tree.name
     bases = [ build_expr(reporter, frame, space, base, evals) for base in tree.bases ]
-    klass = PythonClassType(reporter, frame, space, tree, name, bases, tree.code, evals, tree)
+    klass = PythonClassType(reporter, frame, space, tree, name, bases, evals, tree)
     space[name].bind(klass)
 
   # assign

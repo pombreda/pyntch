@@ -53,7 +53,7 @@ class FuncType(BuiltinType, TreeReporter):
       return
 
   def __init__(self, parent_reporter, parent_frame, parent_space, anchor,
-               name, argnames, defaults, variargs, kwargs, code, tree):
+               name, argnames, defaults, variargs, kwargs, tree):
     TreeReporter.__init__(self, parent_reporter)
     def maprec(func, x):
       if isinstance(x, tuple):
@@ -61,7 +61,6 @@ class FuncType(BuiltinType, TreeReporter):
       else:
         return func(x)
     self.name = name
-    self.code = code
     # prepare local variables that hold passed arguments.
     self.space = Namespace(parent_space, name)
     self.frame = ExecutionFrame(None, tree)
@@ -81,9 +80,9 @@ class FuncType(BuiltinType, TreeReporter):
     self.argnames = tuple(argnames)
     maprec(lambda argname: self.space.register_var(argname), self.argnames)
     # build the function body.
-    self.space.register_names(code)
+    self.space.register_names(tree.code)
     self.body = self.FuncBody(name)
-    self.body.set_retval(self.build_evals(code))
+    self.body.set_retval(self.build_evals(tree.code))
     self.argvars = maprec(lambda argname: self.space[argname], self.argnames)
     # assign the default values.
     self.defaults = tuple(defaults)
@@ -195,10 +194,8 @@ class FuncType(BuiltinType, TreeReporter):
     return
 
   def showxml(self, out):
-    from pyntch.syntax import getlineno
     (module,lineno) = self.frame.getloc()
-    out.start_xmltag('function', name=self.name,
-                     loc='%s:%s:%s' % (module.get_name(), lineno, getlineno(self.code)))
+    out.start_xmltag('function', name=self.name)
     for frame in self.frames:
       (module,lineno) = frame.getloc()
       out.show_xmltag('caller', loc='%s:%s' % (module.get_name(), lineno))
@@ -237,10 +234,10 @@ class ClassMethodType(FuncType): pass
 class LambdaFuncType(FuncType):
   
   def __init__(self, parent_reporter, parent_frame, parent_space, anchor,
-               argnames, defaults, variargs, kwargs, code, tree):
-    name = '__lambda_%x' % id(code)
+               argnames, defaults, variargs, kwargs, tree):
+    name = '__lambda_%x' % id(tree)
     FuncType.__init__(self, parent_reporter, parent_frame, parent_space, anchor,
-                      name, argnames, defaults, variargs, kwargs, code, tree)
+                      name, argnames, defaults, variargs, kwargs, tree)
     return
 
   def build_evals(self, code):
