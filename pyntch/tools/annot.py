@@ -46,7 +46,6 @@ def annot(fp, module):
     lines[n].append(x)
     return
   def rec(e):
-    (_,n) = getlineno(e.get('loc', ':1'))
     for c in e.getchildren():
       if c.tag in ('module', 'class', 'function'):
         rec(c)
@@ -61,8 +60,8 @@ def annot(fp, module):
       elif c.tag == 'raise':
         (i,_) = getlineno(c.get('loc'))
         add(i, '# raise %s' % c.get('msg'))
-      elif c.tag == 'called':
-        add(n, '# called: %s' % c.get('loc'))
+      elif c.tag == 'caller':
+        add(n, '# caller: %s' % c.get('loc'))
     return
   rec(module)
   for (i,line) in enumerate(fp):

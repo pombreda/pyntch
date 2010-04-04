@@ -44,7 +44,7 @@ class TypeNode(object):
   def run(klass):
     while klass.procs:
       if klass.verbose:
-        print >>sys.stderr, 'processing:', klass.nodes, len(klass.procs)
+        print >>sys.stderr, 'processing: %d nodes (%d left)' % (klass.nodes, len(klass.procs))
       (procs, klass.procs) = (klass.procs, set())
       for (proc,obj) in procs:
         proc(obj)
@@ -232,9 +232,12 @@ class UndefinedTypeNode(TypeNode):
 class BuiltinObject(SimpleTypeNode):
 
   def get_attr(self, frame, anchor, name, write=False):
+    from pyntch.basic_types import StrType
     if name == '__class__':
       if write: raise NodeAssignError(name)
       return self.get_type()
+    elif name == '__doc__':
+      return StrType.get_object()
     return self.get_type().get_attr(frame, anchor, name, write=write)
   
   def is_type(self, *typeobjs):

@@ -48,9 +48,6 @@ def main(argv):
     elif k == '-t': format = v
   if defaultpath:
     modpath.extend(sys.path)
-  outfp = sys.stdout
-  if output:
-    outfp = file(output, 'w')
   TypeNode.debug = debug
   TypeNode.verbose = verbose
   Interpreter.debug = debug
@@ -83,6 +80,9 @@ def main(argv):
   if verbose:
     print >>sys.stderr, ('total files=%d, lines=%d in %.2fsec' %
                          (Interpreter.files, Interpreter.lines, time.time()-t))
+  outfp = sys.stdout
+  if output:
+    outfp = file(output, 'w')
   strm = IndentedStream(outfp)
   if format == 'xml': strm.write('<output>')
   for module in modules:

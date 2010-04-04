@@ -21,7 +21,7 @@ Static code analyzer for Python
 
 <div align=right class=lastmod>
 <!-- hhmts start -->
-Last Modified: Thu Oct 29 00:27:38 JST 2009
+Last Modified: Sun Nov  1 18:27:50 JST 2009
 <!-- hhmts end -->
 </div>
 
@@ -48,15 +48,36 @@ Last Modified: Thu Oct 29 00:27:38 JST 2009
 <li> <a href="#license">Terms and Conditions</a>
 </ul>
 
+<a name="source"></a>
+<p>
+<strong>Download:</strong><br>
+<a href="http://www.unixuser.org/~euske/python/pyntch/pyntch-20091028.tar.gz">
+http://www.unixuser.org/~euske/python/pyntch/pyntch-20091028.tar.gz
+</a>
+(50KBytes)
+
+<p>
+<strong>Discussion:</strong> (for questions and comments, post here)<br>
+<a href="http://groups.google.com/group/pyntch-users/">
+http://groups.google.com/group/pyntch-users/
+</a>
+
+<P>
+<strong>View the source:</strong><br>
+<a href="http://code.google.com/p/pyntch/source/browse/trunk/pyntch">
+http://code.google.com/p/pyntch/source/browse/trunk/pyntch
+</a>
+
+
 <a name="intro"></a>
 <hr noshade>
 <h2>What's It?</h2>
 <p>
 Pyntch (pron. "<em>pinch</em>", originally means PYthoN Type CHecker) is a
 static code analyzer for Python programming language.  It detects
-possible runtime errors before actually running a code.  If you have been 
-constantly bothered by a TypeError or AttributeError caused by giving a wrong type of
-objects, Pyntch is a tool for you.  Pyntch examines a source
+possible runtime errors before actually running a code.  If you are
+worried about potential runtime errors in a Python program,
+Pyntch is a tool for you.  Pyntch examines a source
 code and infers all possible types of variables, attributes,
 function arguments, and return values of each function or
 method (take a look at a <a href="#sample">sample output</a> below). 
@@ -138,26 +159,6 @@ def countchars(directory):
 
 countchars(sys.argv[1])
 </pre></blockquote>
-
-<a name="source"></a>
-<p>
-<strong>Download:</strong><br>
-<a href="http://www.unixuser.org/~euske/python/pyntch/pyntch-20091028.tar.gz">
-http://www.unixuser.org/~euske/python/pyntch/pyntch-20091028.tar.gz
-</a>
-(62KBytes)
-
-<p>
-<strong>Discussion:</strong> (for questions and comments, post here)<br>
-<a href="http://groups.google.com/group/pyntch-users/">
-http://groups.google.com/group/pyntch-users/
-</a>
-
-<P>
-<strong>View the source:</strong><br>
-<a href="http://code.google.com/p/pyntch/source/browse/trunk/pyntch">
-http://code.google.com/p/pyntch/source/browse/trunk/pyntch
-</a>
 
 
 <a name="background"></a>
@@ -491,11 +492,6 @@ They are normally placed in the Pyntch package directory
 (e.g. <code>/usr/local/lib/python2.5/site-packages</code>) and
 used by default instead of built-in Python modules.
 
-<p>
-Pyntch cannot correctly analyze a built-in function that returns
-different types of values depending on its parameters
-(notably <code>struct.unpack</code>).
-
 <a name="constraint"></a>
 <h3>Putting Extra Constraints</h3>
 <p>
@@ -588,19 +584,26 @@ the following conditions:
 <li> no metaclass programming.
 </ul>
 
+<p>
+Pyntch cannot correctly analyze a built-in function that returns
+different types of values depending on its parameters
+(notably <code>struct.unpack</code>).
+
+
 <a name="howitworks"></a>
 <hr noshade>
 <h2>How It Works</h2>
 <p>
-(This section is still way under construction.)
+(This section is still under construction.)
 <p>
 The basic mechanism of Pyntch is based on the idea of "typeflow
 analysis."  This is similar to dataflow analysis, which gives the
 maximal set of possible data that are stored at each location
-(either variable or continuation) in a program. First, it constructs
-a big connected graph that represents the entire Python program.
-Every expression or statement is converted to a "node", which is
-an abstraact place where certain type(s) of data is stored or
+(variables, attributes, arguments, and return values) in a
+program. First, it constructs a large connected graph that
+represents the entire dataflow of a Python program.  Every
+expression or statement is converted to a "node", which is an
+abstract place where certain type(s) of data is stored or
 passed. Then it tries to figure out what type of data goes from
 one node to another.
 <p>
@@ -610,9 +613,13 @@ A = 'xyz'
 B = 2
 C = a*b
 </pre></blockquote>
+<center>
+<img src="simple1.png"><br>
+Fig 1. Simple expression
+</center>
 <p>
 Given the above statements, Pyntch constructs a graph shown in
-Fig. 1. A square shaped node is a "leaf" node, which represents a
+Fig. 1. A square shaped node is a "simple" node, which represents a
 single type of Python object. A round shaped node is a "compound"
 node, which is a place that one or more types of objects can be
 potentially stored. Now, the data stored at the top two leaf
@@ -622,16 +629,18 @@ the arrow. Both objects are "mixed" at the plus sign node, which
 produces a string object (because in Python multiplying a string
 and an integer gives a repreated string).  Eventually, the object
 goes into variable c, which is the node at the bottom.
-This way, you can infer the possible type of each variable.
-
-<center>
-<img src="simple1.png"><br>
-Fig 1. Simple expression
-</center>
+This way, you can infer the possible type of each variable:
+<ul>
+<li> <strong>&lt;str&gt;</strong> &rarr; Node "A". Therefore, variable <code>A</code> has <code>&lt;str&gt;</code>.
+<li> <strong>&lt;int&gt;</strong> &rarr; Node "B". Therefore, variable <code>B</code> has <code>&lt;int&gt;</code>.
+<li> <strong>&lt;str&gt;</strong> &rarr; Node "Mul"
+because in Python, <code>&lt;str&gt;*&lt;int&gt;</code> yields <code>&lt;str&gt;</code>.
+<li> <strong>&lt;str&gt;</strong> &rarr; Node "C". Therefore, variable <code>C</code> has <code>&lt;str&gt;</code>.
+</ul>
 
 <h3>Handling Dynamicity</h3>
 <p>
-Now take an example that involves a function:
+Now take an example with functions:
 <blockquote><pre>
   def foo(x):
     return x+1
@@ -642,11 +651,21 @@ Now take an example that involves a function:
   f = bar
   z = f(2)
 </pre></blockquote>
+<p>
+In Python, defining a function is nothing more than assigning a
+function object to a variable. This means you cannot determine the
+effect of a function call by its name because an actual procedure
+that is being called can be changed. Therefore, you need to infer
+which function procedure is actually stored in a certain variable
+(with a certain name) when that name is used for a function call.
+Pyntch handles this situation by
 
 <center>
 <img src="simple2.png"><br>
 Fig 2. Handling function call
 </center>
+
+<h3>Handling Circular Dependency</h3>
 
 <h3>Preventing Combinatorial Explosion</h3>
 

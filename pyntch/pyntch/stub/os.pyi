@@ -34,9 +34,9 @@ def execle(file, *args):
   execve(file, args[:-1], args[-1])
   return
 execlp = execl
-execlpe = execlp
-execvp = _execvp
-execvpe = _execvpe
+execlpe = execle
+execvp = execv
+execvpe = execve
 
 def getenv(k):
   assert isinstance(k, str)
